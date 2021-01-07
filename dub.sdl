@@ -1,0 +1,14 @@
+name "concurrency"
+description "concurrency library"
+authors "skoppe"
+copyright "Copyright © 2021, skoppe"
+license "proprietary"
+dependency "concepts" version="~>0.0.8"
+dflags "-dip1000" "-dip25"
+configuration "unittest" {
+	dependency "unit-threaded" version=">=0.0.0"
+	targetType "executable"
+	mainSourceFile "tests/ut/ut_runner.d"
+	sourcePaths "source" "tests/ut"
+	importPaths "source" "tests/ut"
+}
