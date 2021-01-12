@@ -90,7 +90,7 @@ class LocalThreadExecutor : Executor {
   }
 }
 
-void executeInNewThread(VoidFunction fn) @trusted {
+void executeInNewThread(VoidFunction fn) @system {
   import kaleidic.experimental.concurrency.utils : closure;
   import core.thread : Thread, thread_detachThis;
   version (Posix) import core.sys.posix.pthread : pthread_detach, pthread_self;
@@ -102,7 +102,7 @@ void executeInNewThread(VoidFunction fn) @trusted {
       }, fn)).start();
 }
 
-void executeInNewThread(VoidDelegate fn) @trusted {
+void executeInNewThread(VoidDelegate fn) @system {
   import kaleidic.experimental.concurrency.utils : closure;
   import core.thread : Thread, thread_detachThis;
   version (Posix) import core.sys.posix.pthread : pthread_detach, pthread_self;
@@ -114,10 +114,10 @@ void executeInNewThread(VoidDelegate fn) @trusted {
 }
 
 class ThreadExecutor : Executor {
-  void execute(VoidFunction fn) @safe {
+  void execute(VoidFunction fn) @trusted {
     executeInNewThread(fn);
   }
-  void execute(VoidDelegate fn) @safe {
+  void execute(VoidDelegate fn) @trusted {
     executeInNewThread(fn);
   }
   bool isInContext() @safe { return false; }
@@ -181,7 +181,7 @@ struct ThreadSender {
   alias Value = void;
   private struct Op(Receiver) {
     private Receiver receiver;
-    void start() @safe {
+    void start() @trusted {
       import kaleidic.experimental.concurrency.utils : closure;
       import kaleidic.experimental.concurrency.receiver : setValueOrError;
       executeInNewThread(closure((Receiver receiver) shared @safe {
