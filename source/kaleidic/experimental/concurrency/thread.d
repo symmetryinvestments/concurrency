@@ -91,24 +91,26 @@ class LocalThreadExecutor : Executor {
 }
 
 void executeInNewThread(VoidFunction fn) @trusted {
+  import kaleidic.experimental.concurrency.utils : closure;
   import core.thread : Thread, thread_detachThis;
   version (Posix) import core.sys.posix.pthread : pthread_detach, pthread_self;
 
-  new Thread(() {
-    fn(); //thread_detachThis(); NOTE: see git.symmetry.dev/SIL/plugins/alpha/web/-/issues/3
-    version (Posix)
-      pthread_detach(pthread_self);
-  }).start();
+  new Thread(cast(void delegate())closure((VoidFunction fn) {
+        fn(); //thread_detachThis(); NOTE: see git.symmetry.dev/SIL/plugins/alpha/web/-/issues/3
+        version (Posix)
+          pthread_detach(pthread_self);
+      }, fn)).start();
 }
 
 void executeInNewThread(VoidDelegate fn) @trusted {
+  import kaleidic.experimental.concurrency.utils : closure;
   import core.thread : Thread, thread_detachThis;
   version (Posix) import core.sys.posix.pthread : pthread_detach, pthread_self;
-  new Thread(() {
-      fn(); //thread_detachThis(); NOTE: see git.symmetry.dev/SIL/plugins/alpha/web/-/issues/3
-      version (Posix)
-        pthread_detach(pthread_self);
-    }).start();
+  new Thread(cast(void delegate())closure((VoidDelegate fn) {
+        fn(); //thread_detachThis(); NOTE: see git.symmetry.dev/SIL/plugins/alpha/web/-/issues/3
+        version (Posix)
+          pthread_detach(pthread_self);
+      }, fn)).start();
 }
 
 class ThreadExecutor : Executor {
