@@ -198,4 +198,8 @@ private struct NurseryReceiver(Value) {
   void setError(Exception e) nothrow @safe {
     nursery.setError(e, id);
   }
+
+  auto getStopToken() @safe {
+    return nursery.getStopToken();
+  }
 }

@@ -96,9 +96,13 @@ unittest {
       auto token = nursery.getStopToken();
       while (!token.isStopRequested()) Thread.yield();
     });
-  auto thread2 = ThreadSender().then(() shared @safe { throw new Exception("Error should stop everyone"); });
+  auto thread2 = ThreadSender().withStopToken((StopToken token) shared @trusted {
+      while (!token.isStopRequested()) Thread.yield();
+    });
+  auto thread3 = ThreadSender().then(() shared @safe { throw new Exception("Error should stop everyone"); });
   nursery.run(thread1);
   nursery.run(thread2);
+  nursery.run(thread3);
   nursery.getStopToken().isStopRequested().shouldBeFalse();
   nursery.sync_wait().shouldThrow();
   nursery.getStopToken().isStopRequested().shouldBeTrue();
