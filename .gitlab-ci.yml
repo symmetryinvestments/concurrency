@@ -1,0 +1,8 @@
+test:
+  stage: test
+  script:
+    - curl -fsS https://dlang.org/install.sh | bash -s dmd
+    - source $(find ~/dlang -maxdepth 1 -type d -name "dmd*" | sort | tail -n 1)/activate
+    - dub test
+  tags:
+    - linux
