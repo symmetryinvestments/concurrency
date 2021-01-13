@@ -60,7 +60,8 @@ struct ForkSender {
             receiver.setError(new Exception("Failed to wait for child, %s".format(strerror(errno).fromStringz)));
           }
           else if (WIFSIGNALED(status)) {
-            receiver.setError(new Exception("Child exited by signal"));
+            auto exitsignal = WTERMSIG(status);
+            receiver.setError(new Exception("Child exited by signal %d".format(exitsignal)));
           }
           else if (WIFEXITED(status)) {
             auto exitstatus = WEXITSTATUS(status);
