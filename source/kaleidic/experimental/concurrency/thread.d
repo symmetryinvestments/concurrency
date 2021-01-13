@@ -123,25 +123,6 @@ class ThreadExecutor : Executor {
   bool isInContext() @safe { return false; }
 }
 
-// No work on SIL 2.3.0 because of old LDC
-// class ThreadPoolExecutor : Executor {
-//   import std.parallelism;
-//   private TaskPool pool;
-//   this(size_t workers) {
-//     pool = new TaskPool(workers);
-//   }
-//   void execute(VoidFunction fn) {
-//     pool.put(task!(f=> f())(fn));
-//   }
-
-//   void execute(VoidDelegate fn) {
-//     pool.put(task!(f => f())(fn));
-//   }
-//   bool isInContext() {
-//     return false;
-//   }
-// }
-
 auto executeAndWait(Executor, Work, Args...)(Executor executor, Work work, Args args) {
   import core.sync.semaphore;
   import std.concurrency;
