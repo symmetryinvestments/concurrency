@@ -1,4 +1,4 @@
-module experimental.concurrency.executor;
+module concurrency.executor;
 
 alias VoidFunction = void function() @safe;
 alias VoidDelegate = void delegate() shared @safe;

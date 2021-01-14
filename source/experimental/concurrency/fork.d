@@ -1,7 +1,7 @@
-module experimental.concurrency.fork;
+module concurrency.fork;
 
-import experimental.concurrency.sender;
-import experimental.concurrency.executor;
+import concurrency.sender;
+import concurrency.executor;
 
 // TODO: fork is an scheduler :)
 // therefor the Function fun could be a `then` continuation

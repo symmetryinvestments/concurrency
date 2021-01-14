@@ -1,7 +1,7 @@
-module experimental.concurrency.operations;
+module concurrency.operations;
 
-import experimental.concurrency;
-import experimental.concurrency.receiver;
+import concurrency;
+import concurrency.receiver;
 
 auto then(Sender, Fun)(Sender sender, Fun fun) {
   import std.traits;

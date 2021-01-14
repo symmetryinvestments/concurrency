@@ -1,4 +1,4 @@
-module experimental.concurrency.sender;
+module concurrency.sender;
 
 import concepts;
 
@@ -67,7 +67,7 @@ struct ValueSender(T) {
     Receiver receiver;
     T t;
     void start() {
-      import experimental.concurrency.receiver : setValueOrError;
+      import concurrency.receiver : setValueOrError;
       receiver.setValueOrError(t);
     }
   }

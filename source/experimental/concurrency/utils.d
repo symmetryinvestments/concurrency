@@ -1,4 +1,4 @@
-module experimental.concurrency.utils;
+module concurrency.utils;
 
 /// A manually constructed closure, aimed at shared
 struct Closure(Fun, Args...) {

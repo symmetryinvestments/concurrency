@@ -1,4 +1,4 @@
-module experimental.concurrency.stoptoken;
+module concurrency.stoptoken;
 
 // originally this code is from https://github.com/josuttis/jthread by Nicolai Josuttis
 // it is licensed under the Creative Commons Attribution 4.0 Internation License http://creativecommons.org/licenses/by/4.0

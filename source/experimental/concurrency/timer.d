@@ -1,6 +1,6 @@
-module experimental.concurrency.timer;
+module concurrency.timer;
 
-import experimental.concurrency.stoptoken;
+import concurrency.stoptoken;
 import core.time : Duration;
 
 /// waits for dur and returns true

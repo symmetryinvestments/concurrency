@@ -1,4 +1,4 @@
-module experimental.concurrency.signal;
+module concurrency.signal;
 
 struct SignalHandler {
   private __gshared void delegate(int) callback = null;

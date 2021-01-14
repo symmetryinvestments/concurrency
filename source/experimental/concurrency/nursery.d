@@ -1,8 +1,8 @@
-module experimental.concurrency.nursery;
+module concurrency.nursery;
 
-import experimental.concurrency.stoptoken : StopSource, StopToken, StopCallback, onStop;
-import experimental.concurrency.thread : LocalThreadExecutor;
-import experimental.concurrency.receiver : getStopToken;
+import concurrency.stoptoken : StopSource, StopToken, StopCallback, onStop;
+import concurrency.thread : LocalThreadExecutor;
+import concurrency.receiver : getStopToken;
 import std.typecons : Nullable;
 
 /// A Nursery is a place for senders to be ran in, while being a Sender itself.
@@ -14,7 +14,7 @@ import std.typecons : Nullable;
 /// Senders can be added to the Nursery at any time.
 /// Senders are only started when the Nursery itself is being awaited on.
 class Nursery : StopSource {
-  import experimental.concurrency.sender : OperationObject, isSender;
+  import concurrency.sender : OperationObject, isSender;
   import core.sync.mutex : Mutex;
 
   alias Value = void;
@@ -36,7 +36,7 @@ class Nursery : StopSource {
   }
 
   this() @safe shared {
-    import experimental.concurrency.utils : resetScheduler;
+    import concurrency.utils : resetScheduler;
     resetScheduler();
     with(assumeThreadSafe) mutex = new Mutex();
   }
@@ -46,7 +46,7 @@ class Nursery : StopSource {
   }
 
   static LocalThreadExecutor silThreadExecutor() nothrow @trusted {
-    import experimental.concurrency.thread : silExecutor;
+    import concurrency.thread : silExecutor;
     return cast()silExecutor;
   }
 

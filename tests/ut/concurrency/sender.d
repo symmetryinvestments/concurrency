@@ -1,10 +1,10 @@
 module ut.concurrency.sender;
 
-import experimental.concurrency;
-import experimental.concurrency.sender;
-import experimental.concurrency.thread;
-import experimental.concurrency.operations;
-import experimental.concurrency.receiver;
+import concurrency;
+import concurrency.sender;
+import concurrency.thread;
+import concurrency.operations;
+import concurrency.receiver;
 import unit_threaded;
 
 @("sync_wait.value")

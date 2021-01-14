@@ -1,11 +1,11 @@
 module ut.concurrency.nursery;
 
-import experimental.concurrency;
-import experimental.concurrency.sender;
-import experimental.concurrency.thread;
-import experimental.concurrency.operations;
-import experimental.concurrency.nursery;
-import experimental.concurrency.stoptoken;
+import concurrency;
+import concurrency.sender;
+import concurrency.thread;
+import concurrency.operations;
+import concurrency.nursery;
+import concurrency.stoptoken;
 import unit_threaded;
 
 @("run.value")

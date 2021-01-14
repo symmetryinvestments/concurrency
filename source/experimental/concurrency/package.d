@@ -1,7 +1,7 @@
-module experimental.concurrency;
+module concurrency;
 
-import experimental.concurrency.stoptoken;
-import experimental.concurrency.sender;
+import concurrency.stoptoken;
+import concurrency.sender;
 import concepts;
 
 bool isMainThread() @trusted {
@@ -11,8 +11,8 @@ bool isMainThread() @trusted {
 
 auto sync_wait(Sender)(auto ref Sender sender, StopSource stopSource = null) {
   static assert(models!(Sender, isSender));
-  import experimental.concurrency.signal;
-  import experimental.concurrency.thread;
+  import concurrency.signal;
+  import concurrency.thread;
   import core.sys.posix.signal : SIGTERM, SIGINT;
 
   alias Value = Sender.Value;
