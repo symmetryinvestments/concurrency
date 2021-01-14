@@ -148,13 +148,10 @@ auto executeAndWait(Executor, Work, Args...)(Executor executor, Work work, Args 
   }
 }
 
-package shared LocalThreadExecutor silExecutor;
-
 shared static this() {
   import concurrency.utils : resetScheduler;
 
   resetScheduler();
-  silExecutor = cast(shared)new LocalThreadExecutor();
 }
 
 @models!(ThreadSender, isSender)

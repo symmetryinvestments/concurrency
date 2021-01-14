@@ -45,11 +45,6 @@ class Nursery : StopSource {
     return StopToken(cast(Nursery)this);
   }
 
-  static LocalThreadExecutor silThreadExecutor() nothrow @trusted {
-    import concurrency.thread : silExecutor;
-    return cast()silExecutor;
-  }
-
   private void setError(Exception e, size_t id) nothrow @safe shared {
     import core.atomic : cas;
     with(assumeThreadSafe) cas(&exception, cast(Exception)null, e); // store exception if not already
