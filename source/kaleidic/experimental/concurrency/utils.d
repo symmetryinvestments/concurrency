@@ -1,4 +1,4 @@
-module kaleidic.experimental.concurrency.utils;
+module experimental.concurrency.utils;
 
 /// A manually constructed closure, aimed at shared
 struct Closure(Fun, Args...) {

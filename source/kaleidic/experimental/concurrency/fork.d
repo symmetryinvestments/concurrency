@@ -1,7 +1,7 @@
-module kaleidic.experimental.concurrency.fork;
+module experimental.concurrency.fork;
 
-import kaleidic.experimental.concurrency.sender;
-import kaleidic.experimental.concurrency.executor;
+import experimental.concurrency.sender;
+import experimental.concurrency.executor;
 
 // TODO: fork is an scheduler :)
 // therefor the Function fun could be a `then` continuation

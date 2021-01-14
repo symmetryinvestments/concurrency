@@ -1,4 +1,4 @@
-module kaleidic.experimental.concurrency.sender;
+module experimental.concurrency.sender;
 
 import concepts;
 
@@ -67,7 +67,7 @@ struct ValueSender(T) {
     Receiver receiver;
     T t;
     void start() {
-      import kaleidic.experimental.concurrency.receiver : setValueOrError;
+      import experimental.concurrency.receiver : setValueOrError;
       receiver.setValueOrError(t);
     }
   }

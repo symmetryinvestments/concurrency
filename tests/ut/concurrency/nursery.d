@@ -1,11 +1,11 @@
 module ut.concurrency.nursery;
 
-import kaleidic.experimental.concurrency;
-import kaleidic.experimental.concurrency.sender;
-import kaleidic.experimental.concurrency.thread;
-import kaleidic.experimental.concurrency.operations;
-import kaleidic.experimental.concurrency.nursery;
-import kaleidic.experimental.concurrency.stoptoken;
+import experimental.concurrency;
+import experimental.concurrency.sender;
+import experimental.concurrency.thread;
+import experimental.concurrency.operations;
+import experimental.concurrency.nursery;
+import experimental.concurrency.stoptoken;
 import unit_threaded;
 
 @("run.value")

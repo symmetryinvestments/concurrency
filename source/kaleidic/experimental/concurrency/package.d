@@ -1,7 +1,7 @@
-module kaleidic.experimental.concurrency;
+module experimental.concurrency;
 
-import kaleidic.experimental.concurrency.stoptoken;
-import kaleidic.experimental.concurrency.sender;
+import experimental.concurrency.stoptoken;
+import experimental.concurrency.sender;
 import concepts;
 
 bool isMainThread() @trusted {
@@ -11,8 +11,8 @@ bool isMainThread() @trusted {
 
 auto sync_wait(Sender)(auto ref Sender sender, StopSource stopSource = null) {
   static assert(models!(Sender, isSender));
-  import kaleidic.experimental.concurrency.signal;
-  import kaleidic.experimental.concurrency.thread;
+  import experimental.concurrency.signal;
+  import experimental.concurrency.thread;
   import core.sys.posix.signal : SIGTERM, SIGINT;
 
   alias Value = Sender.Value;

@@ -1,4 +1,4 @@
-module kaleidic.experimental.concurrency.receiver;
+module experimental.concurrency.receiver;
 
 /// checks that T is a Receiver
 void checkReceiver(T)() {
@@ -16,7 +16,7 @@ void checkReceiver(T)() {
 enum isReceiver(T) = is(typeof(checkReceiver!T));
 
 auto getStopToken(Receiver)(Receiver r) nothrow @safe if (isReceiver!Receiver) {
-  import kaleidic.experimental.concurrency.stoptoken : NeverStopToken;
+  import experimental.concurrency.stoptoken : NeverStopToken;
   return NeverStopToken();
 }
 

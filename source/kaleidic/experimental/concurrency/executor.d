@@ -1,4 +1,4 @@
-module kaleidic.experimental.concurrency.executor;
+module experimental.concurrency.executor;
 
 alias VoidFunction = void function() @safe;
 alias VoidDelegate = void delegate() shared @safe;

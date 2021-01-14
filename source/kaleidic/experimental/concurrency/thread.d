@@ -1,7 +1,7 @@
-module kaleidic.experimental.concurrency.thread;
+module experimental.concurrency.thread;
 
-import kaleidic.experimental.concurrency.executor;
-import kaleidic.experimental.concurrency.sender;
+import experimental.concurrency.executor;
+import experimental.concurrency.sender;
 import concepts;
 
 LocalThreadExecutor getLocalThreadExecutor() @safe {
@@ -91,7 +91,7 @@ class LocalThreadExecutor : Executor {
 }
 
 void executeInNewThread(VoidFunction fn) @system {
-  import kaleidic.experimental.concurrency.utils : closure;
+  import experimental.concurrency.utils : closure;
   import core.thread : Thread, thread_detachThis;
   version (Posix) import core.sys.posix.pthread : pthread_detach, pthread_self;
 
@@ -103,7 +103,7 @@ void executeInNewThread(VoidFunction fn) @system {
 }
 
 void executeInNewThread(VoidDelegate fn) @system {
-  import kaleidic.experimental.concurrency.utils : closure;
+  import experimental.concurrency.utils : closure;
   import core.thread : Thread, thread_detachThis;
   version (Posix) import core.sys.posix.pthread : pthread_detach, pthread_self;
   new Thread(cast(void delegate())closure((VoidDelegate fn) {
@@ -151,7 +151,7 @@ auto executeAndWait(Executor, Work, Args...)(Executor executor, Work work, Args 
 package shared LocalThreadExecutor silExecutor;
 
 shared static this() {
-  import kaleidic.experimental.concurrency.utils : resetScheduler;
+  import experimental.concurrency.utils : resetScheduler;
 
   resetScheduler();
   silExecutor = cast(shared)new LocalThreadExecutor();
@@ -163,8 +163,8 @@ struct ThreadSender {
   private struct Op(Receiver) {
     private Receiver receiver;
     void start() @trusted {
-      import kaleidic.experimental.concurrency.utils : closure;
-      import kaleidic.experimental.concurrency.receiver : setValueOrError;
+      import experimental.concurrency.utils : closure;
+      import experimental.concurrency.receiver : setValueOrError;
       executeInNewThread(closure((Receiver receiver) shared @safe {
             (() @trusted {try {
                 receiver.setValueOrError();

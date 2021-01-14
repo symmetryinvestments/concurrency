@@ -1,4 +1,4 @@
-module kaleidic.experimental.concurrency.signal;
+module experimental.concurrency.signal;
 
 struct SignalHandler {
   private __gshared void delegate(int) callback = null;

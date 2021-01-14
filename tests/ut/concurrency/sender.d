@@ -1,10 +1,10 @@
 module ut.concurrency.sender;
 
-import kaleidic.experimental.concurrency;
-import kaleidic.experimental.concurrency.sender;
-import kaleidic.experimental.concurrency.thread;
-import kaleidic.experimental.concurrency.operations;
-import kaleidic.experimental.concurrency.receiver;
+import experimental.concurrency;
+import experimental.concurrency.sender;
+import experimental.concurrency.thread;
+import experimental.concurrency.operations;
+import experimental.concurrency.receiver;
 import unit_threaded;
 
 @("sync_wait.value")

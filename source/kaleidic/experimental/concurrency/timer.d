@@ -1,6 +1,6 @@
-module kaleidic.experimental.concurrency.timer;
+module experimental.concurrency.timer;
 
-import kaleidic.experimental.concurrency.stoptoken;
+import experimental.concurrency.stoptoken;
 import core.time : Duration;
 
 /// waits for dur and returns true

@@ -1,7 +1,7 @@
-module kaleidic.experimental.concurrency.operations;
+module experimental.concurrency.operations;
 
-import kaleidic.experimental.concurrency;
-import kaleidic.experimental.concurrency.receiver;
+import experimental.concurrency;
+import experimental.concurrency.receiver;
 
 auto then(Sender, Fun)(Sender sender, Fun fun) {
   import std.traits;
