@@ -9,7 +9,8 @@ struct Closure(Fun, Args...) {
   }
 }
 
-auto closure(Fun, Args...)(Fun fun, Args args) @trusted {
+auto closure(Args...)(void function(Args) @safe fun, Args args) @trusted {
+  alias Fun = typeof(fun);
   auto cl = new Closure!(Fun, Args)(fun, args);
   /// need to cast to @safe because a @trusted delegate doesn't fit a @safe one...
   return cast(void delegate() shared @safe)&(cast(shared)cl).apply;

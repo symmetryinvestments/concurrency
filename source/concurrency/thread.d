@@ -95,7 +95,7 @@ void executeInNewThread(VoidFunction fn) @system {
   import core.thread : Thread, thread_detachThis;
   version (Posix) import core.sys.posix.pthread : pthread_detach, pthread_self;
 
-  new Thread(cast(void delegate())closure((VoidFunction fn) {
+  new Thread(cast(void delegate())closure((VoidFunction fn) @trusted {
         fn(); //thread_detachThis(); NOTE: see git.symmetry.dev/SIL/plugins/alpha/web/-/issues/3
         version (Posix)
           pthread_detach(pthread_self);
@@ -106,7 +106,7 @@ void executeInNewThread(VoidDelegate fn) @system {
   import concurrency.utils : closure;
   import core.thread : Thread, thread_detachThis;
   version (Posix) import core.sys.posix.pthread : pthread_detach, pthread_self;
-  new Thread(cast(void delegate())closure((VoidDelegate fn) {
+  new Thread(cast(void delegate())closure((VoidDelegate fn) @trusted {
         fn(); //thread_detachThis(); NOTE: see git.symmetry.dev/SIL/plugins/alpha/web/-/issues/3
         version (Posix)
           pthread_detach(pthread_self);
@@ -162,7 +162,7 @@ struct ThreadSender {
     void start() @trusted {
       import concurrency.utils : closure;
       import concurrency.receiver : setValueOrError;
-      executeInNewThread(closure((Receiver receiver) shared @safe {
+      executeInNewThread(closure((Receiver receiver) @safe {
             (() @trusted {try {
                 receiver.setValueOrError();
               } catch (Throwable t) {
