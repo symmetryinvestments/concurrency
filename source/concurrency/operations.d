@@ -100,6 +100,7 @@ auto withStopToken(Sender, Fun)(Sender sender, Fun fun) {
   }
   static struct STSender {
     import std.traits : ReturnType;
+    static assert(models!(STSender, isSender));
     alias Value = ReturnType!fun;
     Sender sender;
     Fun fun;
