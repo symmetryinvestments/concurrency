@@ -14,7 +14,7 @@ struct ForkSender {
   static struct Operation(Receiver) {
     private {
       Executor executor;
-      VoidDelegate fun;
+      void delegate() shared fun;
       Receiver receiver;
       void delegate(int) afterFork;
       void run() {
@@ -30,7 +30,7 @@ struct ForkSender {
         import std.format : format;
 
         auto token = receiver.getStopToken();
-        shared pid = executor.executeAndWait((VoidDelegate fun) {
+        shared pid = executor.executeAndWait((void delegate() shared fun) {
             auto r = fork();
             if (r != 0)
               return r;
@@ -87,9 +87,9 @@ struct ForkSender {
     }
   }
   private Executor executor;
-  private VoidDelegate fun;
+  private void delegate() shared fun;
   private void delegate(int) afterFork;
-  this(Executor executor, VoidDelegate fun, void delegate(int) afterFork = null) @system { // forking is dangerous so this is @system
+  this(Executor executor, void delegate() shared fun, void delegate(int) afterFork = null) @system { // forking is dangerous so this is @system
     this.executor = executor;
     this.fun = fun;
     this.afterFork = afterFork;
