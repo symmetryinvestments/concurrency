@@ -91,7 +91,33 @@ private:
   }
 }
 
-void spin_yield() nothrow @trusted @nogc {
+interface StopTokenObject {
+  bool isStopRequested() nothrow @safe;
+  bool isStopPossible() nothrow @safe;
+  StopCallback onStop(void delegate() nothrow @safe shared callback) nothrow @safe;
+}
+
+class StopTokenObjectImpl(StopToken) : StopTokenObject {
+  private StopToken token;
+  this(StopToken token) { this.token = token; }
+  bool isStopRequested() nothrow @safe {
+    return token.isStopRequested;
+  }
+  bool isStopPossible() nothrow @safe {
+    return token.isStopPossible;
+  }
+  StopCallback onStop(void delegate() nothrow @safe shared callback) nothrow @safe {
+    return token.onStop(callback);
+  }
+}
+
+auto stopTokenObject(StopToken)(StopToken stopToken) {
+  return new StopTokenObjectImpl!(StopToken)(stopToken);
+}
+
+
+
+private void spin_yield() nothrow @trusted @nogc {
   // TODO: could use the pause asm instruction
   // it is available in LDC as intrinsic... but not in DMD
   import core.thread : Thread;

@@ -1,5 +1,7 @@
 module concurrency.receiver;
 
+import concepts;
+
 /// checks that T is a Receiver
 void checkReceiver(T)() {
   T t = T.init;
@@ -18,6 +20,16 @@ enum isReceiver(T) = is(typeof(checkReceiver!T));
 auto getStopToken(Receiver)(Receiver r) nothrow @safe if (isReceiver!Receiver) {
   import concurrency.stoptoken : NeverStopToken;
   return NeverStopToken();
+}
+
+/// A polymorphic receiver of type T
+interface ReceiverObjectBase(T) {
+  import concurrency.stoptoken : StopTokenObject;
+  static assert (models!(ReceiverObjectBase!T, isReceiver));
+  void setValue(T value = T.init);
+  void setDone() nothrow;
+  void setError(Exception) nothrow;
+  StopTokenObject getStopToken() nothrow;
 }
 
 struct NullReceiver(T) {

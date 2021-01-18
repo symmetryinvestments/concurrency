@@ -79,18 +79,31 @@ struct ValueSender(T) {
 
 /// A polymorphic sender of type T
 interface SenderObjectBase(T) {
+  import concurrency.receiver;
+  import concurrency.stoptoken;
   static assert (models!(SenderObjectBase!T, isSender));
   alias Value = T;
   OperationObject connect(ReceiverObjectBase!(T) receiver);
-}
-
-/// A polymorphic receiver of type T
-interface ReceiverObjectBase(T) {
-  static assert (models!(ReceiverObjectBase!T, isReceiver));
-  void setValue(T value = T.init);
-  void setDone() nothrow;
-  void setError(Exception) nothrow;
-  StopTokenObject getStopToken() nothrow;
+  OperationObject connect(Receiver)(Receiver receiver) {
+    return connect(new class(receiver) ReceiverObjectBase!T {
+      Receiver receiver;
+      this(Receiver receiver) {
+        this.receiver = receiver;
+      }
+      void setValue(T value) {
+        receiver.setValueOrError(value);
+      }
+      void setDone() nothrow {
+        receiver.setDone();
+      }
+      void setError(Exception e) nothrow {
+        receiver.setError(e);
+      }
+      StopTokenObject getStopToken() nothrow {
+        return stopTokenObject(receiver.getStopToken());
+      }
+    });
+  }
 }
 
 /// Type-erased operational state object
