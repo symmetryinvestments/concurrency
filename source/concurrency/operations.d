@@ -68,17 +68,17 @@ auto withStopToken(Sender, Fun)(Sender sender, Fun fun) {
       void setValue() {
         static if (is(ReturnType!Fun == void)) {
           fun(receiver.getStopToken);
-          receiver.setValue();
+          receiver.setValueOrError();
         } else
-          receiver.setValue(fun(receiver.getStopToken));
+          receiver.setValueOrError(fun(receiver.getStopToken));
       }
     } else {
       void setValue(Sender.Value value) {
         static if (is(ReturnType!Fun == void)) {
           fun(receiver.getStopToken, value);
-          receiver.setValue();
+          receiver.setValueOrError();
         } else
-          receiver.setValue(fun(receiver.getStopToken, value));
+          receiver.setValueOrError(fun(receiver.getStopToken, value));
       }
     }
     void setDone() nothrow {
