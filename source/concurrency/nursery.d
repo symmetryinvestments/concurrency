@@ -41,7 +41,7 @@ class Nursery : StopSource {
     with(assumeThreadSafe) mutex = new Mutex();
   }
 
-  StopToken getStopToken() @trusted shared {
+  StopToken getStopToken() nothrow @trusted shared {
     return StopToken(cast(Nursery)this);
   }
 
