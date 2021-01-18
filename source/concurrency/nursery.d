@@ -97,7 +97,7 @@ class Nursery : StopSource {
     import std.typecons : Nullable;
     import core.atomic : atomicOp;
 
-    static if (is(Sender == class))
+    static if (is(Sender == class) || is(Sender == interface))
       if (sender is null)
         return;
 
