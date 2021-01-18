@@ -136,7 +136,7 @@ class Nursery : StopSource {
       }
     }
     auto stopToken = receiver.getStopToken();
-    auto cb = stopToken.onStop(() shared => cast(void)this.stop());
+    auto cb = stopToken.onStop(() shared nothrow @trusted => cast(void)this.stop());
     return Op(this, cb, new ReceiverImpl(receiver));
   }
 
