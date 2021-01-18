@@ -120,6 +120,8 @@ struct ForkSender {
     import std.concurrency : receiveTimeout;
     import std.variant : Variant;
     import core.time : seconds;
+    import std.concurrency : thisTid;
+    thisTid(); // need to call otherwise the messagebox might be empty and receiveTimeout will assert
 
     while(receiveTimeout(seconds(-1),(Variant v){})) {}
   }
