@@ -209,14 +209,12 @@ public:
 
   bool try_add_callback(StopCallback cb, bool incrementRefCountIfSuccessful) nothrow @safe {
     ulong oldState;
-    goto load_state;
     do {
-      goto check_state;
+      goto load_state;
       do {
         spin_yield();
       load_state:
         oldState = state_.atomicLoad!(MemoryOrder.acq);
-      check_state:
         if (is_stop_requested(oldState)) {
           cb.execute();
           return false;
