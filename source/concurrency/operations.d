@@ -2,6 +2,7 @@ module concurrency.operations;
 
 import concurrency;
 import concurrency.receiver;
+import concepts;
 
 auto then(Sender, Fun)(Sender sender, Fun fun) {
   import std.traits;
@@ -46,6 +47,8 @@ auto then(Sender, Fun)(Sender sender, Fun fun) {
   }
   static struct ThenSender {
     import std.traits : ReturnType;
+    import concurrency.sender;
+    static assert(models!(ThenSender, isSender));
     alias Value = ReturnType!fun;
     Sender sender;
     Fun fun;
