@@ -1,5 +1,7 @@
 # Structured Concurrency
 
+<img src="https://github.com/symmetryinvestments/concurrency/workflows/build/badge.svg"/>
+
 Provides various primitives useful for structured concurrency and async tasks.
 
 ## StopToken
