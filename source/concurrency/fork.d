@@ -38,6 +38,7 @@ struct ForkSender {
             reinitThreadLocks();
             detachOtherThreads();
             drainMessageBox();
+            setMainThread();
             try {
               (cast()fun)();
             } catch (Throwable t) {
@@ -121,5 +122,14 @@ struct ForkSender {
     import core.time : seconds;
 
     while(receiveTimeout(seconds(-1),(Variant v){})) {}
+  }
+  // after fork there is only one thread left, it is possible
+  // that wasn't the main thread in the 'old' program, so
+  // we overwrite the global to point to the only thread left
+  // in the (forked) process
+  static private void setMainThread() {
+    import core.thread : Thread;
+
+    __traits(getMember, Thread, "sm_main") = Thread.getThis();
   }
 }
