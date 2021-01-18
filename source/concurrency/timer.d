@@ -16,7 +16,6 @@ bool wait(StopToken stopToken, Duration dur) nothrow @trusted {
     version (Windows) {
       import core.sync.mutex : Mutex;
       import core.sync.condition : Condition;
-      import kaleidic.lang.types : Variable;
 
       auto m = new Mutex();
       auto cond = new Condition(m);
