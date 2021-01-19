@@ -107,3 +107,47 @@ unittest {
   nursery.sync_wait().shouldThrow();
   nursery.getStopToken().isStopRequested().shouldBeTrue();
 }
+
+@("withStopSource.1")
+unittest {
+  import core.thread : Thread;
+  auto stopSource = new StopSource();
+  auto nursery = new shared Nursery();
+
+  auto thread1 = ThreadSender()
+    .withStopToken((StopToken stopToken) shared {
+          while(!stopToken.isStopRequested)
+            Thread.yield();
+      })
+    .withStopSource(stopSource);
+
+  // stop via the source
+  auto stopper = ValueSender!StopSource(stopSource).then((StopSource stopSource) shared => stopSource.stop());
+
+  nursery.run(thread1);
+  nursery.run(stopper);
+
+  nursery.sync_wait().shouldEqual(true);
+}
+
+@("withStopSource.2")
+unittest {
+  import core.thread : Thread;
+  auto stopSource = new StopSource();
+  auto nursery = new shared Nursery();
+
+  auto thread1 = ThreadSender()
+    .withStopToken((StopToken stopToken) shared {
+        while(!stopToken.isStopRequested)
+          Thread.yield();
+      })
+    .withStopSource(stopSource);
+
+  // stop via the nursery
+  auto stopper = ValueSender!(shared Nursery)(nursery).then((shared Nursery nursery) shared => nursery.stop());
+
+  nursery.run(thread1);
+  nursery.run(stopper);
+
+  nursery.sync_wait().shouldEqual(false);
+}

@@ -134,7 +134,7 @@ auto withStopSource(Sender)(Sender sender, StopSource stopSource) {
       resetStopCallback();
       receiver.setDone();
     }
-    // TODO: would be good if we only emit this function is the Sender actually could call it
+    // TODO: would be good if we only emit this function in the Sender actually could call it
     void setError(Exception e) nothrow {
       resetStopCallback();
       receiver.setError(e);
@@ -144,7 +144,8 @@ auto withStopSource(Sender)(Sender sender, StopSource stopSource) {
       if (this.combinedSource is null) {
         auto local = new StopSource();
         auto sharedStopSource = cast(shared)local;
-        if (cas!(MemoryOrder.seq, MemoryOrder.seq, StopSource, StopSource, StopSource)(&this.combinedSource, null, local)) {
+        StopSource emptyStopSource = null;
+        if (cas(&this.combinedSource, emptyStopSource, local)) {
           cbs[0] = receiver.getStopToken().onStop(() shared => cast(void)sharedStopSource.stop());
           cbs[1] = StopToken(stopSource).onStop(() shared => cast(void)sharedStopSource.stop());
           if (atomicLoad(this.combinedSource) is null) {
