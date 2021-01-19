@@ -130,7 +130,7 @@ class SenderObjectImpl(Sender) : SenderObjectBase!(Sender.Value) {
   }
 }
 
-/// Converts any Sender to a SenderObject for use in SIL
+/// Converts any Sender to a polymorphic SenderObject
 auto toSenderObject(Sender)(Sender sender) {
   static assert(models!(Sender, isSender));
   return cast(SenderObjectBase!(Sender.Value))new SenderObjectImpl!(Sender)(sender);
