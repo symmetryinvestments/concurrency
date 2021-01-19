@@ -21,7 +21,10 @@ class Nursery : StopSource {
   private {
     Node[] operations;
     struct Node {
-      OperationObject operation;
+      void delegate() start_;
+      void start() @trusted {
+        this.start_();
+      }
       size_t id;
     }
     Mutex mutex;
@@ -106,7 +109,7 @@ class Nursery : StopSource {
 
     mutex.lock();
     // TODO: might also use the receiver as key instead of a wrapping ulong
-    operations ~= Node(OperationObject(() => op.start()), id);
+    operations ~= Node(() => op.start(), id);
     atomicOp!"+="(busy, 1);
     bool hasStarted = this.receiver !is null;
     mutex.unlock();
@@ -151,7 +154,7 @@ class Nursery : StopSource {
 
       // start all work
       foreach(op; ops)
-        op.operation.start();
+        op.start();
     }
   }
 }
