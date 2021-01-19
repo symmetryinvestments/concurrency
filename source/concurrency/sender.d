@@ -109,29 +109,31 @@ interface SenderObjectBase(T) {
 /// Type-erased operational state object
 /// used in polymorphic senders
 struct OperationObject {
-  private void delegate() _start;
+  private void delegate() shared _start;
   void start() @trusted { _start(); }
-}
-
-/// Wraps a generic operation into an OperationObject
-/// for polymorphic senders/receivers
-OperationObject wrapOperation(alias fun, Args...)(Args args) {
-  return OperationObject(closure(fun, args));
 }
 
 /// A class extending from SenderObjectBase that wraps any Sender
 class SenderObjectImpl(Sender) : SenderObjectBase!(Sender.Value) {
+  import concurrency.receiver : ReceiverObjectBase;
   private Sender sender;
   this(Sender sender) {
     this.sender = sender;
   }
   OperationObject connect(ReceiverObjectBase!(Sender.Value) receiver) {
+    import concurrency.utils;
     auto state = sender.connect(receiver);
-    return wrapOperation!(state => state.start(), state);
+    return OperationObject(closure((typeof(state) state) @trusted => state.start(), state));
   }
   auto connect(Receiver)(Receiver receiver) {
     return sender.connect(receiver);
   }
+}
+
+/// Converts any Sender to a SenderObject for use in SIL
+auto toSenderObject(Sender)(Sender sender) {
+  static assert(models!(Sender, isSender));
+  return cast(SenderObjectBase!(Sender.Value))new SenderObjectImpl!(Sender)(sender);
 }
 
 /// A sender that always sets an error
