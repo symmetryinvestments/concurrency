@@ -40,3 +40,8 @@ import unit_threaded;
     .sync_wait()
     .shouldThrow();
 }
+
+@("toSenderObject")
+@safe unittest {
+  ValueSender!(int)(4).toSenderObject.sync_wait().shouldEqual(4);
+}
