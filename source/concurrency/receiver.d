@@ -26,10 +26,10 @@ auto getStopToken(Receiver)(Receiver r) nothrow @safe if (isReceiver!Receiver) {
 interface ReceiverObjectBase(T) {
   import concurrency.stoptoken : StopTokenObject;
   static assert (models!(ReceiverObjectBase!T, isReceiver));
-  void setValue(T value = T.init);
-  void setDone() nothrow;
-  void setError(Exception) nothrow;
-  StopTokenObject getStopToken() nothrow;
+  void setValue(T value = T.init) @safe;
+  void setDone() nothrow @safe;
+  void setError(Exception) nothrow @safe;
+  StopTokenObject getStopToken() nothrow @safe;
 }
 
 struct NullReceiver(T) {
