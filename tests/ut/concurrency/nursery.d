@@ -9,11 +9,19 @@ import concurrency.stoptoken;
 import unit_threaded;
 
 @("run.value")
-unittest {
+@safe unittest {
   auto nursery = new shared Nursery();
   nursery.run(ValueSender!(int)(5));
   nursery.sync_wait().shouldEqual(true);
   nursery.getStopToken().isStopRequested().shouldBeFalse();
+}
+
+@("run.exception")
+@safe unittest {
+  auto nursery = new shared Nursery();
+  nursery.run(ThrowingSender());
+  nursery.sync_wait().shouldThrow();
+  nursery.getStopToken().isStopRequested().shouldBeTrue();
 }
 
 @("run.value.then")
