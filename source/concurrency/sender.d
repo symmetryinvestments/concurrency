@@ -123,7 +123,7 @@ class SenderObjectImpl(Sender) : SenderObjectBase!(Sender.Value) {
   OperationObject connect(ReceiverObjectBase!(Sender.Value) receiver) {
     import concurrency.utils;
     auto state = sender.connect(receiver);
-    return OperationObject(closure((typeof(state) state) @trusted => state.start(), state));
+    return OperationObject(cast(typeof(OperationObject._start))closure((typeof(state) state) @trusted => state.start(), state));
   }
   auto connect(Receiver)(Receiver receiver) {
     return sender.connect(receiver);
