@@ -14,7 +14,7 @@ import std.typecons : Nullable;
 /// Senders can be added to the Nursery at any time.
 /// Senders are only started when the Nursery itself is being awaited on.
 class Nursery : StopSource {
-  import concurrency.sender : OperationObject, isSender;
+  import concurrency.sender : isSender;
   import core.sync.mutex : Mutex;
 
   alias Value = void;
