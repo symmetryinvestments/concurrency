@@ -41,7 +41,12 @@ import unit_threaded;
     .shouldThrow();
 }
 
-@("toSenderObject")
+@("toSenderObject.value")
 @safe unittest {
   ValueSender!(int)(4).toSenderObject.sync_wait().shouldEqual(4);
+}
+
+@("toSenderObject.thread")
+@safe unittest {
+  ThreadSender().then(() shared => 2*3+1).toSenderObject.sync_wait().shouldEqual(7);
 }
