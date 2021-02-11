@@ -36,9 +36,10 @@ auto sync_wait(Sender)(auto ref Sender sender, StopSource stopSource = null) {
       signalHandler.on(SIGTERM);
     }
   }
+  auto worker = LocalThreadWorker(localThreadExecutor);
 
   static struct Receiver {
-    LocalThreadExecutor localThreadExecutor;
+    LocalThreadWorker* worker;
     bool* canceled;
     static if (!is(Value == void))
       Value* result;
@@ -47,21 +48,21 @@ auto sync_wait(Sender)(auto ref Sender sender, StopSource stopSource = null) {
     StopSource stopSource;
     void setDone() nothrow @safe {
       (*canceled) = true;
-      localThreadExecutor.stop();
+      worker.stop();
     }
     static if (!NoThrow)
       void setError(Exception e) nothrow @safe {
         (*exception) = e;
-        localThreadExecutor.stop();
+        worker.stop();
       }
     static if (is(Value == void))
       void setValue() nothrow @safe {
-        localThreadExecutor.stop();
+        worker.stop();
       }
     else
       void setValue(Value value) nothrow @safe {
         (*result) = value;
-        localThreadExecutor.stop();
+        worker.stop();
       }
     auto getStopToken() nothrow @safe @nogc {
       return StopToken(stopSource);
@@ -70,20 +71,20 @@ auto sync_wait(Sender)(auto ref Sender sender, StopSource stopSource = null) {
 
   static if (!is(Value == void)) {
     static if (!NoThrow)
-      auto receiver = Receiver(localThreadExecutor, &canceled, &result, &exception, stopSource);
+      auto receiver = Receiver(&worker, &canceled, &result, &exception, stopSource);
     else
-      auto receiver = Receiver(localThreadExecutor, &canceled, &result, stopSource);
+      auto receiver = Receiver(&worker, &canceled, &result, stopSource);
   } else {
     static if (!NoThrow)
-      auto receiver = Receiver(localThreadExecutor, &canceled, &exception, stopSource);
+      auto receiver = Receiver(&worker, &canceled, &exception, stopSource);
     else
-      auto receiver = Receiver(localThreadExecutor, &canceled, stopSource);
+      auto receiver = Receiver(&worker, &canceled, stopSource);
   }
 
   /// we allow passing a scoped receiver because we know this sender will terminate before this function ends
   (()@trusted => sender.connect(receiver).start())();
 
-  localThreadExecutor.start(); /// this blocks until one of the setXxx function on the receiver is called
+  worker.start();
 
   if (isMainThread)
     signalHandler.teardown();

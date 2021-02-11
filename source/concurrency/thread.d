@@ -16,8 +16,6 @@ class LocalThreadExecutor : Executor {
   import std.concurrency : Tid, thisTid, send, receive;
   private {
     Tid tid;
-    shared bool running;
-    shared int counter;
   }
 
   this() @safe {
@@ -49,12 +47,28 @@ class LocalThreadExecutor : Executor {
     }
   }
 
+  bool isInContext() @trusted {
+    return thisTid == cast()tid;
+  }
+}
+
+package struct LocalThreadWorker {
+  import std.concurrency : Tid, thisTid, send, receive;
+  private {
+    Tid tid;
+    shared int counter;
+  }
+
+  this(LocalThreadExecutor e) @safe {
+    this.tid = e.tid;
+  }
+
+  this(this) @disable;
+
   void start() @trusted {
-    if (atomicOp!"+="(counter, 1) < 1)
-      return;
     assert(isInContext); // start can only be called on the thread
-    atomicStore(running, true);
-    while (atomicLoad(running)) {
+    bool running = true;
+    while (running) {
       VoidFunction vFunc = null;
       VoidDelegate vDel = null;
       receive((VoidFunction fn) => vFunc = fn,
@@ -69,17 +83,11 @@ class LocalThreadExecutor : Executor {
       }
     }
     // TODO: do we want to drain all VoidFunction/VoidDelegates here?
-    if (atomicLoad(counter) > 0) {
-      atomicStore(running, true);
-    }
   }
 
   void stop() nothrow @trusted {
     try {
-      atomicOp!"-="(counter, 1);
-      if (cas(&running, true, false)) {
-        (cast()tid).send(false);
-      }
+      (cast()tid).send(false);
     } catch (Exception e) {
       assert(false, e.msg);
     }
