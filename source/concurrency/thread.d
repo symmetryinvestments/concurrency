@@ -90,27 +90,30 @@ class LocalThreadExecutor : Executor {
   }
 }
 
-void executeInNewThread(VoidFunction fn) @system {
+package void executeInNewThread(VoidFunction fn) @system {
   import concurrency.utils : closure;
-  import core.thread : Thread, thread_detachThis;
+  import core.thread : Thread, thread_detachThis, thread_detachInstance;
   version (Posix) import core.sys.posix.pthread : pthread_detach, pthread_self;
 
-  new Thread(cast(void delegate())closure((VoidFunction fn) @trusted {
-        fn(); //thread_detachThis(); NOTE: see git.symmetry.dev/SIL/plugins/alpha/web/-/issues/3
+  auto t = new Thread(cast(void delegate())closure((VoidFunction fn) @trusted {
+        fn();
         version (Posix)
-          pthread_detach(pthread_self);
+          pthread_detach(pthread_self); //NOTE: see git.symmetry.dev/SIL/plugins/alpha/web/-/issues/3
       }, fn)).start();
+  t.isDaemon = true; // is needed because of pthread_detach (otherwise there is a race between druntime joining and the thread exiting)
 }
 
-void executeInNewThread(VoidDelegate fn) @system {
+package void executeInNewThread(VoidDelegate fn) @system {
   import concurrency.utils : closure;
-  import core.thread : Thread, thread_detachThis;
+  import core.thread : Thread, thread_detachThis, thread_detachInstance;
   version (Posix) import core.sys.posix.pthread : pthread_detach, pthread_self;
-  new Thread(cast(void delegate())closure((VoidDelegate fn) @trusted {
-        fn(); //thread_detachThis(); NOTE: see git.symmetry.dev/SIL/plugins/alpha/web/-/issues/3
+
+  auto t = new Thread(cast(void delegate())closure((VoidDelegate fn) @trusted {
+        fn();
         version (Posix)
-          pthread_detach(pthread_self);
+          pthread_detach(pthread_self); //NOTE: see git.symmetry.dev/SIL/plugins/alpha/web/-/issues/3
       }, fn)).start();
+  t.isDaemon = true; // is needed because of pthread_detach (otherwise there is a race between druntime joining and the thread exiting)
 }
 
 class ThreadExecutor : Executor {
