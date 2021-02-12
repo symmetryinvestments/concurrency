@@ -2,6 +2,7 @@ module concurrency;
 
 import concurrency.stoptoken;
 import concurrency.sender;
+import concurrency.thread;
 import concepts;
 
 bool isMainThread() @trusted {
@@ -9,10 +10,40 @@ bool isMainThread() @trusted {
   return Thread.getThis().isMainThread();
 }
 
+private struct SyncWaitReceiver(Value, bool isNoThrow) {
+  LocalThreadWorker* worker;
+  bool* canceled;
+  static if (!is(Value == void))
+    Value* result;
+  static if (!isNoThrow)
+    Exception* exception;
+  StopSource stopSource;
+  void setDone() nothrow @safe {
+    (*canceled) = true;
+    worker.stop();
+  }
+  static if (!isNoThrow)
+    void setError(Exception e) nothrow @safe {
+      (*exception) = e;
+      worker.stop();
+    }
+  static if (is(Value == void))
+    void setValue() nothrow @safe {
+      worker.stop();
+    }
+  else
+    void setValue(Value value) nothrow @safe {
+      (*result) = value;
+      worker.stop();
+    }
+  auto getStopToken() nothrow @safe @nogc {
+    return StopToken(stopSource);
+  }
+}
+
 auto sync_wait(Sender)(auto ref Sender sender, StopSource stopSource = null) {
   static assert(models!(Sender, isSender));
   import concurrency.signal;
-  import concurrency.thread;
   import core.sys.posix.signal : SIGTERM, SIGINT;
 
   alias Value = Sender.Value;
@@ -38,36 +69,7 @@ auto sync_wait(Sender)(auto ref Sender sender, StopSource stopSource = null) {
   }
   auto worker = LocalThreadWorker(localThreadExecutor);
 
-  static struct Receiver {
-    LocalThreadWorker* worker;
-    bool* canceled;
-    static if (!is(Value == void))
-      Value* result;
-    static if (!NoThrow)
-      Exception* exception;
-    StopSource stopSource;
-    void setDone() nothrow @safe {
-      (*canceled) = true;
-      worker.stop();
-    }
-    static if (!NoThrow)
-      void setError(Exception e) nothrow @safe {
-        (*exception) = e;
-        worker.stop();
-      }
-    static if (is(Value == void))
-      void setValue() nothrow @safe {
-        worker.stop();
-      }
-    else
-      void setValue(Value value) nothrow @safe {
-        (*result) = value;
-        worker.stop();
-      }
-    auto getStopToken() nothrow @safe @nogc {
-      return StopToken(stopSource);
-    }
-  }
+  alias Receiver = SyncWaitReceiver!(Value, NoThrow);
 
   static if (!is(Value == void)) {
     static if (!NoThrow)
