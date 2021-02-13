@@ -6,6 +6,7 @@ int main(string[] args)
                         "ut.concurrency.fork",
                         "ut.concurrency.sender",
                         "ut.concurrency.nursery",
+                        "ut.concurrency.operations",
                         "ut.concurrency.pressure",
                         "ut.concurrency.pressure2"
                         );

@@ -185,3 +185,35 @@ auto withStopSource(Sender)(Sender sender, StopSource stopSource) {
   }
   return SSSender(sender, stopSource);
 }
+
+auto ignoreError(Sender)(Sender sender) {
+  import concurrency.receiver : setValueOrError;
+  struct IEReceiver(Value, Receiver) {
+    Receiver receiver;
+    static if (is(Value == void))
+      void setValue() {
+        receiver.setValueOrError();
+      }
+    else
+      void setValue(Value value) {
+        receiver.setValueOrError(value);
+      }
+    void setDone() {
+      receiver.setDone();
+    }
+    void setError(Exception e) {
+      receiver.setDone();
+    }
+    auto getStopToken() {
+      return receiver.getStopToken();
+    }
+  }
+  struct IESender {
+    Sender sender;
+    alias Value = Sender.Value;
+    auto connect(Receiver)(Receiver receiver) {
+      return sender.connect(IEReceiver!(Sender.Value,Receiver)(receiver));
+    }
+  }
+  return IESender(sender);
+}
