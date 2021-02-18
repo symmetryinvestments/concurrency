@@ -116,6 +116,7 @@ struct OperationObject {
 /// A class extending from SenderObjectBase that wraps any Sender
 class SenderObjectImpl(Sender) : SenderObjectBase!(Sender.Value) {
   import concurrency.receiver : ReceiverObjectBase;
+  static assert (models!(SenderObjectImpl, isSender));
   private Sender sender;
   this(Sender sender) {
     this.sender = sender;
