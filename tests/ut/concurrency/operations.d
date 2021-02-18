@@ -86,3 +86,14 @@ unittest {
 @safe unittest {
   ValueSender!int(3).then((int i) shared => i*3).sync_wait().shouldEqual(9);
 }
+
+@("finally")
+unittest {
+  ValueSender!int(1).finally_(() => 4).sync_wait().should == 4;
+  ValueSender!int(2).finally_(3).sync_wait().should == 3;
+  ThrowingSender().finally_(3).sync_wait().should == 3;
+  ThrowingSender().finally_(() => 4).sync_wait().should == 4;
+  ThrowingSender().finally_(3).sync_wait().should == 3;
+  DoneSender().finally_(() => 4).sync_wait().shouldThrowWithMessage("Canceled");
+  DoneSender().finally_(3).sync_wait().shouldThrowWithMessage("Canceled");
+}
