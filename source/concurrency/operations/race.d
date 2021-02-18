@@ -151,7 +151,10 @@ private struct RaceReceiver(Receiver, InnerValue, Value) {
 
       if (isLast(transition.new_)) {
         state.cb.dispose();
-        setReceiverValue();
+        if (receiver.getStopToken().isStopRequested())
+          receiver.setDone();
+        else
+          setReceiverValue();
       }
     }
   else
@@ -162,17 +165,20 @@ private struct RaceReceiver(Receiver, InnerValue, Value) {
       }
       if (isLast(transition.new_)) {
         state.cb.dispose();
-        setReceiverValue();
+        if (receiver.getStopToken().isStopRequested())
+          receiver.setDone();
+        else
+          setReceiverValue();
       }
     }
   void setDone() {
     auto transition = update(0);
     if (isLast(transition.new_)) {
       state.cb.dispose();
-      if (isValueProduced(transition.new_))
-        setReceiverValue();
-      else if (state.isStopRequested())
+      if (receiver.getStopToken().isStopRequested())
         receiver.setDone();
+      else if (isValueProduced(transition.new_))
+        setReceiverValue();
       else if (isExceptionProduced(transition.new_))
         receiver.setError(state.exception);
       else
@@ -188,10 +194,10 @@ private struct RaceReceiver(Receiver, InnerValue, Value) {
 
     if (isLast(transition.new_)) {
       state.cb.dispose();
-      if (isValueProduced(transition.new_))
-        setReceiverValue();
-      else if (state.isStopRequested())
+      if (receiver.getStopToken().isStopRequested())
         receiver.setDone();
+      else if (isValueProduced(transition.new_))
+        setReceiverValue();
       else
         receiver.setError(state.exception);
     }
