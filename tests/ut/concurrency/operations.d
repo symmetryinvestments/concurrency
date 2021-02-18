@@ -62,3 +62,27 @@ unittest {
   nursery.sync_wait().should == false;
 }
 
+@("via")
+unittest {
+  struct VoidSender {
+    alias Value = void;
+    struct VoidOp(Receiver) {
+      Receiver receiver;
+      void start() {
+        receiver.setValue();
+      }
+    }
+    auto connect(Receiver)(Receiver receiver) {
+      return VoidOp!Receiver(receiver);
+    }
+  }
+  import std.typecons : tuple;
+  ValueSender!int(3).via(ValueSender!int(6)).sync_wait().should == tuple(6,3);
+  ValueSender!int(5).via(VoidSender()).sync_wait().should == 5;
+  VoidSender().via(ValueSender!int(4)).sync_wait().should == 4;
+}
+
+@("then.value")
+@safe unittest {
+  ValueSender!int(3).then((int i) shared => i*3).sync_wait().shouldEqual(9);
+}
