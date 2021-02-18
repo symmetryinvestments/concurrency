@@ -169,3 +169,33 @@ template canSenderThrow(Sender) {
 
 static assert( canSenderThrow!ThrowingSender);
 static assert(!canSenderThrow!(ValueSender!int));
+
+/// A sender that always calls setDone
+struct DoneSender {
+  static assert (models!(DoneSender, isSender));
+  alias Value = void;
+  static struct DoneOp(Receiver) {
+    Receiver receiver;
+    void start() {
+      receiver.setDone();
+    }
+  }
+  auto connect(Receiver)(Receiver receiver) {
+    return DoneOp!(Receiver)(receiver);
+  }
+}
+
+/// A sender that always calls setValue with no args
+struct VoidSender {
+  static assert (models!(VoidSender, isSender));
+  alias Value = void;
+  struct VoidOp(Receiver) {
+    Receiver receiver;
+    void start() {
+      receiver.setValue();
+    }
+  }
+  auto connect(Receiver)(Receiver receiver) {
+    return VoidOp!Receiver(receiver);
+  }
+}
