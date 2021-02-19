@@ -7,3 +7,4 @@ public import concurrency.operations.withstoptoken;
 public import concurrency.operations.race;
 public import concurrency.operations.via;
 public import concurrency.operations.finally_;
+public import concurrency.operations.whenall;

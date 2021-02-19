@@ -10,6 +10,7 @@ import concurrency.nursery;
 import unit_threaded;
 import core.time;
 import core.thread;
+import std.typecons;
 
 @("ignoreErrors.sync_wait.value")
 @safe unittest {
@@ -84,4 +85,34 @@ unittest {
   ThrowingSender().finally_(3).sync_wait().should == 3;
   DoneSender().finally_(() => 4).sync_wait().shouldThrowWithMessage("Canceled");
   DoneSender().finally_(3).sync_wait().shouldThrowWithMessage("Canceled");
+}
+
+@("whenAll")
+unittest {
+  whenAll(ValueSender!int(1), ValueSender!int(2)).sync_wait.should == tuple(1,2);
+  whenAll(VoidSender(), ValueSender!int(2)).sync_wait.should == 2;
+  whenAll(ValueSender!int(1), VoidSender()).sync_wait.should == 1;
+  whenAll(VoidSender(), VoidSender()).sync_wait.should == true;
+  whenAll(ValueSender!int(1), ThrowingSender()).sync_wait.shouldThrow;
+  whenAll(ThrowingSender(), ValueSender!int(1)).sync_wait.shouldThrow;
+  whenAll(ValueSender!int(1), DoneSender()).sync_wait.shouldThrowWithMessage("Canceled");
+  whenAll(DoneSender(), ValueSender!int(1)).sync_wait.shouldThrowWithMessage("Canceled");
+
+}
+
+@("whenAll.cancel")
+unittest {
+  auto waiting = ThreadSender().withStopToken((StopToken token){
+      while (!token.isStopRequested) { Thread.yield(); }
+    });
+  whenAll(waiting, DoneSender()).sync_wait.should == false;
+  whenAll(ThrowingSender(), waiting).sync_wait.shouldThrow;
+  whenAll(waiting, ThrowingSender()).sync_wait.shouldThrow;
+  auto waitingInt = ThreadSender().withStopToken((StopToken token){
+      while (!token.isStopRequested) { Thread.yield(); }
+      return 42;
+    });
+  whenAll(waitingInt, DoneSender()).sync_wait.shouldThrowWithMessage("Canceled");
+  whenAll(ThrowingSender(), waitingInt).sync_wait.shouldThrow;
+  whenAll(waitingInt, ThrowingSender()).sync_wait.shouldThrow;
 }

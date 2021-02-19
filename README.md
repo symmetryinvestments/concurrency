@@ -38,17 +38,17 @@ Senders enjoy the following operations.
 
 - `withStopSource`. When applied after a Sender you can stop the Sender manually with the stopsource. It will still stop when the downstream receiver's StopToken is triggered.
 
-- `race`. Runs 2 Senders and completes with the value produced by the first that completes, before first cancelling and awaiting the other. When both Senders complete with an error, the first error is propagated.
+- `race`. Runs 2 Senders and completes with the value produced by the first to complete, after first cancelling and awaiting the others. When both Senders complete with an error, the first error is propagated. When both Senders complete with cancellation, `race` completes with cancellation as well.
 
 - `ignoreError`. Redirects the `setException` to `setDone`, so as not to trigger the downstream error path.
 
 - `finally_`. Takes a Sender and a callable or value and completes with that regardless of whether the Sender completed with `setValue` or `setException`.
 
+- `whenAll`. Produces a tuple of values after all Senders produced their values. If one or more Senders complete with an error, `whenAll` will complete with the first error, after stopping and awaiting the remaining Senders. Likewise, if one Sender completes with cancellation, `whenAll` completes with cancellation as well, after stopping and awaiting the remaining Senders.
+
 ### To be added
 
 - `retry`. It retries the underlying Sender as many times as unconfigured until success or cancellation.
-
-- `when_all`. It completes only when all Senders have completed. If any Sender completed with an error, all Senders are cancelled.
 
 - others...
 

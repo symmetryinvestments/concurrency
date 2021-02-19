@@ -4,6 +4,7 @@ import concurrency;
 import concurrency.receiver;
 import concurrency.sender;
 import concurrency.stoptoken;
+import concurrency.utils : spin_yield, casWeak;
 import concepts;
 import std.traits;
 
@@ -61,31 +62,6 @@ private class State(Value) : StopSource {
   Exception exception;
   shared size_t racestate;
 }
-
-private void spin_yield() nothrow @trusted @nogc {
-  // TODO: could use the pause asm instruction
-  // it is available in LDC as intrinsic... but not in DMD
-  import core.thread : Thread;
-
-  Thread.yield();
-}
-
-/// ugly ugly
-static if (__traits(compiles, () { import core.atomic : casWeak; }) && __traits(compiles, () {
-      import core.internal.atomic : atomicCompareExchangeWeakNoResult;
-    }))
-  import core.atomic : casWeak;
- else {
-   import core.atomic : MemoryOrder;
-   auto casWeak(MemoryOrder M1, MemoryOrder M2, T, V1, V2)(T* here, V1 ifThis, V2 writeThis) pure nothrow @nogc @safe {
-     import core.atomic : cas;
-
-     static if (__traits(compiles, cas!(M1, M2)(here, ifThis, writeThis)))
-       return cas!(M1, M2)(here, ifThis, writeThis);
-     else
-       return cas(here, ifThis, writeThis);
-   }
- }
 
 private enum Flags : size_t {
   locked = 0x1,
