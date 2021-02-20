@@ -98,7 +98,7 @@ package struct LocalThreadWorker {
   }
 }
 
-package void executeInNewThread(VoidFunction fn) @system {
+package void executeInNewThread(VoidFunction fn) @system nothrow {
   import concurrency.utils : closure;
   import core.thread : Thread, thread_detachThis, thread_detachInstance;
   version (Posix) import core.sys.posix.pthread : pthread_detach, pthread_self;
@@ -108,10 +108,22 @@ package void executeInNewThread(VoidFunction fn) @system {
         version (Posix)
           pthread_detach(pthread_self); //NOTE: see git.symmetry.dev/SIL/plugins/alpha/web/-/issues/3
       }, fn)).start();
-  t.isDaemon = true; // is needed because of pthread_detach (otherwise there is a race between druntime joining and the thread exiting)
+  try {
+    /*
+      the isDaemon is really only a protecting against a race condition in druntime,
+      which is only introduced because I am detaching the thread, which I need to do
+      if I don't want to leak memory.
+
+      If the isDaemon fails because the Thread is gone (unlikely) than it can't
+      trigger unwanted behavior the isDaemon is preventing in the first place.
+
+      So it is fine if the exception is ignored.
+     */
+    t.isDaemon = true; // is needed because of pthread_detach (otherwise there is a race between druntime joining and the thread exiting)
+  } catch (Exception e) {}
 }
 
-package void executeInNewThread(VoidDelegate fn) @system {
+package void executeInNewThread(VoidDelegate fn) @system nothrow {
   import concurrency.utils : closure;
   import core.thread : Thread, thread_detachThis, thread_detachInstance;
   version (Posix) import core.sys.posix.pthread : pthread_detach, pthread_self;
@@ -121,7 +133,19 @@ package void executeInNewThread(VoidDelegate fn) @system {
         version (Posix)
           pthread_detach(pthread_self); //NOTE: see git.symmetry.dev/SIL/plugins/alpha/web/-/issues/3
       }, fn)).start();
-  t.isDaemon = true; // is needed because of pthread_detach (otherwise there is a race between druntime joining and the thread exiting)
+  try {
+    /*
+      the isDaemon is really only a protecting against a race condition in druntime,
+      which is only introduced because I am detaching the thread, which I need to do
+      if I don't want to leak memory.
+
+      If the isDaemon fails because the Thread is gone (unlikely) than it can't
+      trigger unwanted behavior the isDaemon is preventing in the first place.
+
+      So it is fine if the exception is ignored.
+    */
+    t.isDaemon = true; // is needed because of pthread_detach (otherwise there is a race between druntime joining and the thread exiting)
+  } catch (Exception e) {}
 }
 
 class ThreadExecutor : Executor {
@@ -170,7 +194,7 @@ struct ThreadSender {
   alias Value = void;
   private struct Op(Receiver) {
     private Receiver receiver;
-    void start() @trusted {
+    void start() @trusted nothrow {
       import concurrency.utils : closure;
       import concurrency.receiver : setValueOrError;
       executeInNewThread(closure((Receiver receiver) @safe {
