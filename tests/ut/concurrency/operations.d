@@ -97,6 +97,8 @@ unittest {
   whenAll(ThrowingSender(), ValueSender!int(1)).sync_wait.shouldThrow;
   whenAll(ValueSender!int(1), DoneSender()).sync_wait.shouldThrowWithMessage("Canceled");
   whenAll(DoneSender(), ValueSender!int(1)).sync_wait.shouldThrowWithMessage("Canceled");
+  whenAll(DoneSender(), ThrowingSender()).sync_wait.shouldThrowWithMessage("ThrowingSender");
+  whenAll(ThrowingSender(), DoneSender()).sync_wait.shouldThrowWithMessage("ThrowingSender");
 
 }
 
