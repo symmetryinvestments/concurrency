@@ -6,9 +6,9 @@ Provides various primitives useful for structured concurrency and async tasks.
 
 ## Senders/Receivers
 
-A Sender is a lazy Task (in the general sense of the word). It needs to be connected to a Receiver and then started before it will (eventually) call one of the three receiver methods exactly once: setValue, setDone, setError.
+A Sender is a lazy Task (in the general sense of the word). It needs to be connected to a Receiver and then started before it will (eventually) call one of the three receiver methods exactly once: `setValue`, `setDone`, `setError`.
 
-It can be used to model many asynchronous operations. It enforces structured concurrency because a Sender cannot start without it being awaited on.
+It can be used to model many asynchronous operations: Futures, Fiber, Coroutines, Threads, etc. It enforces structured concurrency because a Sender cannot start without it being awaited on.
 
  `setValue` is the only one allowed to throw exceptions, and if it does, `setError` is called with the Exception. `setDone` is called when the operation has been cancelled. 
 
@@ -19,10 +19,40 @@ Currently we have the following Senders:
 - `ValueSender`. Just produces a plain value.
 - `ThreadSender`. Calls the setValue function in the context of a new thread.
 - `Nursery`. A place to await multiple Senders.
-- `ForkSender`. Forks the program and executes supplied function.
+- `ForkSender`. Forks the program and executes the supplied function.
 - `ThrowingSender`. Always throws.
 - `DoneSender`. Always cancels.
-- `VoidSender`. Always calls setValue with no args.
+- `VoidSender`. Always calls setValue with no arguments.
+
+### Writing your own Sender
+
+Most of the asynchronous tasks you will do involve writing your own `Sender`. 
+
+Here is the implementation of the `ValueSender`.
+
+```
+/// A Sender that sends a single value of type T
+struct ValueSender(T) {
+  alias Value = T;
+  static struct Op(Receiver) {
+    Receiver receiver;
+    T t;
+    void start() {
+      receiver.setValue(t);
+    }
+  }
+  T t;
+  Op!Receiver connect(Receiver)(Receiver r) {
+    return Op!(Receiver)(r, t);
+  }
+}
+```
+
+A `ValueSender!int` is nothing more than a `int` wrapped in a struct with a `connect` method. It can be constructed and passed around, but it won't produce a value until it is connected and started. The `Op` object (operational-state) returned by `connect` represents a connected Sender/Receiver pair's state, which in case of the `ValueSender` includes the value to be send. After connecting the operational-state still needis its `start` method to be called, before it actually produces a value.
+
+A Receiver implements at least the `setValue`, `setError` and `setDone`. A Sender is required to call exactly one of the three functions. Both `setError` and `setdone` are required to be `nothrow`. If `setValue` is not nothrow then the Sender must call `setError` if `setValue` throws.
+
+Most Senders should call `receiver.getStopToken` to retrieve a stoptoken by which they can be notified (or polled) whether they are cancelled. See the section of stoptokens how this works.
 
 ## Operations
 
