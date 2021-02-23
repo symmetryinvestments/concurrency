@@ -107,12 +107,12 @@ class Nursery : StopSource {
     size_t id = atomicOp!"+="(counter, 1);
     auto op = sender.connect(NurseryReceiver!(Sender.Value)(this, id));
 
-    mutex.lock();
+    mutex.lock_nothrow();
     // TODO: might also use the receiver as key instead of a wrapping ulong
     operations ~= Node(() => op.start(), id);
     atomicOp!"+="(busy, 1);
     bool hasStarted = this.receiver !is null;
-    mutex.unlock();
+    mutex.unlock_nothrow();
 
     if (hasStarted)
       op.start();

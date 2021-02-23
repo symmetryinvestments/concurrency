@@ -159,3 +159,9 @@ unittest {
 
   nursery.sync_wait().shouldEqual(false);
 }
+
+@("nothrow")
+@safe unittest {
+  auto nursery = new shared Nursery();
+  (() nothrow => nursery.run(ValueSender!int(21)))();
+}
