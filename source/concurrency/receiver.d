@@ -28,13 +28,13 @@ interface ReceiverObjectBase(T) {
   static assert (models!(ReceiverObjectBase!T, isReceiver));
   void setValue(T value = T.init) @safe;
   void setDone() nothrow @safe;
-  void setError(Exception) nothrow @safe;
+  void setError(Exception e) nothrow @safe;
   StopTokenObject getStopToken() nothrow @safe;
 }
 
 struct NullReceiver(T) {
   void setDone() nothrow @safe @nogc {}
-  void setError(Exception) nothrow @safe @nogc {}
+  void setError(Exception e) nothrow @safe @nogc {}
   static if (is(T == void))
     void setValue() nothrow @safe @nogc {}
   else
@@ -43,7 +43,7 @@ struct NullReceiver(T) {
 
 struct ThrowingNullReceiver(T) {
   void setDone() nothrow @safe @nogc {}
-  void setError(Exception) nothrow @safe @nogc {}
+  void setError(Exception e) nothrow @safe @nogc {}
   static if (is(T == void))
     void setValue() @safe { throw new Exception("ThrowingNullReceiver"); }
   else

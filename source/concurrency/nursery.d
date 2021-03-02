@@ -162,7 +162,7 @@ class Nursery : StopSource {
 private interface ReceiverObject {
   void setValue() @safe;
   void setDone() nothrow @safe;
-  void setError(Exception) nothrow @safe;
+  void setError(Exception e) nothrow @safe;
 }
 
 private struct NurseryReceiver(Value) {
