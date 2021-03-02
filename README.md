@@ -103,3 +103,9 @@ The simplest way is to poll the stoptoken regularly. There is a `isStopRequested
 In some case you might need a push notification that a stop has been requested. There is a free function called `onStop` that takes a StopToken and a delegate. The delegate will be called - in another execution context - to signify that a stop is requested. The `onStop` function returns a `StopCallback` that needs its `dispose` to be called before or after the Sender has called one of the completion functions. Not calling `dispose` will lead to memory leaks in long-running Senders (e.g. the Nursery).
 
 See http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2175r0.html for a thorough explanation for why we need stop tokens in particular and cancellation in general.
+
+## DSemver
+
+This package uses [dsemver](https://github.com/symmetryinvestments/dsemver) to calculate the next semantic version.
+
+run `dub run dsemver@1.1.0 -- -p $(pwd) -c` to calcuate the next version.

@@ -13,3 +13,4 @@ concurrency-test-*
 *.o
 *.obj
 *.lst
+.dsemver
