@@ -330,8 +330,9 @@ private:
   }
 
   bool try_lock_and_signal_until_signalled() nothrow @safe @nogc {
-    ulong oldState = state_.atomicLoad!(MemoryOrder.acq);
+    ulong oldState;
     do {
+      oldState = state_.atomicLoad!(MemoryOrder.acq);
       if (is_stop_requested(oldState))
         return false;
       while (is_locked(oldState)) {
@@ -347,8 +348,9 @@ private:
   }
 
   void lock() nothrow @safe @nogc {
-    auto oldState = state_.atomicLoad!(MemoryOrder.raw);
+    ulong oldState;
     do {
+      oldState = state_.atomicLoad!(MemoryOrder.raw);
       while (is_locked(oldState)) {
         spin_yield();
         oldState = state_.atomicLoad!(MemoryOrder.raw);
