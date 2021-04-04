@@ -38,7 +38,6 @@ bool wait(StopToken stopToken, Duration dur) nothrow @trusted {
       scope(exit) m.unlock_nothrow();
       return !cond.wait(dur);
     } else version (Posix) {
-      import core.sys.linux.timerfd;
       import core.sys.linux.sys.eventfd;
       import core.sys.posix.sys.select;
       import std.exception : ErrnoException;
