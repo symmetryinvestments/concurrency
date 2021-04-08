@@ -2,7 +2,7 @@ name "concurrency"
 description "concurrency library"
 authors "skoppe"
 copyright "Copyright © 2021, skoppe"
-license "proprietary"
+license "MIT"
 dependency "mir-core" version="~>1.1.62"
 dependency "concepts" version="~>0.0.8"
 configuration "default" {
