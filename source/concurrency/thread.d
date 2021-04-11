@@ -139,7 +139,7 @@ package void executeInNewThread(VoidDelegate fn) @system nothrow {
       which is only introduced because I am detaching the thread, which I need to do
       if I don't want to leak memory.
 
-      If the isDaemon fails because the Thread is gone (unlikely) than it can't
+      If the isDaemon fails because the Thread is gone (unlikely) then it can't
       trigger unwanted behavior the isDaemon is preventing in the first place.
 
       So it is fine if the exception is ignored.
@@ -172,14 +172,28 @@ auto executeAndWait(Executor, Work, Args...)(Executor executor, Work work, Args 
   auto localSemaphore = semaphore;
 
   alias RT = ReturnType!Work;
-  static if (is(RT == void)) {
-    executor.execute(cast(VoidDelegate)() { work(args); localSemaphore.notify(); });
-    semaphore.wait();
-  } else {
-    RT result;
-    executor.execute(cast(VoidDelegate)() { result = work(args); localSemaphore.notify(); });
-    semaphore.wait();
-    return result;
+  struct Context {
+    Work work;
+    Args args;
+    Semaphore semaphore;
+    static if (is(RT == void)) {
+      void run() {
+        work(args);
+        semaphore.notify();
+      }
+    } else {
+      RT result;
+      void run() {
+        result = work(args);
+        semaphore.notify();
+      }
+    }
+  }
+  Context c = Context(work, args, localSemaphore);
+  executor.execute(cast(VoidDelegate)&c.run);
+  semaphore.wait();
+  static if (!is(RT == void)) {
+    return c.result;
   }
 }
 

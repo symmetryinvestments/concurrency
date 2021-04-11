@@ -10,34 +10,47 @@ bool isMainThread() @trusted {
   return Thread.getThis().isMainThread();
 }
 
-private struct SyncWaitReceiver(Value, bool isNoThrow) {
-  LocalThreadWorker* worker;
-  bool* canceled;
-  static if (!is(Value == void))
-    Value* result;
-  static if (!isNoThrow)
-    Exception* exception;
-  StopSource stopSource;
-  void setDone() nothrow @safe {
-    (*canceled) = true;
-    worker.stop();
+package struct SyncWaitReceiver2(Value, bool isNoThrow) {
+  static struct State {
+    LocalThreadWorker worker;
+    bool canceled;
+    static if (!is(Value == void))
+      Value result;
+    static if (!isNoThrow)
+      Exception exception;
+    StopSource stopSource;
+
+    this(StopSource stopSource) {
+      this.stopSource = stopSource;
+      worker = LocalThreadWorker(getLocalThreadExecutor());
+    }
+
+    void handleSignal(int signal) {
+      stopSource.stop();
+    }
   }
+  State* state;
+  void setDone() nothrow @safe {
+    state.canceled = true;
+    state.worker.stop();
+  }
+
   static if (!isNoThrow)
     void setError(Exception e) nothrow @safe {
-      (*exception) = e;
-      worker.stop();
+      state.exception = e;
+      state.worker.stop();
     }
   static if (is(Value == void))
     void setValue() nothrow @safe {
-      worker.stop();
+      state.worker.stop();
     }
   else
     void setValue(Value value) nothrow @safe {
-      (*result) = value;
-      worker.stop();
+      state.result = value;
+      state.worker.stop();
     }
   auto getStopToken() nothrow @safe @nogc {
-    return StopToken(stopSource);
+    return StopToken(state.stopSource);
   }
 }
 
@@ -47,62 +60,43 @@ auto sync_wait(Sender)(auto ref Sender sender, StopSource stopSource = null) {
   import core.sys.posix.signal : SIGTERM, SIGINT;
 
   alias Value = Sender.Value;
-
   enum NoThrow = !canSenderThrow!(Sender);
-  static if (!NoThrow)
-    Exception exception;
-  SignalHandler signalHandler;
-  bool canceled;
-  static if (!is(Value == void))
-    Value result;
 
-  auto localThreadExecutor = getLocalThreadExecutor();
-  import std.stdio;
+  alias Receiver = SyncWaitReceiver2!(Value, NoThrow);
+
+  auto state = Receiver.State(stopSource is null ? new StopSource() : stopSource);
+  Receiver receiver = Receiver(&state);
+  SignalHandler signalHandler;
+
   if (stopSource is null) {
-    stopSource = new StopSource();
     /// TODO: not so sure about this
     if (isMainThread) {
-      signalHandler.setup((int signal) => cast(void)stopSource.stop());
+      (()@trusted => signalHandler.setup(&state.handleSignal))();
       signalHandler.on(SIGINT);
       signalHandler.on(SIGTERM);
     }
-  }
-  auto worker = LocalThreadWorker(localThreadExecutor);
-
-  alias Receiver = SyncWaitReceiver!(Value, NoThrow);
-
-  static if (!is(Value == void)) {
-    static if (!NoThrow)
-      auto receiver = Receiver(&worker, &canceled, &result, &exception, stopSource);
-    else
-      auto receiver = Receiver(&worker, &canceled, &result, stopSource);
-  } else {
-    static if (!NoThrow)
-      auto receiver = Receiver(&worker, &canceled, &exception, stopSource);
-    else
-      auto receiver = Receiver(&worker, &canceled, stopSource);
   }
 
   /// we allow passing a scoped receiver because we know this sender will terminate before this function ends
   (()@trusted => sender.connect(receiver).start())();
 
-  worker.start();
+  state.worker.start();
 
   if (isMainThread)
     signalHandler.teardown();
 
   /// if exception, rethrow
   static if (!NoThrow)
-    if (exception !is null)
-      throw exception;
+    if (state.exception !is null)
+      throw state.exception;
 
   /// if no value, return true if not canceled
   static if (is(Value == void))
-    return !canceled;
+    return !state.canceled;
   else {
-    if (canceled)
+    if (state.canceled)
       throw new Exception("Canceled");
 
-    return result;
+    return state.result;
   }
 }
