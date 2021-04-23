@@ -118,3 +118,35 @@ unittest {
   whenAll(ThrowingSender(), waitingInt).sync_wait.shouldThrow;
   whenAll(waitingInt, ThrowingSender()).sync_wait.shouldThrow;
 }
+
+@("retry")
+unittest {
+  ValueSender!int(5).retry(Times(5)).sync_wait.should == 5;
+  int t = 3;
+  int n = 0;
+  struct Sender {
+    alias Value = void;
+    static struct Op(Receiver) {
+      Receiver receiver;
+      bool fail;
+      void start() nothrow {
+        if (fail)
+          receiver.setError(new Exception("Fail fail fail"));
+        else
+          receiver.setValue();
+      }
+    }
+    auto connect(Receiver)(Receiver receiver) {
+      return Op!(Receiver)(receiver, n++ < t);
+    }
+  }
+  Sender().retry(Times(5)).sync_wait.should == true;
+  n.should == 4;
+  n = 0;
+
+  Sender().retry(Times(2)).sync_wait.shouldThrowWithMessage("Fail fail fail");
+  n.should == 2;
+  shared int p = 0;
+  ThreadSender().then(()shared { import core.atomic; p.atomicOp!("+=")(1); throw new Exception("Failed"); }).retry(Times(5)).sync_wait.shouldThrowWithMessage("Failed");
+  p.should == 5;
+}

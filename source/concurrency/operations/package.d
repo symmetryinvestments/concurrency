@@ -8,3 +8,4 @@ public import concurrency.operations.race;
 public import concurrency.operations.via;
 public import concurrency.operations.finally_;
 public import concurrency.operations.whenall;
+public import concurrency.operations.retry;
