@@ -47,7 +47,7 @@ private struct ThenReceiver(Receiver, Value, Fun) {
 private struct Op(Sender, Receiver, Fun) {
   Sender sender;
   ThenReceiver!(Receiver, Sender.Value, Fun) receiver;
-  void start() nothrow {
+  void start() {
     sender.connect(receiver).start();
   }
 }

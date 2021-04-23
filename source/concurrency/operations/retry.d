@@ -43,8 +43,13 @@ private struct RetryReceiver(Receiver, Sender, Logic) {
   void setError(Exception e) nothrow {
     if (logic.failure(e))
       receiver.setError(e);
-    else
-      sender.connect(this).start();
+    else {
+      try {
+        sender.connect(this).start();
+      } catch (Exception e) {
+        receiver.setError(e);
+      }
+    }
   }
   auto getStopToken() nothrow @safe {
     return receiver.getStopToken();
