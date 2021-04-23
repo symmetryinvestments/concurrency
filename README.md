@@ -76,11 +76,7 @@ Senders enjoy the following operations.
 
 - `whenAll`. Produces a tuple of values after all Senders produced their values. If one or more Senders complete with an error, `whenAll` will complete with the first error, after stopping and awaiting the remaining Senders. Likewise, if one Sender completes with cancellation, `whenAll` completes with cancellation as well, after stopping and awaiting the remaining Senders.
 
-### To be added
-
-- `retry`. It retries the underlying Sender as many times as unconfigured until success or cancellation.
-
-- others...
+- `retry`. It retries the underlying Sender until success or cancellation. The retry logic is customizable. Included is a Times, that will retry n times and then propagate the latest failure.
 
 ## Nursery
 
