@@ -109,7 +109,7 @@ class Nursery : StopSource {
 
     mutex.lock_nothrow();
     // TODO: might also use the receiver as key instead of a wrapping ulong
-    operations ~= Node(() => op.start(), id);
+    operations ~= cast(shared) Node(() => op.start(), id);
     atomicOp!"+="(busy, 1);
     bool hasStarted = this.receiver !is null;
     mutex.unlock_nothrow();
