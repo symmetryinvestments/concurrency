@@ -72,18 +72,30 @@ private template WhenAllResult(Senders...) {
 }
 
 private struct WhenAllOp(Receiver, Senders...) {
+  import std.meta : staticMap;
+  alias R = WhenAllResult!(Senders);
+  alias ElementReceiver(Sender) = WhenAllReceiver!(Receiver, Sender.Value, R);
+  alias ConnectResult(Sender) = ReturnType!(Sender.connect!(ElementReceiver!Sender));
+  alias Ops = staticMap!(ConnectResult, Senders);
   Receiver receiver;
-  Senders senders;
+  WhenAllState!R state;
+  Ops ops;
+  this(Receiver receiver, Senders senders) {
+    this.receiver = receiver;
+    state = new WhenAllState!R();
+    foreach(i, Sender; Senders) {
+      ops[i] = senders[i].connect(WhenAllReceiver!(Receiver, Sender.Value, WhenAllResult!(Senders))(receiver, state, i, Senders.length));
+    }
+  }
   void start() @trusted {
     import concurrency.stoptoken : StopSource;
     if (receiver.getStopToken().isStopRequested) {
       receiver.setDone();
       return;
     }
-    auto state = new WhenAllState!(WhenAllResult!(Senders))();
     state.cb = receiver.getStopToken().onStop(cast(void delegate() nothrow @safe shared)&state.stop); // butt ugly cast, but it won't take the second overload
-    foreach(i, Sender; Senders) {
-      senders[i].connect(WhenAllReceiver!(Receiver, Sender.Value, WhenAllResult!(Senders))(receiver, state, i, Senders.length)).start();
+    foreach(i, _; Senders) {
+      ops[i].start();
     }
   }
 }

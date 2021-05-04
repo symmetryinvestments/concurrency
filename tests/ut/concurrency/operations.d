@@ -183,3 +183,10 @@ unittest {
   ThreadSender().then(()shared { import core.atomic; p.atomicOp!("+=")(1); throw new Exception("Failed"); }).retry(Times(5)).sync_wait.shouldThrowWithMessage("Failed");
   p.should == 5;
 }
+
+@("whenAll.oob")
+unittest {
+  auto oob = OutOfBandValueSender!int(43);
+  auto value = ValueSender!int(11);
+  whenAll(oob, value).sync_wait().should == tuple(43, 11);
+}
