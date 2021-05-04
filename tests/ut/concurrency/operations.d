@@ -22,7 +22,7 @@ struct OutOfBandValueSender(T) {
     void run() {
       receiver.setValue(t);
     }
-    void start() {
+    void start() @trusted {
       auto t = new Thread(&this.run).start();
     }
   }
@@ -106,6 +106,11 @@ unittest {
 @("then.value")
 @safe unittest {
   ValueSender!int(3).then((int i) shared => i*3).sync_wait().shouldEqual(9);
+}
+
+@("then.oob")
+@safe unittest {
+  OutOfBandValueSender!int(46).then((int i) shared => i*3).sync_wait().shouldEqual(138);
 }
 
 @("finally")

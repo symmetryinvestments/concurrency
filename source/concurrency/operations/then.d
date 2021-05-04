@@ -44,14 +44,6 @@ private struct ThenReceiver(Receiver, Value, Fun) {
   }
 }
 
-private struct Op(Sender, Receiver, Fun) {
-  Sender sender;
-  ThenReceiver!(Receiver, Sender.Value, Fun) receiver;
-  void start() {
-    sender.connect(receiver).start();
-  }
-}
-
 private struct ThenSender(Sender, Fun) {
   import std.traits : ReturnType;
   static assert(models!(typeof(this), isSender));
@@ -59,6 +51,7 @@ private struct ThenSender(Sender, Fun) {
   Sender sender;
   Fun fun;
   auto connect(Receiver)(Receiver receiver) {
-    return Op!(Sender, Receiver, Fun)(sender, ThenReceiver!(Receiver, Sender.Value, Fun)(receiver, fun));
+    alias R = ThenReceiver!(Receiver, Sender.Value, Fun);
+    return sender.connect(R(receiver, fun));
   }
 }
