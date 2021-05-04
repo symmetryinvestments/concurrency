@@ -20,3 +20,14 @@ configuration "unittest" {
 configuration "nodip" {
 	targetType "library"
 }
+
+configuration "unittest-asan" {
+	dependency "unit-threaded" version=">=0.0.0"
+	targetType "executable"
+	mainSourceFile "tests/ut/ut_runner.d"
+	dflags "-dip1000" "-dip25" "-fsanitize=address"
+	sourcePaths "source" "tests/ut"
+	importPaths "source" "tests/ut"
+  # buildOptions "unittests"  "optimize"  "inline"
+  buildOptions "unittests"  "optimize"
+}
