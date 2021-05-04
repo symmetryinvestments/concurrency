@@ -68,20 +68,13 @@ private struct SSReceiver(Receiver, Value) {
   }
 }
 
-private struct Op(Receiver, Sender) {
-  Sender sender;
-  SSReceiver!(Receiver,Sender.Value) receiver;
-  void start() {
-    sender.connect(receiver).start();
-  }
-}
-
 private struct SSSender(Sender) {
   static assert(models!(typeof(this), isSender));
   alias Value = Sender.Value;
   Sender sender;
   StopSource stopSource;
   auto connect(Receiver)(Receiver receiver) {
-    return Op!(Receiver,Sender)(sender, SSReceiver!(Receiver, Sender.Value)(receiver, stopSource));
+    alias R = SSReceiver!(Receiver, Sender.Value);
+    return sender.connect(R(receiver, stopSource));
   }
 }

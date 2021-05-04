@@ -201,3 +201,9 @@ unittest {
   auto oob = OutOfBandValueSender!int(44);
   oob.withStopToken((StopToken stopToken, int t) => t).sync_wait().should == 44;
 }
+
+@("withStopSource.oob")
+unittest {
+  auto oob = OutOfBandValueSender!int(45);
+  oob.withStopSource(new StopSource()).sync_wait().should == 45;
+}
