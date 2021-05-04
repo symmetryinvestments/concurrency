@@ -122,6 +122,7 @@ unittest {
 @("whenAll")
 unittest {
   whenAll(ValueSender!int(1), ValueSender!int(2)).sync_wait.should == tuple(1,2);
+  whenAll(ValueSender!int(1), ValueSender!int(2), ValueSender!int(3)).sync_wait.should == tuple(1,2,3);
   whenAll(VoidSender(), ValueSender!int(2)).sync_wait.should == 2;
   whenAll(ValueSender!int(1), VoidSender()).sync_wait.should == 1;
   whenAll(VoidSender(), VoidSender()).sync_wait.should == true;

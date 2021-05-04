@@ -8,8 +8,8 @@ import concepts;
 import std.traits;
 import concurrency.utils : spin_yield, casWeak;
 
-WhenAllSender!(SenderA, SenderB) whenAll(SenderA, SenderB)(SenderA senderA, SenderB senderB) {
-  return WhenAllSender!(SenderA, SenderB)(senderA, senderB);
+WhenAllSender!(Senders) whenAll(Senders...)(Senders senders) if (Senders.length > 1){
+  return WhenAllSender!(Senders)(senders);
 }
 
 private enum Flags : size_t {
@@ -23,7 +23,7 @@ private enum Counter : size_t {
   mask = ~0x7
 }
 
-private template WhenAllResult(SenderA, SenderB) {
+private template WhenAllResult(Senders...) {
   import std.meta;
   import std.typecons;
   import mir.algebraic : Algebraic, Nullable;
@@ -39,7 +39,8 @@ private template WhenAllResult(SenderA, SenderB) {
       alias Cummulative = AliasSeq!();
     }
   }
-  alias SenderValues = AliasSeq!(SenderA.Value, SenderB.Value);
+  alias SenderValue(T) = T.Value;
+  alias SenderValues = staticMap!(SenderValue, Senders);
   alias ValueTypes = Filter!(NoVoid, SenderValues);
   static if (ValueTypes.length > 1)
     alias Values = Tuple!(Filter!(NoVoid, SenderValues));
@@ -70,33 +71,32 @@ private template WhenAllResult(SenderA, SenderB) {
   }
 }
 
-private struct WhenAllOp(Receiver, SenderA, SenderB) {
+private struct WhenAllOp(Receiver, Senders...) {
   Receiver receiver;
-  SenderA senderA;
-  SenderB senderB;
+  Senders senders;
   void start() @trusted {
     import concurrency.stoptoken : StopSource;
     if (receiver.getStopToken().isStopRequested) {
       receiver.setDone();
       return;
     }
-    auto state = new WhenAllState!(WhenAllResult!(SenderA, SenderB))();
+    auto state = new WhenAllState!(WhenAllResult!(Senders))();
     state.cb = receiver.getStopToken().onStop(cast(void delegate() nothrow @safe shared)&state.stop); // butt ugly cast, but it won't take the second overload
-    senderA.connect(WhenAllReceiver!(Receiver, SenderA.Value, WhenAllResult!(SenderA, SenderB))(receiver, state, 0, 2)).start();
-    senderB.connect(WhenAllReceiver!(Receiver, SenderB.Value, WhenAllResult!(SenderA, SenderB))(receiver, state, 1, 2)).start();
+    foreach(i, Sender; Senders) {
+      senders[i].connect(WhenAllReceiver!(Receiver, Sender.Value, WhenAllResult!(Senders))(receiver, state, i, Senders.length)).start();
+    }
   }
 }
 
-private struct WhenAllSender(SenderA, SenderB) {
-  alias Result = WhenAllResult!(SenderA, SenderB);
+private struct WhenAllSender(Senders...) {
+  alias Result = WhenAllResult!(Senders);
   static if (hasMember!(Result, "values"))
     alias Value = typeof(Result.values);
   else
     alias Value = void;
-  SenderA senderA;
-  SenderB senderB;
+  Senders senders;
   auto connect(Receiver)(Receiver receiver) {
-    return WhenAllOp!(Receiver, SenderA, SenderB)(receiver, senderA, senderB);
+    return WhenAllOp!(Receiver, Senders)(receiver, senders);
   }
 }
 
