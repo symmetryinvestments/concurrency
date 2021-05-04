@@ -42,20 +42,13 @@ private struct STReceiver(Receiver, Value, Fun) {
   }
 }
 
-private struct Op(Receiver, Sender, Fun) {
-  Sender sender;
-  STReceiver!(Receiver, Sender.Value, Fun) receiver;
-  void start() {
-    sender.connect(receiver).start();
-  }
-}
-
 private struct STSender(Sender, Fun) {
   static assert(models!(typeof(this), isSender));
   alias Value = ReturnType!fun;
   Sender sender;
   Fun fun;
   auto connect(Receiver)(Receiver receiver) {
-    return Op!(Receiver, Sender, Fun)(sender, STReceiver!(Receiver, Sender.Value, Fun)(receiver, fun));
+    alias R = STReceiver!(Receiver, Sender.Value, Fun);
+    return sender.connect(R(receiver, fun));
   }
 }

@@ -190,3 +190,9 @@ unittest {
   auto value = ValueSender!int(11);
   whenAll(oob, value).sync_wait().should == tuple(43, 11);
 }
+
+@("withStopToken.oob")
+unittest {
+  auto oob = OutOfBandValueSender!int(44);
+  oob.withStopToken((StopToken stopToken, int t) => t).sync_wait().should == 44;
+}
