@@ -12,6 +12,25 @@ import core.time;
 import core.thread;
 import std.typecons;
 
+/// Used to test that Senders keep the operational state alive until one receiver's terminal is called
+struct OutOfBandValueSender(T) {
+  alias Value = T;
+  T t;
+  struct Op(Receiver) {
+    Receiver receiver;
+    T t;
+    void run() {
+      receiver.setValue(t);
+    }
+    void start() {
+      auto t = new Thread(&this.run).start();
+    }
+  }
+  auto connect(Receiver)(Receiver receiver) {
+    return Op!(Receiver)(receiver, t);
+  }
+}
+
 @("ignoreErrors.sync_wait.value")
 @safe unittest {
   bool delegate() shared dg = () shared { throw new Exception("Exceptions are rethrown"); };
@@ -22,6 +41,12 @@ import std.typecons;
     .shouldThrowWithMessage("Canceled");
 }
 
+@("oob")
+unittest {
+  auto oob = OutOfBandValueSender!int(43);
+  oob.sync_wait().should == 43;
+}
+
 @("race")
 unittest {
   race(ValueSender!int(4), ValueSender!int(5)).sync_wait.should == 4;
@@ -29,6 +54,13 @@ unittest {
   auto slowThread = ThreadSender().then(() shared { Thread.sleep(50.msecs); return 2; });
   race(fastThread, slowThread).sync_wait.should == 1;
   race(slowThread, fastThread).sync_wait.should == 1;
+}
+
+@("race.oob")
+unittest {
+  auto oob = OutOfBandValueSender!int(43);
+  auto value = ValueSender!int(11);
+  race(oob, value).sync_wait().should == 11;
 }
 
 @("race.exception.single")

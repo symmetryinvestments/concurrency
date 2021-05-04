@@ -30,19 +30,30 @@ private template Result(SenderA, SenderB) {
 }
 
 private struct RaceOp(Receiver, SenderA, SenderB) {
+  import std.traits : ReturnType;
+  alias ElementReceiver(Sender) = RaceReceiver!(Receiver, Sender.Value, R);
+  alias R = Result!(SenderA, SenderB);
+  alias OpA = ReturnType!(SenderA.connect!(ElementReceiver!SenderA));
+  alias OpB = ReturnType!(SenderB.connect!(ElementReceiver!SenderB));
   Receiver receiver;
-  SenderA senderA;
-  SenderB senderB;
+  State!R state;
+  OpA opA;
+  OpB opB;
+  this(Receiver receiver, SenderA senderA, SenderB senderB) {
+    this.receiver = receiver;
+    state = new State!(R)();
+    opA = senderA.connect(RaceReceiver!(Receiver, SenderA.Value, R)(receiver, state, 2));
+    opB = senderB.connect(RaceReceiver!(Receiver, SenderB.Value, R)(receiver, state, 2));
+  }
   void start() @trusted {
     import concurrency.stoptoken : StopSource;
     if (receiver.getStopToken().isStopRequested) {
       receiver.setDone();
       return;
     }
-    auto state = new State!(Result!(SenderA, SenderB))();
     state.cb = receiver.getStopToken().onStop(cast(void delegate() nothrow @safe shared)&state.stop); // butt ugly cast, but it won't take the second overload
-    senderA.connect(RaceReceiver!(Receiver, SenderA.Value, Result!(SenderA, SenderB))(receiver, state, 2)).start();
-    senderB.connect(RaceReceiver!(Receiver, SenderB.Value, Result!(SenderA, SenderB))(receiver, state, 2)).start();
+    opA.start();
+    opB.start();
   }
 }
 
