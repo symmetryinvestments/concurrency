@@ -56,6 +56,11 @@ unittest {
   race(slowThread, fastThread).sync_wait.should == 1;
 }
 
+@("race.multiple")
+unittest {
+  race(ValueSender!int(4), ValueSender!int(5), ValueSender!int(6)).sync_wait.should == 4;
+}
+
 @("race.oob")
 unittest {
   auto oob = OutOfBandValueSender!int(43);

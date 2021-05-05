@@ -11,39 +11,48 @@ import std.traits;
 /// Runs both Senders and propagates the value of whoever completes first
 /// if both error out the first exception is propagated,
 /// uses mir.algebraic if the Sender value types differ
-RaceSender!(SenderA, SenderB) race(SenderA, SenderB)(SenderA senderA, SenderB senderB) {
-  return RaceSender!(SenderA, SenderB)(senderA, senderB);
+RaceSender!(Senders) race(Senders...)(Senders senders) {
+  return RaceSender!(Senders)(senders);
 }
 
-private template Result(SenderA, SenderB) {
+private template Result(Senders...) {
+  import concurrency.utils : NoVoid;
   import mir.algebraic : Algebraic, Nullable;
-  static if (is(SenderA.Value == void) && is(SenderB.Value == void))
+  import std.meta : staticMap, Filter, NoDuplicates;
+  alias getValue(Sender) = Sender.Value;
+  alias SenderValues = staticMap!(getValue, Senders);
+  alias NoVoidValueTypes = Filter!(NoVoid, SenderValues);
+  enum HasVoid = SenderValues.length != NoVoidValueTypes.length;
+  alias ValueTypes = NoDuplicates!(NoVoidValueTypes);
+
+  static if (ValueTypes.length == 0)
     alias Result = void;
-  else static if (is(SenderA.Value == void))
-    alias Result = Nullable!(SenderB.Value);
-  else static if (is(SenderB.Value == void))
-    alias Result = Nullable!(SenderA.Value);
-  else static if (is(SenderA.Value == SenderB.Value))
-    alias Result = SenderA.Value;
-  else
-    alias Result = Algebraic!(SenderA.Value, SenderB.Value);
+  else static if (ValueTypes.length == 1)
+    static if (HasVoid)
+      alias Result = Nullable!(ValueTypes[0]);
+    else
+      alias Result = ValueTypes[0];
+  else {
+    alias Result = Algebraic!(ValueTypes);
+  }
 }
 
-private struct RaceOp(Receiver, SenderA, SenderB) {
+private struct RaceOp(Receiver, Senders...) {
+  import std.meta : staticMap;
   import std.traits : ReturnType;
+  alias R = Result!(Senders);
   alias ElementReceiver(Sender) = RaceReceiver!(Receiver, Sender.Value, R);
-  alias R = Result!(SenderA, SenderB);
-  alias OpA = ReturnType!(SenderA.connect!(ElementReceiver!SenderA));
-  alias OpB = ReturnType!(SenderB.connect!(ElementReceiver!SenderB));
+  alias ConnectResult(Sender) = ReturnType!(Sender.connect!(ElementReceiver!Sender));
+  alias Ops = staticMap!(ConnectResult, Senders);
   Receiver receiver;
   State!R state;
-  OpA opA;
-  OpB opB;
-  this(Receiver receiver, SenderA senderA, SenderB senderB) {
+  Ops ops;
+  this(Receiver receiver, Senders senders) {
     this.receiver = receiver;
     state = new State!(R)();
-    opA = senderA.connect(RaceReceiver!(Receiver, SenderA.Value, R)(receiver, state, 2));
-    opB = senderB.connect(RaceReceiver!(Receiver, SenderB.Value, R)(receiver, state, 2));
+    foreach(i, Sender; Senders) {
+      ops[i] = senders[i].connect(ElementReceiver!(Sender)(receiver, state, Senders.length));
+    }
   }
   void start() @trusted {
     import concurrency.stoptoken : StopSource;
@@ -52,17 +61,17 @@ private struct RaceOp(Receiver, SenderA, SenderB) {
       return;
     }
     state.cb = receiver.getStopToken().onStop(cast(void delegate() nothrow @safe shared)&state.stop); // butt ugly cast, but it won't take the second overload
-    opA.start();
-    opB.start();
+    foreach(i, _; Senders) {
+      ops[i].start();
+    }
   }
 }
 
-private struct RaceSender(SenderA, SenderB) {
-  alias Value = Result!(SenderA, SenderB);
-  SenderA senderA;
-  SenderB senderB;
+private struct RaceSender(Senders...) {
+  alias Value = Result!(Senders);
+  Senders senders;
   auto connect(Receiver)(Receiver receiver) {
-    return RaceOp!(Receiver, SenderA, SenderB)(receiver, senderA, senderB);
+    return RaceOp!(Receiver, Senders)(receiver, senders);
   }
 }
 
