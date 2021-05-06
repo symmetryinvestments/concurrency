@@ -61,7 +61,7 @@ enum isSender(T) = is(typeof(checkSender!T));
 
 /// A Sender that sends a single value of type T
 struct ValueSender(T) {
-  static assert (models!(ValueSender!T, isSender));
+  static assert (models!(typeof(this), isSender));
   alias Value = T;
   static struct Op(Receiver) {
     Receiver receiver;
@@ -81,7 +81,7 @@ struct ValueSender(T) {
 interface SenderObjectBase(T) {
   import concurrency.receiver;
   import concurrency.stoptoken;
-  static assert (models!(SenderObjectBase!T, isSender));
+  static assert (models!(typeof(this), isSender));
   alias Value = T;
   OperationObject connect(ReceiverObjectBase!(T) receiver);
   OperationObject connect(Receiver)(Receiver receiver) {
@@ -116,7 +116,7 @@ struct OperationObject {
 /// A class extending from SenderObjectBase that wraps any Sender
 class SenderObjectImpl(Sender) : SenderObjectBase!(Sender.Value) {
   import concurrency.receiver : ReceiverObjectBase;
-  static assert (models!(SenderObjectImpl, isSender));
+  static assert (models!(typeof(this), isSender));
   private Sender sender;
   this(Sender sender) {
     this.sender = sender;
@@ -173,7 +173,7 @@ static assert(!canSenderThrow!(ValueSender!int));
 
 /// A sender that always calls setDone
 struct DoneSender {
-  static assert (models!(DoneSender, isSender));
+  static assert (models!(typeof(this), isSender));
   alias Value = void;
   static struct DoneOp(Receiver) {
     Receiver receiver;
@@ -188,7 +188,7 @@ struct DoneSender {
 
 /// A sender that always calls setValue with no args
 struct VoidSender {
-  static assert (models!(VoidSender, isSender));
+  static assert (models!(typeof(this), isSender));
   alias Value = void;
   struct VoidOp(Receiver) {
     Receiver receiver;

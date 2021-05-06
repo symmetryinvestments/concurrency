@@ -51,7 +51,7 @@ private struct Op(Receiver, Sender, Fun) {
 }
 
 private struct STSender(Sender, Fun) {
-  static assert(models!(STSender, isSender));
+  static assert(models!(typeof(this), isSender));
   alias Value = ReturnType!fun;
   Sender sender;
   Fun fun;
