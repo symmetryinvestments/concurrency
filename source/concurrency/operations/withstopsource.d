@@ -77,7 +77,7 @@ private struct Op(Receiver, Sender) {
 }
 
 private struct SSSender(Sender) {
-  static assert(models!(SSSender, isSender));
+  static assert(models!(typeof(this), isSender));
   alias Value = Sender.Value;
   Sender sender;
   StopSource stopSource;

@@ -12,7 +12,7 @@ IESender!Sender ignoreError(Sender)(Sender sender) {
 }
 
 private struct IESender(Sender) {
-  static assert(models!(IESender, isSender));
+  static assert(models!(typeof(this), isSender));
   alias Value = Sender.Value;
   Sender sender;
   auto connect(Receiver)(Receiver receiver) {

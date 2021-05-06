@@ -10,7 +10,7 @@ import concepts;
 version (Posix)
 struct ForkSender {
   alias Value = void;
-  static assert(models!(ForkSender, isSender));
+  static assert(models!(typeof(this), isSender));
   static struct Operation(Receiver) {
     private {
       Executor executor;

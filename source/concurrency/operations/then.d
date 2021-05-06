@@ -54,7 +54,7 @@ private struct Op(Sender, Receiver, Fun) {
 
 private struct ThenSender(Sender, Fun) {
   import std.traits : ReturnType;
-  static assert(models!(ThenSender, isSender));
+  static assert(models!(typeof(this), isSender));
   alias Value = ReturnType!fun;
   Sender sender;
   Fun fun;
