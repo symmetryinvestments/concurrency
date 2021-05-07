@@ -10,7 +10,7 @@ A Sender is a lazy Task (in the general sense of the word). It needs to be conne
 
 It can be used to model many asynchronous operations: Futures, Fiber, Coroutines, Threads, etc. It enforces structured concurrency because a Sender cannot start without it being awaited on.
 
- `setValue` is the only one allowed to throw exceptions, and if it does, `setError` is called with the Exception. `setDone` is called when the operation has been cancelled. 
+ `setValue` is the only one allowed to throw exceptions, and if it does, `setError` is called with the Exception. `setDone` is called when the operation has been cancelled.
 
 See http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p0443r14.html for the C++ proposal for introducing Senders/Receivers.
 
@@ -26,7 +26,7 @@ Currently we have the following Senders:
 
 ### Writing your own Sender
 
-Most of the asynchronous tasks you will do involve writing your own `Sender`. 
+Most of the asynchronous tasks you will do involve writing your own `Sender`.
 
 Here is the implementation of the `ValueSender`.
 
@@ -34,16 +34,16 @@ Here is the implementation of the `ValueSender`.
 /// A Sender that sends a single value of type T
 struct ValueSender(T) {
   alias Value = T;
+  T value;
   static struct Op(Receiver) {
     Receiver receiver;
-    T t;
+    T value;
     void start() {
-      receiver.setValue(t);
+      receiver.setValue(value);
     }
   }
-  T t;
-  Op!Receiver connect(Receiver)(Receiver r) {
-    return Op!(Receiver)(r, t);
+  Op!Receiver connect(Receiver)(Receiver receiver) {
+    return Op!(Receiver)(receiver, value);
   }
 }
 ```

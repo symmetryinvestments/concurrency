@@ -15,19 +15,19 @@ import std.typecons;
 /// Used to test that Senders keep the operational state alive until one receiver's terminal is called
 struct OutOfBandValueSender(T) {
   alias Value = T;
-  T t;
+  T value;
   struct Op(Receiver) {
     Receiver receiver;
-    T t;
+    T value;
     void run() {
-      receiver.setValue(t);
+      receiver.setValue(value);
     }
     void start() @trusted {
-      auto t = new Thread(&this.run).start();
+      auto value = new Thread(&this.run).start();
     }
   }
   auto connect(Receiver)(Receiver receiver) {
-    return Op!(Receiver)(receiver, t);
+    return Op!(Receiver)(receiver, value);
   }
 }
 
