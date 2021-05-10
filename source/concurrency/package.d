@@ -54,7 +54,15 @@ package struct SyncWaitReceiver2(Value, bool isNoThrow) {
   }
 }
 
-auto sync_wait(Sender)(auto ref Sender sender, StopSource stopSource = null) {
+auto sync_wait(Sender, StopSource)(auto ref Sender sender, StopSource stopSource) {
+  return sync_wait_impl(sender, (()@trusted=>cast()stopSource)());
+}
+
+auto sync_wait(Sender)(auto ref Sender sender) {
+  return sync_wait_impl(sender);
+}
+
+auto sync_wait_impl(Sender)(auto ref Sender sender, StopSource stopSource = null) {
   static assert(models!(Sender, isSender));
   import concurrency.signal;
   import core.sys.posix.signal : SIGTERM, SIGINT;

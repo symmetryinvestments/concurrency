@@ -90,8 +90,14 @@ interface SenderObjectBase(T) {
       this(Receiver receiver) {
         this.receiver = receiver;
       }
-      void setValue(T value) {
-        receiver.setValueOrError(value);
+      static if (is(T == void)) {
+        void setValue() {
+          receiver.setValueOrError();
+        }
+      } else {
+        void setValue(T value) {
+          receiver.setValueOrError(value);
+        }
       }
       void setDone() nothrow {
         receiver.setDone();

@@ -8,6 +8,7 @@ int main(string[] args)
                         "ut.concurrency.nursery",
                         "ut.concurrency.operations",
                         "ut.concurrency.pressure",
-                        "ut.concurrency.pressure2"
+                        "ut.concurrency.pressure2",
+                        "ut.concurrency.stream"
                         );
 }

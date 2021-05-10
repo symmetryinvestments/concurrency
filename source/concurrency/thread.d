@@ -1,6 +1,7 @@
 module concurrency.thread;
 
 import concurrency.executor;
+import concurrency.scheduler;
 import concurrency.sender;
 import concepts;
 
@@ -226,4 +227,9 @@ struct ThreadSender {
   auto connect(Receiver)(Receiver receiver) {
     return Op!(Receiver)(receiver);
   }
+}
+
+@models!(ThreadScheduler, isScheduler)
+struct ThreadScheduler {
+  auto schedule() { return ThreadSender(); }
 }

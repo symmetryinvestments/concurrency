@@ -16,6 +16,8 @@ configuration "unittest" {
 	dflags "-dip1000" "-dip25"
 	sourcePaths "source" "tests/ut"
 	importPaths "source" "tests/ut"
+  # buildOptions "unittests"  "optimize"  "inline"
+  buildOptions "unittests"  "optimize"
 }
 configuration "nodip" {
 	targetType "library"

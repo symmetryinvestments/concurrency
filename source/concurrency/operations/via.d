@@ -31,9 +31,7 @@ private struct ViaAReceiver(ValueB, ValueA, Receiver) {
   void setError(Exception e) {
     receiver.setError(e);
   }
-  auto getStopToken() {
-    return receiver.getStopToken();
-  }
+  mixin ForwardExtensionPoints!receiver;
 }
 private struct ViaBReceiver(SenderA, ValueB, Receiver) {
   SenderA senderA;
@@ -52,9 +50,7 @@ private struct ViaBReceiver(SenderA, ValueB, Receiver) {
   void setError(Exception e) {
     receiver.setError(e);
   }
-  auto getStopToken() {
-    return receiver.getStopToken();
-  }
+  mixin ForwardExtensionPoints!receiver;
 }
 private struct ViaSender(SenderA, SenderB) {
   import std.meta : Filter, AliasSeq;
