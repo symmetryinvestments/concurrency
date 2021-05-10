@@ -22,11 +22,20 @@ auto getStopToken(Receiver)(Receiver r) nothrow @safe if (isReceiver!Receiver) {
   return NeverStopToken();
 }
 
+mixin template ForwardExtensionPoints(alias receiver) {
+  auto getStopToken() nothrow @safe {
+    return receiver.getStopToken();
+  }
+}
+
 /// A polymorphic receiver of type T
 interface ReceiverObjectBase(T) {
   import concurrency.stoptoken : StopTokenObject;
   static assert (models!(ReceiverObjectBase!T, isReceiver));
-  void setValue(T value = T.init) @safe;
+  static if (is(T == void))
+    void setValue() @safe;
+  else
+    void setValue(T value = T.init) @safe;
   void setDone() nothrow @safe;
   void setError(Exception e) nothrow @safe;
   StopTokenObject getStopToken() nothrow @safe;

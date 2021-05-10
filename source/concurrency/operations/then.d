@@ -39,9 +39,7 @@ private struct ThenReceiver(Receiver, Value, Fun) {
   void setError(Exception e) nothrow {
     receiver.setError(e);
   }
-  auto getStopToken() {
-    return receiver.getStopToken();
-  }
+  mixin ForwardExtensionPoints!receiver;
 }
 
 private struct ThenSender(Sender, Fun) {

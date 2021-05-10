@@ -37,7 +37,5 @@ private struct IEReceiver(Value, Receiver) {
   void setError(Exception e) {
     receiver.setDone();
   }
-  auto getStopToken() {
-    return receiver.getStopToken();
-  }
+  mixin ForwardExtensionPoints!receiver;
 }

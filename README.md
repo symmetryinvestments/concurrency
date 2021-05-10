@@ -78,6 +78,32 @@ Senders enjoy the following operations.
 
 - `retry`. It retries the underlying Sender until success or cancellation. The retry logic is customizable. Included is a Times, that will retry n times and then propagate the latest failure.
 
+## Streams
+
+A Stream is anything that has a `.collect` function that accepts a `shared` callable and returns a Sender. Once the Sender is connected and started the Stream will call the callable zero or more times before one of the three terminal functions of the Receiver is called.
+
+An exception throw in the callable will cancel the stream and complete the Sender with that exception.
+
+Streams can be cancelled by triggering the StopToken supplied via the Receiver.
+
+The callable supplied to the Stream has to annotated with `shared` because the execution context where the callable is called from is undefined.
+
+Currently there are the following Streams:
+
+- `infiniteStream`. Continously emits the same value.
+- `iotaStream`. Emits the values that span the given starting and stopping values.
+- `arrayStream`. Emits every value from the array.
+- `intervalStream`. Emits every interval.
+
+With the following operations:
+
+- `take`. Emits at most the first n values.
+
+Most of the time you will need to write your own Stream however. The following helpers can speed that up:
+
+- `loopStream`. Takes a struct with a `loop` function and calls that with an `emit` and `stopToken` while ensuring the struct is alive during that.
+- `startStopStream`. Takes a struct with a `start` and `stop` function, calling `start` with an `emit` and `stopToken`, and `stop` when the stream is to end. The struct will be kept alive until after `stop` is called.
+
 ## Nursery
 
 A place where Senders can be awaited in. Senders placed in the Nursery are started only when the Nursery is started.

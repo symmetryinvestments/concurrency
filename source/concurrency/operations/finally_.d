@@ -34,9 +34,7 @@ private struct FinallyReceiver(Value, Result, Receiver) {
   void setError(Exception e) {
     receiver.setValue(getResult());
   }
-  auto getStopToken() {
-    return receiver.getStopToken();
-  }
+  mixin ForwardExtensionPoints!receiver;
 }
 
 private struct FinallySender(Sender, Result) {

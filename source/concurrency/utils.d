@@ -2,6 +2,28 @@ module concurrency.utils;
 
 import std.traits;
 
+/// Helper used in with() to easily access `shared` methods of a class
+struct SharedGuard(T) if (is(T == class)) {
+  import core.sync.mutex : Mutex;
+private:
+  Mutex mutex;
+public:
+  T reg;
+  alias reg this;
+  @disable this();
+  @disable this(this);
+  static SharedGuard acquire(shared T reg, Mutex mutex) {
+    mutex.lock_nothrow();
+    auto instance = SharedGuard.init;
+    instance.reg = (cast() reg);
+    instance.mutex = mutex;
+    return instance;
+  }
+  ~this() {
+    mutex.unlock_nothrow();
+  }
+}
+
 /// A manually constructed closure, aimed at shared
 struct Closure(Fun, Args...) {
   Fun fun;

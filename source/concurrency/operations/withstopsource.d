@@ -7,10 +7,14 @@ import concurrency.stoptoken;
 import concepts;
 import std.traits;
 
-auto withStopSource(Sender)(Sender sender, StopSource stopSource) {
-  return SSSender!(Sender)(sender, stopSource);
+template withStopSource(Sender) {
+  auto withStopSource(Sender sender, StopSource stopSource) {
+    return SSSender!(Sender)(sender, stopSource);
+  }
+  auto withStopSource(Sender sender, shared StopSource stopSource) @trusted {
+    return SSSender!(Sender)(sender, cast()stopSource);
+  }
 }
-
 
 private struct SSReceiver(Receiver, Value) {
   private {
@@ -39,7 +43,7 @@ private struct SSReceiver(Receiver, Value) {
     resetStopCallback();
     receiver.setError(e);
   }
-  auto getStopToken() {
+  auto getStopToken() nothrow @trusted {
     import core.atomic;
     if (this.combinedSource is null) {
       auto local = new StopSource();
