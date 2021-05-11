@@ -47,14 +47,16 @@ void checkSender(T)() {
       void setDone() nothrow {};
       void setError(Exception e) nothrow {};
     }
-    t.connect(Receiver.init);
+    auto op = t.connect(Receiver.init);
+    op.start();
   } else {
     struct Receiver {
       void setValue(T.Value) {};
       void setDone() nothrow {};
       void setError(Exception e) nothrow {};
     }
-    t.connect(Receiver.init);
+    auto op = t.connect(Receiver.init);
+    op.start();
   }
 }
 enum isSender(T) = is(typeof(checkSender!T));
