@@ -50,7 +50,7 @@ struct ValueSender(T) {
 
 A `ValueSender!int` is nothing more than a `int` wrapped in a struct with a `connect` method. It can be constructed and passed around, but it won't produce a value until it is connected and started. The `Op` object (operational-state) returned by `connect` represents the state of a connected Sender/Receiver pair, which in case of the `ValueSender` includes the value to be send. After connecting the operational-state still need its `start` method called, before it actually produces a value.
 
-A Receiver needs to implement the `setValue`, `setError` and `setDone`. A Sender is required to call exactly one of the three functions. Both `setError` and `setdone` are required to be `nothrow`. If `setValue` is not nothrow then the Sender must call `setError` if `setValue` throws.
+A Receiver needs to implement the `setValue`, `setError` and `setDone`. A Sender is required to call exactly one of the three functions once. Both `setError` and `setdone` are required to be `nothrow`. If `setValue` is not nothrow then the Sender must call `setError` if `setValue` throws.
 
 Most Senders should call `receiver.getStopToken` to retrieve a stoptoken by which they can be notified (or polled) whether they are cancelled. See the section of stoptokens how this works.
 
