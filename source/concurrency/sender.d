@@ -48,6 +48,7 @@ void checkSender(T)() {
       void setError(Exception e) nothrow {};
     }
     auto op = t.connect(Receiver.init);
+    pragma(msg, typeof(op), "  ", typeof(op.start));
     op.start();
   } else {
     struct Receiver {
@@ -56,6 +57,7 @@ void checkSender(T)() {
       void setError(Exception e) nothrow {};
     }
     auto op = t.connect(Receiver.init);
+    pragma(msg, typeof(op), "  ", typeof(op.start));
     op.start();
   }
 }
