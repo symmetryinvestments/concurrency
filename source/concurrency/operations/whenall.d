@@ -169,11 +169,11 @@ private struct WhenAllReceiver(Receiver, InnerValue, Value) {
 
       if (isLast(transition.new_)) {
         state.cb.dispose();
-        if (receiver.getStopToken().isStopRequested())
+        if (receiver.getStopToken().isStopRequested)
           receiver.setDone();
         else if (isExceptionProduced(transition.new_))
           receiver.setError(state.exception);
-        else if (state.isStopRequested())
+        else if (state.isStopRequested)
           receiver.setDone();
         else
           setReceiverValue();
@@ -186,11 +186,11 @@ private struct WhenAllReceiver(Receiver, InnerValue, Value) {
       if (isLast(transition.new_)) {
         state.cb.dispose();
 
-        if (receiver.getStopToken().isStopRequested())
+        if (receiver.getStopToken().isStopRequested)
           receiver.setDone();
         else if (isExceptionProduced(transition.new_))
           receiver.setError(state.exception);
-        else if (state.isStopRequested())
+        else if (state.isStopRequested)
           receiver.setDone();
         else
           setReceiverValue();
@@ -200,7 +200,7 @@ private struct WhenAllReceiver(Receiver, InnerValue, Value) {
     auto transition = update(0);
     if (isLast(transition.new_)) {
       state.cb.dispose();
-      if (receiver.getStopToken().isStopRequested())
+      if (receiver.getStopToken().isStopRequested)
         receiver.setDone();
       else if (isExceptionProduced(transition.new_))
         receiver.setError(state.exception);
@@ -220,7 +220,7 @@ private struct WhenAllReceiver(Receiver, InnerValue, Value) {
 
     if (isLast(transition.new_)) {
       state.cb.dispose();
-      if (receiver.getStopToken().isStopRequested())
+      if (receiver.getStopToken().isStopRequested)
         receiver.setDone();
       else
         receiver.setError(state.exception);
