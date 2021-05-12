@@ -122,7 +122,7 @@ The simplest way is to poll the stoptoken regularly. There is a `isStopRequested
 
 > NOTE: In some cases when a stop is requested, the Sender is already busy setting a value or an exception. Receivers should not assume that because the stoptoken is triggered only `setDone` will be called, it is perfectly valid to call one of the other two as well.
 
-In some case you might need a push notification that a stop has been requested. There is a free function called `onStop` that takes a StopToken and a delegate. The delegate will be called - in another execution context - to signify that a stop is requested. The `onStop` function returns a `StopCallback` that needs its `dispose` to be called before or after the Sender has called one of the completion functions. Not calling `dispose` will lead to memory leaks in long-running Senders (e.g. the Nursery).
+You might need a push notification that a stop has been requested. There is a free function called `onStop` that takes a StopToken and a delegate. The delegate will be called - in an undefined execution context - to signify that a stop is requested. The `onStop` function returns a `StopCallback` that needs its `dispose` to be called before the Sender has terminated. Not calling `dispose` will lead to memory leaks in long-running Senders (e.g. the Nursery).
 
 See http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2175r0.html for a thorough explanation for why we need stop tokens in particular and cancellation in general.
 
