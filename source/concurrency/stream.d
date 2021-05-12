@@ -263,7 +263,6 @@ auto intervalStream(Duration duration) {
         scope (exit)
           cb.dispose();
 
-        /// wait returns true if notified, we want to return false in that case as it signifies cancellation
         m.lock_nothrow();
         scope(exit) m.unlock_nothrow();
         while (!cond.wait(duration)) {
@@ -346,6 +345,7 @@ auto take(Stream)(Stream stream, size_t n) {
     static if (is(ElementType == void)) {
       private void item() {
         dg();
+        /// TODO: this implies the stream will only call emit from a single execution context, we might need to enforce that
         n--;
         if (n == 0)
           stopSource.stop();
