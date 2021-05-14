@@ -140,3 +140,10 @@ unittest {
 
   p.should == true;
 }
+
+@("transform.int")
+@safe unittest {
+  shared int p = 0;
+  [1,2,3].arrayStream().transform((int i) => i * 3).collect((int t) shared { p.atomicOp!"+="(t); }).sync_wait();
+  p.should == 18;
+}

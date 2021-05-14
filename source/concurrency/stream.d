@@ -372,6 +372,34 @@ auto take(Stream)(Stream stream, size_t n) {
   return fromStreamOp!(Properties.ElementType, Properties.Value, TakeOp)(stream, n);
 }
 
+auto transform(Stream, Fun)(Stream stream, Fun fun) {
+  alias Properties = StreamProperties!Stream;
+  import std.traits : ReturnType;
+  static struct TransformStreamOp(DG, Receiver) {
+    alias Op = ReturnType!(Properties.Sender.connect!Receiver);
+    Fun fun;
+    DG dg;
+    Op op;
+    this(Stream stream, Fun fun, DG dg, Receiver receiver) {
+      this.fun = fun;
+      this.dg = dg;
+      op = stream.collect(cast(Properties.DG)&item).connect(receiver);
+    }
+    static if (is(Properties.ElementType == void))
+      void item() {
+        dg(fun());
+      }
+    else
+      void item(Properties.ElementType t) {
+        dg(fun(t));
+      }
+    void start() {
+      op.start();
+    }
+  }
+  return fromStreamOp!(ReturnType!Fun, Properties.Value, TransformStreamOp)(stream, fun);
+}
+
 auto fromStreamOp(StreamElementType, SenderValue, alias Op, Args...)(Args args) {
   struct FromStreamSender(DG) {
     alias Value = SenderValue;
