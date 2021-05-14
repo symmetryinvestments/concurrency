@@ -318,6 +318,18 @@ auto intervalStream(Duration duration) {
   return Loop(duration).loopStream!void;
 }
 
+template StreamProperties(Stream) {
+  import std.traits : ReturnType;
+  alias ElementType = Stream.ElementType;
+  /// TODO: it would be good if we can infer the DG's attributes a bit more. Right now we pretend they include @safe
+  static if (is(ElementType == void))
+    alias DG = void delegate() @safe shared;
+  else
+    alias DG = void delegate(ElementType t) @safe shared;
+  alias Sender = ReturnType!(Stream.collect!(DG));
+  alias Value = Sender.Value;
+}
+
 /// takes the first n values from a stream or until cancelled
 auto take(Stream)(Stream stream, size_t n) {
   static assert(models!(Stream, isStream));
