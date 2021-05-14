@@ -119,6 +119,25 @@ struct OperationObject {
   void start() @trusted { _start(); }
 }
 
+interface OperationalStateBase {
+  void start();
+}
+
+/// calls connect on the Sender but stores the OperationState on the heap
+OperationalStateBase connectHeap(Sender, Receiver)(Sender sender, Receiver receiver) {
+  import std.traits : ReturnType;
+  alias State = ReturnType!(Sender.connect!(Receiver));
+  return new class(sender, receiver) OperationalStateBase {
+    State state;
+    this(Sender sender, Receiver receiver) {
+      state = sender.connect(receiver);
+    }
+    void start() {
+      state.start();
+    }
+  };
+}
+
 /// A class extending from SenderObjectBase that wraps any Sender
 class SenderObjectImpl(Sender) : SenderObjectBase!(Sender.Value) {
   import concurrency.receiver : ReceiverObjectBase;
@@ -128,9 +147,8 @@ class SenderObjectImpl(Sender) : SenderObjectBase!(Sender.Value) {
     this.sender = sender;
   }
   OperationObject connect(ReceiverObjectBase!(Sender.Value) receiver) {
-    import concurrency.utils;
-    auto state = sender.connect(receiver);
-    return OperationObject(cast(typeof(OperationObject._start))closure((typeof(state) state) @trusted => state.start(), state));
+    auto state = sender.connectHeap(receiver);
+    return OperationObject(cast(typeof(OperationObject._start))&state.start);
   }
   auto connect(Receiver)(Receiver receiver) {
     return sender.connect(receiver);
