@@ -333,16 +333,11 @@ template StreamProperties(Stream) {
 /// takes the first n values from a stream or until cancelled
 auto take(Stream)(Stream stream, size_t n) {
   static assert(models!(Stream, isStream));
-  struct TakeOp(DG, Receiver) {
+  alias Properties = StreamProperties!Stream;
+  static struct TakeOp(DG, Receiver) {
     import concurrency.operations : withStopSource;
-    import std.traits : ReturnType, Parameters;
-    alias ElementType = Stream.ElementType;
-    static if (is(ElementType == void))
-      alias ItemDG = void delegate() @safe shared;
-    else
-      alias ItemDG = void delegate(ElementType t) @safe shared;
-    alias StreamSender = ReturnType!(Stream.collect!(ItemDG)); // TODO: ensure this delegate has the same attributes as DG, then we can get rid of the cast in the constructor
-    alias SS = ReturnType!(withStopSource!StreamSender);
+    import std.traits : ReturnType;
+    alias SS = ReturnType!(withStopSource!(Properties.Sender));
     alias Op = ReturnType!(SS.connect!Receiver);
     size_t n;
     DG dg;
@@ -352,9 +347,9 @@ auto take(Stream)(Stream stream, size_t n) {
       stopSource = new StopSource();
       this.dg = dg;
       this.n = n;
-      op = stream.collect(cast(ItemDG)&item).withStopSource(stopSource).connect(receiver);
+      op = stream.collect(cast(Properties.DG)&item).withStopSource(stopSource).connect(receiver);
     }
-    static if (is(ElementType == void)) {
+    static if (is(Properties.ElementType == void)) {
       private void item() {
         dg();
         /// TODO: this implies the stream will only call emit from a single execution context, we might need to enforce that
@@ -363,7 +358,7 @@ auto take(Stream)(Stream stream, size_t n) {
           stopSource.stop();
       }
     } else {
-      private void item(ElementType t) {
+      private void item(Properties.ElementType t) {
         dg(t);
         n--;
         if (n == 0)
