@@ -31,12 +31,12 @@ interface StreamObjectBase(T) {
   alias ElementType = T;
   static assert (models!(typeof(this), isStream));
   static if (is(T == void))
-    SenderObjectBase!void collect(void delegate() shared dg) @safe;
+    SenderObjectBase!void collect_(void delegate() shared dg) @safe;
   else
-    SenderObjectBase!void collect(void delegate(T) shared dg) @safe;
+    SenderObjectBase!void collect_(void delegate(T) shared dg) @safe;
   SenderObjectBase!void collect(DG)(DG dg) {
     static assert (hasFunctionAttributes!(DG, "shared"), "Function must be shared");
-    return collect(dg);
+    return collect_(dg);
   }
 }
 
@@ -53,7 +53,7 @@ class StreamObjectImpl(Stream) : StreamObjectBase!(Stream.ElementType) {
   else
     alias DG = void delegate(Stream.ElementType) shared;
 
-  SenderObjectBase!void collect(DG dg) {
+  SenderObjectBase!void collect_(DG dg) {
     import concurrency.sender : toSenderObject;
     return stream.collect(dg).toSenderObject();
   }
