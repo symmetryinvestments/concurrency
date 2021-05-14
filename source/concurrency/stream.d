@@ -369,25 +369,25 @@ auto take(Stream)(Stream stream, size_t n) {
       op.start();
     }
   }
-  struct TakeSender(DG) {
-    alias Value = void;
-    Stream stream;
-    size_t n;
-    DG dg;
-    auto connect(Receiver)(Receiver receiver) {
-      return TakeOp!(DG, Receiver)(stream, n, dg, receiver);
-    }
-  }
-  struct TakeStream {
-    static assert(models!(typeof(this), isStream));
-    alias ElementType = Stream.ElementType;
-    Stream stream;
-    size_t n;
-    auto collect(DG)(DG dg) {
-      static assert (hasFunctionAttributes!(DG, "shared"), "Function must be shared");
-      return TakeSender!(DG)(stream, n, dg);
-    }
-  }
-  return TakeStream(stream, n);
+  return fromStreamOp!(Properties.ElementType, Properties.Value, TakeOp)(stream, n);
 }
 
+auto fromStreamOp(StreamElementType, SenderValue, alias Op, Args...)(Args args) {
+  struct FromStreamSender(DG) {
+    alias Value = SenderValue;
+    Args args;
+    DG dg;
+    auto connect(Receiver)(Receiver receiver) {
+      return Op!(DG, Receiver)(args, dg, receiver);
+    }
+  }
+  struct FromStream {
+    alias ElementType = StreamElementType;
+    Args args;
+    auto collect(DG)(DG dg) {
+      static assert (hasFunctionAttributes!(DG, "shared"), "Function must be shared");
+      return FromStreamSender!DG(args, dg);
+    }
+  }
+  return FromStream(args);
+}
