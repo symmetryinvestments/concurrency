@@ -82,7 +82,7 @@ unittest {
     import concurrency.utils : closure;
     shared bool running;
     Thread t;
-    void start(DG, StopToken)(DG emit, StopToken stopToken) {
+    void start(DG, StopToken)(DG emit, StopToken stopToken) @trusted {
       running = true;
       t = new Thread(cast(void delegate())closure((shared bool* running, DG emit) @trusted {
             int i = 1;
@@ -113,7 +113,7 @@ unittest {
   }
   shared int p;
 
-  getStream().collect((int i) shared { p.atomicOp!"+="(i); }).sync_wait();
+  getStream().collect((int i) @safe shared { p.atomicOp!"+="(i); }).sync_wait();
 
   p.should == 6;
 }

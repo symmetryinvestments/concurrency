@@ -21,8 +21,8 @@ class Nursery : StopSource {
   private {
     Node[] operations;
     struct Node {
-      void delegate() start_;
-      void start() @trusted {
+      void delegate() nothrow start_;
+      void start() nothrow @trusted {
         this.start_();
       }
       size_t id;
@@ -134,7 +134,7 @@ class Nursery : StopSource {
       shared Nursery nursery;
       StopCallback cb;
       ReceiverObject receiver;
-      void start() {
+      void start() nothrow {
         nursery.setReceiver(receiver, cb);
       }
     }
@@ -143,7 +143,7 @@ class Nursery : StopSource {
     return Op(this, cb, new ReceiverImpl(receiver));
   }
 
-  private void setReceiver(ReceiverObject r, StopCallback cb) @safe shared {
+  private void setReceiver(ReceiverObject r, StopCallback cb) nothrow @safe shared {
     with(assumeThreadSafe) {
       mutex.lock_nothrow();
       assert(this.receiver is null, "Cannot await a nursery twice.");

@@ -49,9 +49,9 @@ class StreamObjectImpl(Stream) : StreamObjectBase!(Stream.ElementType) {
     this.stream = stream;
   }
   static if (is(Stream.ElementType == void))
-    alias DG = void delegate() shared;
+    alias DG = void delegate() @safe shared;
   else
-    alias DG = void delegate(Stream.ElementType) shared;
+    alias DG = void delegate(Stream.ElementType) @safe shared;
 
   SenderObjectBase!void collect_(DG dg) {
     import concurrency.sender : toSenderObject;
@@ -104,14 +104,14 @@ StreamObjectBase!(Stream.ElementType) toStreamObject(Stream)(Stream stream) {
 /// Helper to construct a Stream, useful if the Stream you are modeling has a blocking loop
 template loopStream(E) {
   auto loopStream(T)(T t) {
-    struct LoopStream {
+    static struct LoopStream {
       static assert(models!(typeof(this), isStream));
       alias ElementType = E;
       static struct LoopOp(DG, Receiver) {
         T t;
         DG dg;
         Receiver receiver;
-        void start() {
+        void start() @safe nothrow {
           try {
             t.loop(dg, receiver.getStopToken);
           } catch (Exception e) {
@@ -120,7 +120,7 @@ template loopStream(E) {
           if (receiver.getStopToken().isStopRequested)
             receiver.setDone();
           else
-            receiver.setValue();
+            receiver.setValueOrError();
         }
       }
       static struct LoopSender(DG) {
@@ -144,7 +144,7 @@ template loopStream(E) {
 /// Helper to construct a Stream, useful if the Stream you are modeling has an external source that should be started/stopped
 template startStopStream(E) {
   auto startStopStream(T)(T t) {
-    struct StartStopStream {
+    static struct StartStopStream {
       static assert(models!(typeof(this), isStream));
       alias ElementType = E;
       static struct StartStopOp(DG, Receiver) {
@@ -152,7 +152,7 @@ template startStopStream(E) {
         DG dg;
         Receiver receiver;
         StopCallback cb;
-        void start() {
+        void start() @trusted nothrow {
           t.start(&emit, receiver.getStopToken);
           cb = receiver.getStopToken.onStop(&(cast(shared)this).stop);
         }
@@ -220,7 +220,7 @@ auto iotaStream(T)(T start, T end) {
 auto arrayStream(T)(T[] arr) {
   struct Loop {
     T[] arr;
-    void loop(DG, StopToken)(DG emit, StopToken stopToken) {
+    void loop(DG, StopToken)(DG emit, StopToken stopToken) @safe {
       foreach(item; arr) {
         emit(item);
         if (stopToken.isStopRequested)
@@ -237,7 +237,7 @@ import core.time : Duration;
 auto intervalStream(Duration duration) {
   static struct Loop {
     Duration duration;
-    void loop(DG, StopToken)(DG emit, StopToken stopToken) {
+    void loop(DG, StopToken)(DG emit, StopToken stopToken) @trusted {
 
       if (stopToken.isStopRequested)
         return;
@@ -343,7 +343,7 @@ auto take(Stream)(Stream stream, size_t n) {
     DG dg;
     StopSource stopSource;
     Op op;
-    private this(Stream stream, size_t n, DG dg, Receiver receiver) {
+    private this(Stream stream, size_t n, DG dg, Receiver receiver) @trusted {
       stopSource = new StopSource();
       this.dg = dg;
       this.n = n;
@@ -380,7 +380,7 @@ auto transform(Stream, Fun)(Stream stream, Fun fun) {
     Fun fun;
     DG dg;
     Op op;
-    this(Stream stream, Fun fun, DG dg, Receiver receiver) {
+    this(Stream stream, Fun fun, DG dg, Receiver receiver) @trusted {
       this.fun = fun;
       this.dg = dg;
       op = stream.collect(cast(Properties.DG)&item).connect(receiver);
@@ -405,7 +405,7 @@ auto fromStreamOp(StreamElementType, SenderValue, alias Op, Args...)(Args args) 
     alias Value = SenderValue;
     Args args;
     DG dg;
-    auto connect(Receiver)(Receiver receiver) {
+    auto connect(Receiver)(Receiver receiver) @safe {
       return Op!(DG, Receiver)(args, dg, receiver);
     }
   }

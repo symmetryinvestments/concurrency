@@ -79,7 +79,7 @@ struct ForkSender {
         }
       }
     }
-    void start() @trusted {
+    void start() @trusted nothrow {
       import concurrency.thread : executeInNewThread, executeAndWait;
       import concurrency.utils : closure;
 
