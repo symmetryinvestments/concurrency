@@ -39,23 +39,17 @@ import concepts;
 // starting with http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p0443r14.html
 
 /// checks that T is a Sender
-void checkSender(T)() {
+void checkSender(T)() @safe {
   T t = T.init;
-  static if (is(T.Value == void)) {
-    struct Receiver {
-      void setValue() {};
-      void setDone() nothrow {};
-      void setError(Exception e) nothrow {};
-    }
-    t.connect(Receiver.init);
-  } else {
-    struct Receiver {
-      void setValue(T.Value) {};
-      void setDone() nothrow {};
-      void setError(Exception e) nothrow {};
-    }
-    t.connect(Receiver.init);
+  struct Receiver {
+    static if (is(T.Value == void))
+      void setValue() {}
+    else
+      void setValue(T.Value) {}
+    void setDone() nothrow {}
+    void setError(Exception e) nothrow {}
   }
+  auto op = t.connect(Receiver.init);
 }
 enum isSender(T) = is(typeof(checkSender!T));
 
@@ -83,8 +77,8 @@ interface SenderObjectBase(T) {
   import concurrency.stoptoken;
   static assert (models!(typeof(this), isSender));
   alias Value = T;
-  OperationObject connect(ReceiverObjectBase!(T) receiver);
-  OperationObject connect(Receiver)(Receiver receiver) {
+  OperationObject connect(ReceiverObjectBase!(T) receiver) @safe;
+  OperationObject connect(Receiver)(Receiver receiver) @safe {
     return connect(new class(receiver) ReceiverObjectBase!T {
       Receiver receiver;
       this(Receiver receiver) {
@@ -115,8 +109,8 @@ interface SenderObjectBase(T) {
 /// Type-erased operational state object
 /// used in polymorphic senders
 struct OperationObject {
-  private void delegate() shared _start;
-  void start() @trusted { _start(); }
+  private void delegate() nothrow shared _start;
+  void start() nothrow @trusted { _start(); }
 }
 
 interface OperationalStateBase {
@@ -126,7 +120,9 @@ interface OperationalStateBase {
 /// calls connect on the Sender but stores the OperationState on the heap
 OperationalStateBase connectHeap(Sender, Receiver)(Sender sender, Receiver receiver) {
   import std.traits : ReturnType;
-  alias connectFn = __traits(getOverloads, Sender, "connect", true)[0];
+  import std.meta : Filter;
+  enum isTemplate(alias t) = __traits(isTemplate, t);
+  alias connectFn = Filter!(isTemplate, __traits(getOverloads, Sender, "connect", true))[0];
   alias State = ReturnType!(connectFn!(Receiver));
   return new class(sender, receiver) OperationalStateBase {
     State state;
@@ -147,7 +143,7 @@ class SenderObjectImpl(Sender) : SenderObjectBase!(Sender.Value) {
   this(Sender sender) {
     this.sender = sender;
   }
-  OperationObject connect(ReceiverObjectBase!(Sender.Value) receiver) {
+  OperationObject connect(ReceiverObjectBase!(Sender.Value) receiver) @trusted {
     auto state = sender.connectHeap(receiver);
     return OperationObject(cast(typeof(OperationObject._start))&state.start);
   }
