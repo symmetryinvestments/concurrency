@@ -120,19 +120,20 @@ struct OperationObject {
 }
 
 interface OperationalStateBase {
-  void start();
+  void start() @safe nothrow;
 }
 
 /// calls connect on the Sender but stores the OperationState on the heap
 OperationalStateBase connectHeap(Sender, Receiver)(Sender sender, Receiver receiver) {
   import std.traits : ReturnType;
-  alias State = ReturnType!(Sender.connect!(Receiver));
+  alias connectFn = __traits(getOverloads, Sender, "connect", true)[0];
+  alias State = ReturnType!(connectFn!(Receiver));
   return new class(sender, receiver) OperationalStateBase {
     State state;
     this(Sender sender, Receiver receiver) {
       state = sender.connect(receiver);
     }
-    void start() {
+    void start() @safe nothrow {
       state.start();
     }
   };

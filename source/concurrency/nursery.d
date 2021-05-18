@@ -14,16 +14,16 @@ import std.typecons : Nullable;
 /// Senders can be added to the Nursery at any time.
 /// Senders are only started when the Nursery itself is being awaited on.
 class Nursery : StopSource {
-  import concurrency.sender : isSender;
+  import concurrency.sender : isSender, OperationalStateBase;
   import core.sync.mutex : Mutex;
 
   alias Value = void;
   private {
     Node[] operations;
     struct Node {
-      void delegate() nothrow start_;
-      void start() nothrow @trusted {
-        this.start_();
+      OperationalStateBase state;
+      void start() @safe nothrow {
+        state.start();
       }
       size_t id;
     }
@@ -99,17 +99,19 @@ class Nursery : StopSource {
   void run(Sender)(Sender sender) shared @trusted if (isSender!Sender) {
     import std.typecons : Nullable;
     import core.atomic : atomicOp;
+    import concurrency.sender : connectHeap;
 
     static if (is(Sender == class) || is(Sender == interface))
       if (sender is null)
         return;
 
     size_t id = atomicOp!"+="(counter, 1);
-    auto op = sender.connect(NurseryReceiver!(Sender.Value)(this, id));
+    auto op = sender.connectHeap(NurseryReceiver!(Sender.Value)(this, id));
 
     mutex.lock_nothrow();
     // TODO: might also use the receiver as key instead of a wrapping ulong
-    operations ~= cast(shared) Node(() => op.start(), id);
+    // TODO: use op directly instead of op.start()
+    operations ~= cast(shared) Node(op, id);
     atomicOp!"+="(busy, 1);
     bool hasStarted = this.receiver !is null;
     mutex.unlock_nothrow();
