@@ -47,14 +47,17 @@ void checkSender(T)() {
       void setDone() nothrow {};
       void setError(Exception e) nothrow {};
     }
-    t.connect(Receiver.init);
+    auto op = t.connect(Receiver.init);
+    // static assert(__traits(hasMember, op, "start")); // TODO this fails for Operation!(Receiver)*
+    // pragma(msg, __FILE__, "(", __LINE__, ",1): Debug: ", typeof(op), " ", __traits(hasMember, op, "start"));
   } else {
     struct Receiver {
       void setValue(T.Value) {};
       void setDone() nothrow {};
       void setError(Exception e) nothrow {};
     }
-    t.connect(Receiver.init);
+    auto op = t.connect(Receiver.init);
+    static assert(__traits(hasMember, op, "start"));
   }
 }
 enum isSender(T) = is(typeof(checkSender!T));
