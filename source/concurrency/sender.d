@@ -159,7 +159,10 @@ class SenderObjectImpl(Sender) : SenderObjectBase!(Sender.Value) {
 /// Converts any Sender to a polymorphic SenderObject
 auto toSenderObject(Sender)(Sender sender) {
   static assert(models!(Sender, isSender));
-  return cast(SenderObjectBase!(Sender.Value))new SenderObjectImpl!(Sender)(sender);
+  static if (is(Sender : SenderObjectBase!(Sender.Value))) {
+    return sender;
+  } else
+    return cast(SenderObjectBase!(Sender.Value))new SenderObjectImpl!(Sender)(sender);
 }
 
 /// A sender that always sets an error
