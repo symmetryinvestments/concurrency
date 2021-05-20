@@ -366,6 +366,8 @@ auto take(Stream)(Stream stream, size_t n) {
       op.start();
     }
   }
+  import std.exception : enforce;
+  enforce(n > 0, "cannot take 0");
   return fromStreamOp!(Properties.ElementType, Properties.Value, TakeOp)(stream, n);
 }
 
