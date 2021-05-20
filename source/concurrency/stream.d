@@ -372,14 +372,15 @@ auto take(Stream)(Stream stream, size_t n) {
 }
 
 auto transform(Stream, Fun)(Stream stream, Fun fun) {
-  alias Properties = StreamProperties!Stream;
   import std.traits : ReturnType;
+  alias Properties = StreamProperties!Stream;
+  alias DG = CollectDelegate!(ReturnType!Fun);
   static struct TransformStreamOp(Receiver) {
     alias Op = ReturnType!(Properties.Sender.connect!Receiver);
     Fun fun;
-    Properties.DG dg;
+    DG dg;
     Op op;
-    this(Stream stream, Fun fun, Properties.DG dg, Receiver receiver) @trusted {
+    this(Stream stream, Fun fun, DG dg, Receiver receiver) @trusted {
       this.fun = fun;
       this.dg = dg;
       op = stream.collect(cast(Properties.DG)&item).connect(receiver);

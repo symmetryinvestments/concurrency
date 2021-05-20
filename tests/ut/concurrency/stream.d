@@ -141,9 +141,16 @@ unittest {
   p.should == true;
 }
 
-@("transform.int")
+@("transform.int.double")
 @safe unittest {
   shared int p = 0;
   [1,2,3].arrayStream().transform((int i) => i * 3).collect((int t) shared { p.atomicOp!"+="(t); }).sync_wait();
   p.should == 18;
+}
+
+@("transform.int.bool")
+@safe unittest {
+  shared int p = 0;
+  [1,2,3].arrayStream().transform((int i) => i % 2 == 0).collect((bool t) shared { if (t) p.atomicOp!"+="(1); }).sync_wait();
+  p.should == 1;
 }
