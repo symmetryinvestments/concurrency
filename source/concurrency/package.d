@@ -73,7 +73,7 @@ auto sync_wait_impl(Sender)(auto ref Sender sender, StopSource stopSource = null
   alias Receiver = SyncWaitReceiver2!(Value, NoThrow);
 
   auto state = Receiver.State(stopSource is null ? new StopSource() : stopSource);
-  Receiver receiver = Receiver(&state);
+  Receiver receiver = (()@trusted => Receiver(&state))();
   SignalHandler signalHandler;
 
   if (stopSource is null) {
