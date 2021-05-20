@@ -9,14 +9,18 @@ import std.traits : hasFunctionAttributes;
 /// A Stream is anything that has a `.collect` function that accepts a callable and returns a Sender.
 /// Once the Sender is connected and started the Stream will call the callable zero or more times before one of the three terminal functions of the Receiver is called.
 
+template CollectDelegate(ElementType) {
+  static if (is(ElementType == void)) {
+    alias CollectDelegate = void delegate() @safe shared;
+  } else {
+    alias CollectDelegate = void delegate(ElementType) @safe shared;
+  }
+}
+
 /// checks that T is a Stream
 void checkStream(T)() {
   import std.traits : ReturnType;
-  static if (is(T.ElementType == void)) {
-    alias DG = void delegate() shared;
-  } else {
-    alias DG = void delegate(T.ElementType) shared;
-  }
+  alias DG = CollectDelegate!(T.ElementType);
   static if (is(typeof(T.collect!DG)))
     alias Sender = ReturnType!(T.collect!(DG));
   else
@@ -30,14 +34,9 @@ interface StreamObjectBase(T) {
   import concurrency.sender : SenderObjectBase;
   alias ElementType = T;
   static assert (models!(typeof(this), isStream));
-  static if (is(T == void))
-    SenderObjectBase!void collect_(void delegate() shared dg) @safe;
-  else
-    SenderObjectBase!void collect_(void delegate(T) shared dg) @safe;
-  SenderObjectBase!void collect(DG)(DG dg) {
-    static assert (hasFunctionAttributes!(DG, "shared"), "Function must be shared");
-    return collect_(dg);
-  }
+  alias DG = CollectDelegate!(ElementType);
+
+  SenderObjectBase!void collect(DG dg) @safe;
 }
 
 /// A class extending from StreamObjectBase that wraps any Stream
@@ -48,12 +47,9 @@ class StreamObjectImpl(Stream) : StreamObjectBase!(Stream.ElementType) {
   this(Stream stream) {
     this.stream = stream;
   }
-  static if (is(Stream.ElementType == void))
-    alias DG = void delegate() @safe shared;
-  else
-    alias DG = void delegate(Stream.ElementType) @safe shared;
+  alias DG = CollectDelegate!(Stream.ElementType);
 
-  SenderObjectBase!void collect_(DG dg) {
+  SenderObjectBase!void collect(DG dg) {
     import concurrency.sender : toSenderObject;
     return stream.collect(dg).toSenderObject();
   }
@@ -103,11 +99,12 @@ StreamObjectBase!(Stream.ElementType) toStreamObject(Stream)(Stream stream) {
 
 /// Helper to construct a Stream, useful if the Stream you are modeling has a blocking loop
 template loopStream(E) {
+  alias DG = CollectDelegate!(E);
   auto loopStream(T)(T t) {
     static struct LoopStream {
       static assert(models!(typeof(this), isStream));
       alias ElementType = E;
-      static struct LoopOp(DG, Receiver) {
+      static struct LoopOp(Receiver) {
         T t;
         DG dg;
         Receiver receiver;
@@ -123,18 +120,17 @@ template loopStream(E) {
             receiver.setValueOrError();
         }
       }
-      static struct LoopSender(DG) {
+      static struct LoopSender {
         alias Value = void;
         T t;
         DG dg;
         auto connect(Receiver)(Receiver receiver) {
-          return LoopOp!(DG, Receiver)(t, dg, receiver);
+          return LoopOp!(Receiver)(t, dg, receiver);
         }
       }
       T t;
-      auto collect(DG)(DG dg) {
-        static assert (hasFunctionAttributes!(DG, "shared"), "Function must be shared");
-        return LoopSender!(DG)(t, dg);
+      auto collect(DG dg) {
+        return LoopSender(t, dg);
       }
     }
     return LoopStream(t);
@@ -143,11 +139,12 @@ template loopStream(E) {
 
 /// Helper to construct a Stream, useful if the Stream you are modeling has an external source that should be started/stopped
 template startStopStream(E) {
+  alias DG = CollectDelegate!(E);
   auto startStopStream(T)(T t) {
     static struct StartStopStream {
       static assert(models!(typeof(this), isStream));
       alias ElementType = E;
-      static struct StartStopOp(DG, Receiver) {
+      static struct StartStopOp(Receiver) {
         T t;
         DG dg;
         Receiver receiver;
@@ -172,17 +169,17 @@ template startStopStream(E) {
           (cast()receiver).setDone();
         }
       }
-      static struct StartStopSender(DG) {
+      static struct StartStopSender {
         alias Value = void;
         T t;
         DG dg;
         auto connect(Receiver)(Receiver receiver) {
-          return StartStopOp!(DG, Receiver)(t, dg, receiver);
+          return StartStopOp!(Receiver)(t, dg, receiver);
         }
       }
       T t;
-      auto collect(DG)(DG dg) {
-        return StartStopSender!(DG)(t, dg);
+      auto collect(DG dg) {
+        return StartStopSender(t, dg);
       }
     }
     return StartStopStream(t);
@@ -191,9 +188,10 @@ template startStopStream(E) {
 
 /// Stream that emit the same value until cancelled
 auto infiniteStream(T)(T t) {
+  alias DG = CollectDelegate!(T);
   struct Loop {
     T val;
-    void loop(DG, StopToken)(DG emit, StopToken stopToken) {
+    void loop(StopToken)(DG emit, StopToken stopToken) {
       while(!stopToken.isStopRequested)
         emit(val);
     }
@@ -203,9 +201,10 @@ auto infiniteStream(T)(T t) {
 
 /// Stream that emits from start..end or until cancelled
 auto iotaStream(T)(T start, T end) {
+  alias DG = CollectDelegate!(T);
   struct Loop {
     T b,e;
-    void loop(DG, StopToken)(DG emit, StopToken stopToken) {
+    void loop(StopToken)(DG emit, StopToken stopToken) {
       foreach(i; b..e) {
         emit(i);
         if (stopToken.isStopRequested)
@@ -218,9 +217,10 @@ auto iotaStream(T)(T start, T end) {
 
 /// Stream that emits each value from the array or until cancelled
 auto arrayStream(T)(T[] arr) {
+  alias DG = CollectDelegate!(T);
   struct Loop {
     T[] arr;
-    void loop(DG, StopToken)(DG emit, StopToken stopToken) @safe {
+    void loop(StopToken)(DG emit, StopToken stopToken) @safe {
       foreach(item; arr) {
         emit(item);
         if (stopToken.isStopRequested)
@@ -235,9 +235,10 @@ import core.time : Duration;
 
 /// Stream that emits after each duration or until cancelled
 auto intervalStream(Duration duration) {
+  alias DG = CollectDelegate!(void);
   static struct Loop {
     Duration duration;
-    void loop(DG, StopToken)(DG emit, StopToken stopToken) @trusted {
+    void loop(StopToken)(DG emit, StopToken stopToken) @trusted {
 
       if (stopToken.isStopRequested)
         return;
@@ -321,12 +322,8 @@ auto intervalStream(Duration duration) {
 template StreamProperties(Stream) {
   import std.traits : ReturnType;
   alias ElementType = Stream.ElementType;
-  /// TODO: it would be good if we can infer the DG's attributes a bit more. Right now we pretend they include @safe
-  static if (is(ElementType == void))
-    alias DG = void delegate() @safe shared;
-  else
-    alias DG = void delegate(ElementType t) @safe shared;
-  alias Sender = ReturnType!(Stream.collect!(DG));
+  alias DG = CollectDelegate!(ElementType);
+  alias Sender = ReturnType!(Stream.collect);
   alias Value = Sender.Value;
 }
 
@@ -334,16 +331,16 @@ template StreamProperties(Stream) {
 auto take(Stream)(Stream stream, size_t n) {
   static assert(models!(Stream, isStream));
   alias Properties = StreamProperties!Stream;
-  static struct TakeOp(DG, Receiver) {
+  static struct TakeOp(Receiver) {
     import concurrency.operations : withStopSource;
     import std.traits : ReturnType;
     alias SS = ReturnType!(withStopSource!(Properties.Sender));
     alias Op = ReturnType!(SS.connect!Receiver);
     size_t n;
-    DG dg;
+    Properties.DG dg;
     StopSource stopSource;
     Op op;
-    private this(Stream stream, size_t n, DG dg, Receiver receiver) @trusted {
+    private this(Stream stream, size_t n, Properties.DG dg, Receiver receiver) @trusted {
       stopSource = new StopSource();
       this.dg = dg;
       this.n = n;
@@ -375,12 +372,12 @@ auto take(Stream)(Stream stream, size_t n) {
 auto transform(Stream, Fun)(Stream stream, Fun fun) {
   alias Properties = StreamProperties!Stream;
   import std.traits : ReturnType;
-  static struct TransformStreamOp(DG, Receiver) {
+  static struct TransformStreamOp(Receiver) {
     alias Op = ReturnType!(Properties.Sender.connect!Receiver);
     Fun fun;
-    DG dg;
+    Properties.DG dg;
     Op op;
-    this(Stream stream, Fun fun, DG dg, Receiver receiver) @trusted {
+    this(Stream stream, Fun fun, Properties.DG dg, Receiver receiver) @trusted {
       this.fun = fun;
       this.dg = dg;
       op = stream.collect(cast(Properties.DG)&item).connect(receiver);
@@ -401,20 +398,20 @@ auto transform(Stream, Fun)(Stream stream, Fun fun) {
 }
 
 auto fromStreamOp(StreamElementType, SenderValue, alias Op, Args...)(Args args) {
-  struct FromStreamSender(DG) {
+  alias DG = CollectDelegate!(StreamElementType);
+  struct FromStreamSender {
     alias Value = SenderValue;
     Args args;
     DG dg;
     auto connect(Receiver)(Receiver receiver) @safe {
-      return Op!(DG, Receiver)(args, dg, receiver);
+      return Op!(Receiver)(args, dg, receiver);
     }
   }
   struct FromStream {
     alias ElementType = StreamElementType;
     Args args;
-    auto collect(DG)(DG dg) {
-      static assert (hasFunctionAttributes!(DG, "shared"), "Function must be shared");
-      return FromStreamSender!DG(args, dg);
+    auto collect(DG dg) {
+      return FromStreamSender(args, dg);
     }
   }
   return FromStream(args);

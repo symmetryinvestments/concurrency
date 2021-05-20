@@ -48,7 +48,7 @@ import core.atomic;
 @("infiniteStream.take")
 @safe unittest {
   shared int g = 0;
-  infiniteStream(4).take(5).collect((int n) shared => g.atomicOp!"+="(n)).sync_wait();
+  infiniteStream(4).take(5).collect((int n) shared { g.atomicOp!"+="(n); }).sync_wait();
   g.should == 20;
 }
 
@@ -56,7 +56,7 @@ import core.atomic;
 @safe unittest {
   import concurrency.stoptoken;
   shared int g = 0;
-  iotaStream(0, 5).collect((int n) shared => g.atomicOp!"+="(n)).sync_wait();
+  iotaStream(0, 5).collect((int n) shared { g.atomicOp!"+="(n); }).sync_wait();
   g.should == 10;
 }
 
@@ -70,7 +70,7 @@ import core.atomic;
     }
   }
   shared int g = 0;
-  Loop(0,4).loopStream!size_t.collect((size_t n) shared => g.atomicOp!"+="(n)).sync_wait();
+  Loop(0,4).loopStream!size_t.collect((size_t n) shared { g.atomicOp!"+="(n); }).sync_wait();
   g.should == 6;
 }
 
@@ -99,7 +99,7 @@ unittest {
   shared int p;
 
   auto stream = StartStop().startStopStream!int;
-  stream.take(2).collect((int i) shared => p.atomicOp!"+="(i)).sync_wait();
+  stream.take(2).collect((int i) shared { p.atomicOp!"+="(i); }).sync_wait();
 
   p.should == 3;
 }
@@ -136,7 +136,7 @@ unittest {
   import core.time : msecs;
   shared bool p = false;
 
-  1.msecs.intervalStream().toStreamObject().take(1).collect(() shared => p = true).sync_wait();
+  1.msecs.intervalStream().toStreamObject().take(1).collect(() shared { p = true; }).sync_wait();
 
   p.should == true;
 }
