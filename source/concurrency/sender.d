@@ -119,11 +119,7 @@ interface OperationalStateBase {
 
 /// calls connect on the Sender but stores the OperationState on the heap
 OperationalStateBase connectHeap(Sender, Receiver)(Sender sender, Receiver receiver) {
-  import std.traits : ReturnType;
-  import std.meta : Filter;
-  enum isTemplate(alias t) = __traits(isTemplate, t);
-  alias connectFn = Filter!(isTemplate, __traits(getOverloads, Sender, "connect", true))[0];
-  alias State = ReturnType!(connectFn!(Receiver));
+  alias State = typeof(sender.connect(receiver));
   return new class(sender, receiver) OperationalStateBase {
     State state;
     this(Sender sender, Receiver receiver) {
