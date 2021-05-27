@@ -198,4 +198,5 @@ private struct RaceReceiver(Receiver, InnerValue, Value) {
         receiver.setError(state.exception);
     }
   }
+  mixin ForwardExtensionPoints!receiver;
 }

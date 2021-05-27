@@ -226,4 +226,5 @@ private struct WhenAllReceiver(Receiver, InnerValue, Value) {
         receiver.setError(state.exception);
     }
   }
+  mixin ForwardExtensionPoints!receiver;
 }
