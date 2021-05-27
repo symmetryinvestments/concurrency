@@ -419,3 +419,33 @@ auto fromStreamOp(StreamElementType, SenderValue, alias Op, Args...)(Args args) 
   }
   return FromStream(args);
 }
+
+auto doneStream() {
+  alias DG = CollectDelegate!void;
+  static struct DoneStreamOp(Receiver) {
+    Receiver receiver;
+    this(DG dg, Receiver receiver) {
+      this.receiver = receiver;
+    }
+    void start() nothrow @safe {
+      receiver.setDone();
+    }
+  }
+  return fromStreamOp!(void, void, DoneStreamOp)();
+}
+
+auto errorStream(Exception e) {
+  alias DG = CollectDelegate!void;
+  static struct ErrorStreamOp(Receiver) {
+    Exception e;
+    Receiver receiver;
+    this(Exception e, DG dg, Receiver receiver) {
+      this.e = e;
+      this.receiver = receiver;
+    }
+    void start() nothrow @safe {
+      receiver.setError(e);
+    }
+  }
+  return fromStreamOp!(void, void, ErrorStreamOp)(e);
+}
