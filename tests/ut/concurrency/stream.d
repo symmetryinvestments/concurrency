@@ -11,7 +11,7 @@ import core.atomic;
 @("arrayStream")
 @safe unittest {
   shared int p = 0;
-  [1,2,3].arrayStream().collect((int t) shared { p.atomicOp!"+="(t); }).sync_wait();
+  [1,2,3].arrayStream().collect((int t) shared { p.atomicOp!"+="(t); }).sync_wait().should == true;
   p.should == 6;
 }
 
@@ -24,7 +24,7 @@ import core.atomic;
   auto source = new shared StopSource();
   auto slow = 10.msecs.intervalStream().collect(() shared { s.atomicOp!"+="(1); source.stop(); }).withStopSource(source).via(ThreadSender());
   auto fast = 3.msecs.intervalStream().collect(() shared { f.atomicOp!"+="(1); });
-  whenAll(slow, fast).sync_wait(source);
+  whenAll(slow, fast).sync_wait(source).should == false;
   s.should == 1;
   f.shouldBeGreaterThan(1);
 }
@@ -41,7 +41,7 @@ import core.atomic;
       else
         source.stop();
     })
-    .withStopSource(source).sync_wait();
+    .withStopSource(source).sync_wait().should == false;
   g.should == 15;
 };
 
@@ -56,7 +56,7 @@ import core.atomic;
 @safe unittest {
   import concurrency.stoptoken;
   shared int g = 0;
-  iotaStream(0, 5).collect((int n) shared { g.atomicOp!"+="(n); }).sync_wait();
+  iotaStream(0, 5).collect((int n) shared { g.atomicOp!"+="(n); }).sync_wait().should == true;
   g.should == 10;
 }
 
@@ -70,7 +70,7 @@ import core.atomic;
     }
   }
   shared int g = 0;
-  Loop(0,4).loopStream!size_t.collect((size_t n) shared { g.atomicOp!"+="(n); }).sync_wait();
+  Loop(0,4).loopStream!size_t.collect((size_t n) shared { g.atomicOp!"+="(n); }).sync_wait().should == true;
   g.should == 6;
 }
 
@@ -91,7 +91,7 @@ unittest {
             }
           }, &running, emit)).start();
     }
-    void stop() {
+    void stop() @trusted {
       running.atomicStore(false);
       t.join();
     }
@@ -113,7 +113,7 @@ unittest {
   }
   shared int p;
 
-  getStream().collect((int i) @safe shared { p.atomicOp!"+="(i); }).sync_wait();
+  getStream().collect((int i) @safe shared { p.atomicOp!"+="(i); }).sync_wait().should == true;
 
   p.should == 6;
 }
@@ -144,14 +144,14 @@ unittest {
 @("transform.int.double")
 @safe unittest {
   shared int p = 0;
-  [1,2,3].arrayStream().transform((int i) => i * 3).collect((int t) shared { p.atomicOp!"+="(t); }).sync_wait();
+  [1,2,3].arrayStream().transform((int i) => i * 3).collect((int t) shared { p.atomicOp!"+="(t); }).sync_wait().should == true;
   p.should == 18;
 }
 
 @("transform.int.bool")
 @safe unittest {
   shared int p = 0;
-  [1,2,3].arrayStream().transform((int i) => i % 2 == 0).collect((bool t) shared { if (t) p.atomicOp!"+="(1); }).sync_wait();
+  [1,2,3].arrayStream().transform((int i) => i % 2 == 0).collect((bool t) shared { if (t) p.atomicOp!"+="(1); }).sync_wait().should == true;
   p.should == 1;
 }
 
@@ -169,6 +169,7 @@ unittest {
   5.msecs.intervalStream.scan((int acc) => acc += 1, 0).take(3).collect((int t) shared { p.atomicOp!"+="(t); }).sync_wait().should == true;
   p.should == 6;
 }
+
 @("take.enough")
 @safe unittest {
   shared int p = 0;
