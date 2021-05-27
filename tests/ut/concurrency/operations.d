@@ -172,7 +172,7 @@ unittest {
     static struct Op(Receiver) {
       Receiver receiver;
       bool fail;
-      void start() nothrow {
+      void start() @safe nothrow {
         if (fail)
           receiver.setError(new Exception("Fail fail fail"));
         else

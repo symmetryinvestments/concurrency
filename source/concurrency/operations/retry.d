@@ -10,7 +10,7 @@ import std.traits;
 struct Times {
   int max = 5;
   int n = 0;
-  bool failure(Exception e) nothrow {
+  bool failure(Exception e) @safe nothrow {
     n++;
     return n >= max;
   }
@@ -29,18 +29,18 @@ private struct RetryReceiver(Receiver, Sender, Logic) {
     alias Value = Sender.Value;
   }
   static if (is(Value == void)) {
-    void setValue() {
+    void setValue() @safe {
       receiver.setValueOrError();
     }
   } else {
-    void setValue(Value value) {
+    void setValue(Value value) @safe {
       receiver.setValueOrError(value);
     }
   }
-  void setDone() nothrow {
+  void setDone() @safe nothrow {
     receiver.setDone();
   }
-  void setError(Exception e) nothrow {
+  void setError(Exception e) @safe nothrow {
     if (logic.failure(e))
       receiver.setError(e);
     else {
@@ -59,7 +59,7 @@ private struct RetryReceiver(Receiver, Sender, Logic) {
 private struct Op(Receiver, Sender, Logic) {
   Sender sender;
   RetryReceiver!(Receiver, Sender, Logic) receiver;
-  void start() {
+  void start() @safe nothrow {
     sender.connect(receiver).start();
   }
 }
