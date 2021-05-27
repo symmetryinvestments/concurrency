@@ -154,6 +154,21 @@ unittest {
   [1,2,3].arrayStream().transform((int i) => i % 2 == 0).collect((bool t) shared { if (t) p.atomicOp!"+="(1); }).sync_wait();
   p.should == 1;
 }
+
+@("scan")
+@safe unittest {
+  shared int p = 0;
+  [1,2,3].arrayStream().scan((int acc, int i) => acc += i, 0).collect((int t) shared { p.atomicOp!"+="(t); }).sync_wait().should == true;
+  p.should == 10;
+}
+
+@("scan.void-value")
+@safe unittest {
+  import core.time;
+  shared int p = 0;
+  5.msecs.intervalStream.scan((int acc) => acc += 1, 0).take(3).collect((int t) shared { p.atomicOp!"+="(t); }).sync_wait().should == true;
+  p.should == 6;
+}
 @("take.enough")
 @safe unittest {
   shared int p = 0;

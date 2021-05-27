@@ -441,6 +441,40 @@ auto fromStreamOp(StreamElementType, SenderValue, alias Op, Args...)(Args args) 
   return FromStream(args);
 }
 
+/// Applies an accumulator to each value from the source
+auto scan(Stream, ScanFn, Seed)(Stream stream, scope ScanFn scanFn, Seed seed) if (models!(Stream, isStream)) {
+  import std.traits : ReturnType;
+  alias Properties = StreamProperties!Stream;
+  alias DG = CollectDelegate!(Seed);
+  static struct ScanStreamOp(Receiver) {
+    alias Op = ReturnType!(Properties.Sender.connect!Receiver);
+    ScanFn scanFn;
+    Seed acc;
+    DG dg;
+    Op op;
+    this(Stream stream, ScanFn scanFn, Seed seed, DG dg, Receiver receiver) @trusted {
+      this.scanFn = scanFn;
+      this.acc = seed;
+      this.dg = dg;
+      op = stream.collect(cast(Properties.DG)&item).connect(receiver);
+    }
+    static if (is(Properties.ElementType == void))
+      void item() {
+        acc = scanFn(acc);
+        dg(acc);
+      }
+    else
+      void item(Properties.ElementType t) {
+        acc = scanFn(acc, t);
+        dg(acc);
+      }
+    void start() {
+      op.start();
+    }
+  }
+  return fromStreamOp!(Seed, Properties.Value, ScanStreamOp)(stream, scanFn, seed);
+}
+
 auto doneStream() {
   alias DG = CollectDelegate!void;
   static struct DoneStreamOp(Receiver) {
