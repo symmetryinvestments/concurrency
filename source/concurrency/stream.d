@@ -40,7 +40,7 @@ interface StreamObjectBase(T) {
 }
 
 /// A class extending from StreamObjectBase that wraps any Stream
-class StreamObjectImpl(Stream) : StreamObjectBase!(Stream.ElementType) {
+class StreamObjectImpl(Stream) : StreamObjectBase!(Stream.ElementType) if (models!(Stream, isStream)) {
   import concurrency.receiver : ReceiverObjectBase;
   static assert (models!(typeof(this), isStream));
   private Stream stream;
@@ -56,8 +56,7 @@ class StreamObjectImpl(Stream) : StreamObjectBase!(Stream.ElementType) {
 }
 
 /// Converts any Stream to a polymorphic StreamObject
-StreamObjectBase!(Stream.ElementType) toStreamObject(Stream)(Stream stream) {
-  static assert(models!(Stream, isStream));
+StreamObjectBase!(Stream.ElementType) toStreamObject(Stream)(Stream stream) if (models!(Stream, isStream)) {
   return new StreamObjectImpl!(Stream)(stream);
 }
 
@@ -328,8 +327,7 @@ template StreamProperties(Stream) {
 }
 
 /// takes the first n values from a stream or until cancelled
-auto take(Stream)(Stream stream, size_t n) {
-  static assert(models!(Stream, isStream));
+auto take(Stream)(Stream stream, size_t n) if (models!(Stream, isStream)) {
   alias Properties = StreamProperties!Stream;
   static struct TakeReceiver(Receiver) {
     Receiver receiver;
@@ -393,7 +391,7 @@ auto take(Stream)(Stream stream, size_t n) {
   return fromStreamOp!(Properties.ElementType, Properties.Value, TakeOp)(stream, n);
 }
 
-auto transform(Stream, Fun)(Stream stream, Fun fun) {
+auto transform(Stream, Fun)(Stream stream, Fun fun) if (models!(Stream, isStream)) {
   import std.traits : ReturnType;
   alias Properties = StreamProperties!Stream;
   alias DG = CollectDelegate!(ReturnType!Fun);
@@ -433,6 +431,7 @@ auto fromStreamOp(StreamElementType, SenderValue, alias Op, Args...)(Args args) 
     }
   }
   struct FromStream {
+    static assert(models!(typeof(this), isStream));
     alias ElementType = StreamElementType;
     Args args;
     auto collect(DG dg) {
