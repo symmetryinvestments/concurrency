@@ -212,3 +212,8 @@ unittest {
   auto oob = OutOfBandValueSender!int(45);
   oob.withStopSource(new StopSource()).sync_wait().should == 45;
 }
+
+@("completewithcancellation")
+@safe unittest {
+  ValueSender!void().completeWithCancellation.sync_wait.should == false;
+}
