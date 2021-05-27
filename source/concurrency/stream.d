@@ -475,6 +475,74 @@ auto scan(Stream, ScanFn, Seed)(Stream stream, scope ScanFn scanFn, Seed seed) i
   return fromStreamOp!(Seed, Properties.Value, ScanStreamOp)(stream, scanFn, seed);
 }
 
+/// Forwards the latest value from the base stream every time the trigger stream produces a value. If the base stream hasn't produces a (new) value the trigger is ignored
+auto sample(StreamBase, StreamTrigger)(StreamBase base, StreamTrigger trigger) if (models!(StreamBase, isStream) && models!(StreamTrigger, isStream)) {
+  import concurrency.operations.whenall;
+  import concurrency.operations.completewithcancellation;
+  import concurrency.bitfield : SharedBitField;
+  enum Flags : size_t {
+    locked = 0x1,
+    valid = 0x2
+  }
+  alias PropertiesBase = StreamProperties!StreamBase;
+  alias PropertiesTrigger = StreamProperties!StreamTrigger;
+  static assert(!is(PropertiesBase.ElementType == void), "No point in sampling a stream that procudes no values. Might as well use trigger directly");
+  alias DG = PropertiesBase.DG;
+  static struct ScanStreamOp(Receiver) {
+    import std.traits : ReturnType;
+    alias WhenAllSender = ReturnType!(whenAll!(CompleteWithCancellationSender!(PropertiesBase.Sender), CompleteWithCancellationSender!(PropertiesTrigger.Sender)));
+    alias Op = ReturnType!(WhenAllSender.connect!Receiver);
+    DG dg;
+    Op op;
+    PropertiesBase.ElementType element;
+    shared SharedBitField!Flags state;
+    shared size_t sampleState;
+    this(StreamBase base, StreamTrigger trigger, DG dg, Receiver receiver) @trusted {
+      this.dg = dg;
+      op = whenAll(base.collect(cast(PropertiesBase.DG)&item).completeWithCancellation,
+                   trigger.collect(cast(PropertiesTrigger.DG)&this.trigger).completeWithCancellation).connect(receiver);
+    }
+    void item(PropertiesBase.ElementType t) {
+      import core.atomic : atomicOp;
+      with(state.lock(Flags.valid)) {
+        element = t;
+      }
+    }
+    void trigger() {
+      import core.atomic : atomicOp;
+      with(state.lock()) {
+        if (was(Flags.valid)) {
+          auto localElement = element;
+          release(Flags.valid);
+          dg(localElement);
+        }
+      }
+    }
+    void start() {
+      op.start();
+    }
+  }
+  return fromStreamOp!(PropertiesBase.ElementType, PropertiesBase.Value, ScanStreamOp)(base, trigger);
+}
+
+auto via(Stream, Sender)(Stream stream, Sender sender) if (models!(Sender, isSender) && models!(Stream, isStream)) {
+  alias Properties = StreamProperties!Stream;
+  alias DG = Properties.DG;
+  static struct ViaStreamOp(Receiver) {
+    import std.traits : ReturnType;
+    import concurrency.operations.via : senderVia = via;
+    alias Op = ReturnType!(ReturnType!(senderVia!(Properties.Sender, Sender)).connect!Receiver);
+    Op op;
+    this(Stream stream, Sender sender, DG dg, Receiver receiver) {
+      op = stream.collect(dg).senderVia(sender).connect(receiver);
+    }
+    void start() nothrow @safe {
+      op.start();
+    }
+  }
+  return fromStreamOp!(Properties.ElementType, Properties.Value, ViaStreamOp)(stream, sender);
+}
+
 auto doneStream() {
   alias DG = CollectDelegate!void;
   static struct DoneStreamOp(Receiver) {

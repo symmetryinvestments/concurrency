@@ -196,3 +196,41 @@ unittest {
   errorStream(new Exception("Too bad")).take(1).collect(()shared{}).sync_wait().shouldThrowWithMessage("Too bad");
 }
 
+@("sample.slower")
+@safe unittest {
+  import concurrency.thread;
+  import core.time;
+
+  shared int p = 0;
+
+  7.msecs
+    .intervalStream()
+    .via(ThreadSender())
+    .scan((int acc) => acc+1, 0)
+    .sample(10.msecs.intervalStream().take(3))
+    .take(3)
+    .collect((int i) shared { p.atomicOp!"+="(i); })
+    .sync_wait().should == true;
+
+  p.should == 7;
+}
+
+@("sample.faster")
+@safe unittest {
+  import concurrency.thread;
+  import core.time;
+
+  shared int p = 0;
+
+  7.msecs
+    .intervalStream()
+    .via(ThreadSender())
+    .scan((int acc) => acc+1, 0)
+    .sample(3.msecs.intervalStream())
+    .take(3)
+    .collect((int i) shared { p.atomicOp!"+="(i); })
+    .sync_wait().should == true;
+
+  p.should == 6;
+}
+
