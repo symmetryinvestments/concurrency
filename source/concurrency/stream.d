@@ -331,11 +331,33 @@ template StreamProperties(Stream) {
 auto take(Stream)(Stream stream, size_t n) {
   static assert(models!(Stream, isStream));
   alias Properties = StreamProperties!Stream;
+  static struct TakeReceiver(Receiver) {
+    Receiver receiver;
+    StopSource stopSource;
+    static if (is(Properties.Sender.Value == void))
+      void setValue() { receiver.setValue(); }
+    else
+      void setValue(Properties.Sender.Value e) { receiver.setValue(e); }
+    void setDone() nothrow @safe {
+      import concurrency.receiver : setValueOrError;
+      static if (is(Properties.Sender.Value == void)) {
+        if (stopSource.isStopRequested)
+          receiver.setValueOrError();
+        else
+          receiver.setDone();
+      } else
+        receiver.setDone();
+    }
+    void setError(Exception e) {
+      receiver.setError(e);
+    }
+    mixin ForwardExtensionPoints!receiver;
+  }
   static struct TakeOp(Receiver) {
     import concurrency.operations : withStopSource;
     import std.traits : ReturnType;
     alias SS = ReturnType!(withStopSource!(Properties.Sender));
-    alias Op = ReturnType!(SS.connect!Receiver);
+    alias Op = ReturnType!(SS.connect!(TakeReceiver!Receiver));
     size_t n;
     Properties.DG dg;
     StopSource stopSource;
@@ -344,7 +366,7 @@ auto take(Stream)(Stream stream, size_t n) {
       stopSource = new StopSource();
       this.dg = dg;
       this.n = n;
-      op = stream.collect(cast(Properties.DG)&item).withStopSource(stopSource).connect(receiver);
+      op = stream.collect(cast(Properties.DG)&item).withStopSource(stopSource).connect(TakeReceiver!Receiver(receiver, stopSource));
     }
     static if (is(Properties.ElementType == void)) {
       private void item() {

@@ -48,7 +48,7 @@ import core.atomic;
 @("infiniteStream.take")
 @safe unittest {
   shared int g = 0;
-  infiniteStream(4).take(5).collect((int n) shared { g.atomicOp!"+="(n); }).sync_wait();
+  infiniteStream(4).take(5).collect((int n) shared { g.atomicOp!"+="(n); }).sync_wait().should == true;
   g.should == 20;
 }
 
@@ -99,7 +99,7 @@ unittest {
   shared int p;
 
   auto stream = StartStop().startStopStream!int;
-  stream.take(2).collect((int i) shared { p.atomicOp!"+="(i); }).sync_wait();
+  stream.take(2).collect((int i) shared { p.atomicOp!"+="(i); }).sync_wait().should == true;
 
   p.should == 3;
 }
@@ -126,7 +126,7 @@ unittest {
   }
   shared int p;
 
-  getStream().take(2).collect((int i) shared { p.atomicOp!"+="(i); }).sync_wait();
+  getStream().take(2).collect((int i) shared { p.atomicOp!"+="(i); }).sync_wait().should == true;
 
   p.should == 3;
 }
@@ -136,7 +136,7 @@ unittest {
   import core.time : msecs;
   shared bool p = false;
 
-  1.msecs.intervalStream().toStreamObject().take(1).collect(() shared { p = true; }).sync_wait();
+  1.msecs.intervalStream().toStreamObject().take(1).collect(() shared { p = true; }).sync_wait().should == true;
 
   p.should == true;
 }
@@ -154,3 +154,29 @@ unittest {
   [1,2,3].arrayStream().transform((int i) => i % 2 == 0).collect((bool t) shared { if (t) p.atomicOp!"+="(1); }).sync_wait();
   p.should == 1;
 }
+@("take.enough")
+@safe unittest {
+  shared int p = 0;
+
+  [1,2,3].arrayStream.take(2).collect((int i) shared { p.atomicOp!"+="(i); }).sync_wait.should == true;
+  p.should == 3;
+}
+
+@("take.too-few")
+@safe unittest {
+  shared int p = 0;
+
+  [1,2,3].arrayStream.take(4).collect((int i) shared { p.atomicOp!"+="(i); }).sync_wait.should == true;
+  p.should == 6;
+}
+
+@("take.donestream")
+@safe unittest {
+  doneStream().take(1).collect(()shared{}).sync_wait().should == false;
+}
+
+@("take.errorstream")
+@safe unittest {
+  errorStream(new Exception("Too bad")).take(1).collect(()shared{}).sync_wait().shouldThrowWithMessage("Too bad");
+}
+
