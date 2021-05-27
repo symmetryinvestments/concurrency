@@ -22,6 +22,11 @@ import unit_threaded;
   ValueSender!(int)(5).connect(ThrowingNullReceiver!int()).start();
 }
 
+@("value.void")
+@safe unittest {
+  ValueSender!void().sync_wait().should == true;
+}
+
 @("sync_wait.thread")
 @safe unittest {
   ThreadSender().sync_wait().shouldEqual(true);

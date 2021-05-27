@@ -59,15 +59,23 @@ struct ValueSender(T) {
   alias Value = T;
   static struct Op(Receiver) {
     Receiver receiver;
-    T value;
+    static if (!is(T == void))
+      T value;
     void start() {
       import concurrency.receiver : setValueOrError;
-      receiver.setValueOrError(value);
+      static if (!is(T == void))
+        receiver.setValueOrError(value);
+      else
+        receiver.setValueOrError();
     }
   }
-  T value;
+  static if (!is(T == void))
+    T value;
   Op!Receiver connect(Receiver)(Receiver receiver) {
-    return Op!(Receiver)(receiver, value);
+    static if (!is(T == void))
+      return Op!(Receiver)(receiver, value);
+    else
+      return Op!(Receiver)(receiver);
   }
 }
 
