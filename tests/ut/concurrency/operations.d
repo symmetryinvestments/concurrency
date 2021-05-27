@@ -213,6 +213,11 @@ unittest {
   oob.withStopSource(new StopSource()).sync_wait().should == 45;
 }
 
+@("value.withstoptoken.via.thread")
+@safe unittest {
+  ValueSender!int(4).withStopToken((StopToken s, int i) { throw new Exception("Badness");}).via(ThreadSender()).sync_wait.shouldThrowWithMessage("Badness");
+}
+
 @("completewithcancellation")
 @safe unittest {
   ValueSender!void().completeWithCancellation.sync_wait.should == false;

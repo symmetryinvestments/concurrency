@@ -55,3 +55,8 @@ import unit_threaded;
 @safe unittest {
   ThreadSender().then(() shared => 2*3+1).toSenderObject.sync_wait().shouldEqual(7);
 }
+
+@("via.threadsender.error")
+@safe unittest {
+  ThrowingSender().via(ThreadSender()).sync_wait().shouldThrow();
+}
