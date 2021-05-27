@@ -64,7 +64,7 @@ private struct Op(Receiver, Sender, Logic) {
   }
 }
 
-private struct RetrySender(Sender, Logic) {
+struct RetrySender(Sender, Logic) if (models!(Sender, isSender)) {
   static assert(models!(typeof(this), isSender));
   alias Value = Sender.Value;
   Sender sender;

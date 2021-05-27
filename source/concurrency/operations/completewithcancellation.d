@@ -24,8 +24,8 @@ private struct CompleteWithCancellationReceiver(Receiver) {
   mixin ForwardExtensionPoints!receiver;
 }
 
-struct CompleteWithCancellationSender(Sender) {
-  static assert (models!(Sender, isSender));
+struct CompleteWithCancellationSender(Sender) if (models!(Sender, isSender)) {
+  static assert (models!(typeof(this), isSender));
   static assert(is(Sender.Value == void), "Sender must produce void to be able to complete with cancellation.");
   alias Value = void;
   Sender sender;

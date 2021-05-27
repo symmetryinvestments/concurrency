@@ -100,7 +100,9 @@ private struct WhenAllOp(Receiver, Senders...) {
   }
 }
 
-private struct WhenAllSender(Senders...) {
+import std.meta : allSatisfy, ApplyRight;
+
+struct WhenAllSender(Senders...) if (allSatisfy!(ApplyRight!(models, isSender), Senders)) {
   alias Result = WhenAllResult!(Senders);
   static if (hasMember!(Result, "values"))
     alias Value = typeof(Result.values);

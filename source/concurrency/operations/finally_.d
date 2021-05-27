@@ -37,7 +37,8 @@ private struct FinallyReceiver(Value, Result, Receiver) {
   mixin ForwardExtensionPoints!receiver;
 }
 
-private struct FinallySender(Sender, Result) {
+struct FinallySender(Sender, Result) if (models!(Sender, isSender)) {
+  static assert (models!(typeof(this), isSender));
   static if (isCallable!Result)
     alias Value = typeof(result());
   else

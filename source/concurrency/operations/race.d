@@ -67,7 +67,10 @@ private struct RaceOp(Receiver, Senders...) {
   }
 }
 
-private struct RaceSender(Senders...) {
+import std.meta : allSatisfy, ApplyRight;
+
+struct RaceSender(Senders...) if (allSatisfy!(ApplyRight!(models, isSender), Senders)) {
+  static assert(models!(typeof(this), isSender));
   alias Value = Result!(Senders);
   Senders senders;
   auto connect(Receiver)(Receiver receiver) {

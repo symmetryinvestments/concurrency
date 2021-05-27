@@ -11,7 +11,7 @@ IESender!Sender ignoreError(Sender)(Sender sender) {
   return IESender!Sender(sender);
 }
 
-private struct IESender(Sender) {
+struct IESender(Sender) if (models!(Sender, isSender)) {
   static assert(models!(typeof(this), isSender));
   alias Value = Sender.Value;
   Sender sender;

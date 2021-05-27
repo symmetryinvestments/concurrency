@@ -72,7 +72,7 @@ private struct SSReceiver(Receiver, Value) {
   }
 }
 
-private struct SSSender(Sender) {
+struct SSSender(Sender) if (models!(Sender, isSender)) {
   static assert(models!(typeof(this), isSender));
   alias Value = Sender.Value;
   Sender sender;

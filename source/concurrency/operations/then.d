@@ -42,7 +42,7 @@ private struct ThenReceiver(Receiver, Value, Fun) {
   mixin ForwardExtensionPoints!receiver;
 }
 
-private struct ThenSender(Sender, Fun) {
+struct ThenSender(Sender, Fun) if (models!(Sender, isSender)) {
   import std.traits : ReturnType;
   static assert(models!(typeof(this), isSender));
   alias Value = ReturnType!fun;
