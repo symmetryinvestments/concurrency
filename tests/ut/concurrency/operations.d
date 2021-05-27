@@ -136,11 +136,11 @@ unittest {
   whenAll(VoidSender(), ValueSender!int(2)).sync_wait.should == 2;
   whenAll(ValueSender!int(1), VoidSender()).sync_wait.should == 1;
   whenAll(VoidSender(), VoidSender()).sync_wait.should == true;
-  whenAll(ValueSender!int(1), ThrowingSender()).sync_wait.shouldThrow;
-  whenAll(ThrowingSender(), ValueSender!int(1)).sync_wait.shouldThrow;
+  whenAll(ValueSender!int(1), ThrowingSender()).sync_wait.shouldThrowWithMessage("ThrowingSender");
+  whenAll(ThrowingSender(), ValueSender!int(1)).sync_wait.shouldThrowWithMessage("ThrowingSender");
   whenAll(ValueSender!int(1), DoneSender()).sync_wait.shouldThrowWithMessage("Canceled");
   whenAll(DoneSender(), ValueSender!int(1)).sync_wait.shouldThrowWithMessage("Canceled");
-  whenAll(DoneSender(), ThrowingSender()).sync_wait.shouldThrowWithMessage("ThrowingSender");
+  whenAll(DoneSender(), ThrowingSender()).sync_wait.should == false;
   whenAll(ThrowingSender(), DoneSender()).sync_wait.shouldThrowWithMessage("ThrowingSender");
 
 }

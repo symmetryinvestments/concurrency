@@ -15,12 +15,11 @@ WhenAllSender!(Senders) whenAll(Senders...)(Senders senders) if (Senders.length 
 private enum Flags : size_t {
   locked = 0x1,
   value_produced = 0x2,
-  exception_produced = 0x4
+  doneOrError_produced = 0x4
 }
 
 private enum Counter : size_t {
-  tick = 0x8,
-  mask = ~0x7
+  tick = 0x8
 }
 
 private template WhenAllResult(Senders...) {
@@ -115,11 +114,12 @@ struct WhenAllSender(Senders...) if (allSatisfy!(ApplyRight!(models, isSender), 
 }
 
 private class WhenAllState(Value) : StopSource {
+  import concurrency.bitfield;
   StopCallback cb;
   static if (is(typeof(Value.values)))
     Value value;
   Exception exception;
-  shared size_t racestate;
+  shared SharedBitField!Flags bitfield;
 }
 
 private struct WhenAllReceiver(Receiver, InnerValue, Value) {
@@ -131,101 +131,65 @@ private struct WhenAllReceiver(Receiver, InnerValue, Value) {
   auto getStopToken() {
     return StopToken(state);
   }
-  private void setReceiverValue() nothrow {
-    import concurrency.receiver : setValueOrError;
-    static if (is(typeof(Value.values)))
-      receiver.setValueOrError(state.value.values);
-    else
-      receiver.setValueOrError();
-  }
-  private auto update(size_t transition) nothrow {
-    import std.typecons : tuple;
-    size_t oldState, newState;
-    do {
-      goto load_state;
-      do {
-        spin_yield();
-      load_state:
-        oldState = state.racestate.atomicLoad!(MemoryOrder.acq);
-      } while (isLocked(oldState));
-      newState = (oldState + Counter.tick) | transition;
-    } while (!casWeak!(MemoryOrder.acq, MemoryOrder.acq)(&state.racestate, oldState, newState));
-    return tuple!("old", "new_")(oldState, newState);
-  }
   private bool isValueProduced(size_t state) {
     return (state & Flags.value_produced) > 0;
   }
-  private bool isExceptionProduced(size_t state) {
-    return (state & Flags.exception_produced) > 0;
-  }
-  private bool isLocked(size_t state) {
-    return (state & Flags.locked) > 0;
+  private bool isDoneOrErrorProduced(size_t state) {
+    return (state & Flags.doneOrError_produced) > 0;
   }
   private bool isLast(size_t state) {
     return (state >> 3) == senderCount;
   }
   static if (!is(InnerValue == void))
     void setValue(InnerValue value) {
-      auto transition = update(Flags.value_produced);
-      state.value.setValue(value, senderIndex);
-
-      if (isLast(transition.new_)) {
-        state.cb.dispose();
-        if (receiver.getStopToken().isStopRequested)
-          receiver.setDone();
-        else if (isExceptionProduced(transition.new_))
-          receiver.setError(state.exception);
-        else if (state.isStopRequested)
-          receiver.setDone();
-        else
-          setReceiverValue();
+      with (state.bitfield.lock(Flags.value_produced, Counter.tick)) {
+        state.value.setValue(value, senderIndex);
+        release();
+        process(newState);
       }
     }
   else
     void setValue() {
-      auto transition = update(Flags.value_produced);
-
-      if (isLast(transition.new_)) {
-        state.cb.dispose();
-
-        if (receiver.getStopToken().isStopRequested)
-          receiver.setDone();
-        else if (isExceptionProduced(transition.new_))
-          receiver.setError(state.exception);
-        else if (state.isStopRequested)
-          receiver.setDone();
-        else
-          setReceiverValue();
+      with (state.bitfield.update(Flags.value_produced, Counter.tick)) {
+        process(newState);
       }
     }
   void setDone() {
-    auto transition = update(0);
-    if (isLast(transition.new_)) {
-      state.cb.dispose();
-      if (receiver.getStopToken().isStopRequested)
-        receiver.setDone();
-      else if (isExceptionProduced(transition.new_))
-        receiver.setError(state.exception);
-      else
-        receiver.setDone();
-    } else
-      state.stop();
+    with (state.bitfield.update(Flags.doneOrError_produced, Counter.tick)) {
+      if (!isDoneOrErrorProduced(oldState))
+        state.stop();
+      process(newState);
+    }
   }
   void setError(Exception exception) {
-    auto transition = update(Flags.exception_produced | Flags.locked);
-    if (!isExceptionProduced(transition.old)) {
-      state.exception = exception;
-      state.racestate.atomicOp!"-="(Flags.locked); // need to unlock before stop
-      state.stop();
-    } else
-      state.racestate.atomicOp!"-="(Flags.locked);
+    with (state.bitfield.lock(Flags.doneOrError_produced, Counter.tick)) {
+      if (!isDoneOrErrorProduced(oldState)) {
+        state.exception = exception;
+        state.stop();
+      }
+      release();
+      process(newState);
+    }
+  }
+  private void process(size_t newState) {
+    if (!isLast(newState))
+      return;
 
-    if (isLast(transition.new_)) {
-      state.cb.dispose();
-      if (receiver.getStopToken().isStopRequested)
-        receiver.setDone();
-      else
+    state.cb.dispose();
+
+    if (receiver.getStopToken().isStopRequested)
+      receiver.setDone();
+    else if (isDoneOrErrorProduced(newState)) {
+      if (state.exception)
         receiver.setError(state.exception);
+      else
+        receiver.setDone();
+    } else {
+      import concurrency.receiver : setValueOrError;
+      static if (is(typeof(Value.values)))
+        receiver.setValueOrError(state.value.values);
+      else
+        receiver.setValueOrError();
     }
   }
   mixin ForwardExtensionPoints!receiver;
