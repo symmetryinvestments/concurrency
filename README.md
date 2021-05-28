@@ -78,6 +78,8 @@ Senders enjoy the following operations.
 
 - `retry`. It retries the underlying Sender until success or cancellation. The retry logic is customizable. Included is a Times, that will retry n times and then propagate the latest failure.
 
+- `completeWithCancellation`. Wraps the Sender and redirects the setValue termination to complete with cancellation. The Sender is not allowed to produce a Value.
+
 ## Streams
 
 A Stream is anything that has a `.collect` function that accepts a `shared` callable and returns a Sender. Once the Sender is connected and started the Stream will call the callable zero or more times before one of the three terminal functions of the Receiver is called.
@@ -94,15 +96,22 @@ Currently there are the following Streams:
 - `iotaStream`. Emits the values that span the given starting and stopping values.
 - `arrayStream`. Emits every value from the array.
 - `intervalStream`. Emits every interval.
+- `doneStream`. Upon start immediately emits cancellation.
+- `errorStream`. Upon start immediately emits an error.
 
 With the following operations:
 
 - `take`. Emits at most the first n values.
+- `transform`. Applies a tranformation function to each value.
+- `scan`. Applies an accumulator function with seed to each value.
+- `sample`. Forwards the latest value of the base Stream every time the trigger Stream emits a value. If the base stream hasn't produced a (new) value the trigger is ignored.
+- `via`. Starts the Stream on the context of another Sender.
 
 Most of the time you will need to write your own Stream however. The following helpers can speed that up:
 
 - `loopStream`. Takes a struct with a `loop` function and calls that with an `emit` and `stopToken` while ensuring the struct is alive during that.
 - `startStopStream`. Takes a struct with a `start` and `stop` function, calling `start` with an `emit` and `stopToken`, and `stop` when the stream is to end. The struct will be kept alive until after `stop` is called.
+- `fromStreamOp`. Constructs a full Stream given only a templated OperationalState. Allows passing in custom values into the OperationalState's constructor. Since Streams build on Senders they require a bit of boilerplate to setup, this helper eliminates that.
 
 ## Nursery
 
