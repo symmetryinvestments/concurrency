@@ -79,6 +79,10 @@ struct ValueSender(T) {
   }
 }
 
+ValueSender!T just(T)(T t) {
+  return ValueSender!T(t);
+}
+
 /// A polymorphic sender of type T
 interface SenderObjectBase(T) {
   import concurrency.receiver;

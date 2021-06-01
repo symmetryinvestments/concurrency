@@ -69,7 +69,7 @@ static if (__traits(compiles, () { import core.atomic : casWeak; }) && __traits(
   public import core.atomic : casWeak;
  else {
    import core.atomic : MemoryOrder;
-   auto casWeak(MemoryOrder M1, MemoryOrder M2, T, V1, V2)(T* here, V1 ifThis, V2 writeThis) pure nothrow @nogc @safe {
+   auto casWeak(MemoryOrder M1 = MemoryOrder.seq, MemoryOrder M2 = MemoryOrder.seq, T, V1, V2)(T* here, V1 ifThis, V2 writeThis) pure nothrow @nogc @safe {
      import core.atomic : cas;
 
      static if (__traits(compiles, cas!(M1, M2)(here, ifThis, writeThis)))
