@@ -127,7 +127,7 @@ private void spin_yield() nothrow @trusted @nogc {
 
 private struct stop_state {
   import core.thread : Thread;
-  import core.atomic : atomicOp, atomicStore, atomicLoad, MemoryOrder;
+  import core.atomic : atomicStore, atomicLoad, MemoryOrder, atomicFetchSub, atomicFetchAdd;
 
   static if (__traits(compiles, () { import core.atomic : casWeak; }) && __traits(compiles, () {
       import core.internal.atomic : atomicCompareExchangeWeakNoResult;
@@ -145,25 +145,19 @@ private struct stop_state {
 
 public:
   void add_token_reference() nothrow @safe @nogc {
-    state_.atomicOp!"+="(token_ref_increment);
+    state_.atomicFetchAdd!(MemoryOrder.raw)(token_ref_increment);
   }
 
   void remove_token_reference() nothrow @safe @nogc {
-    auto newState = state_.atomicOp!"-="(token_ref_increment);
-    if (newState < (token_ref_increment)) {
-      // delete this;
-    }
+    state_.atomicFetchSub!(MemoryOrder.acq_rel)(token_ref_increment);
   }
 
   void add_source_reference() nothrow @safe @nogc {
-    state_.atomicOp!"+="(source_ref_increment);
+    state_.atomicFetchAdd!(MemoryOrder.raw)(source_ref_increment);
   }
 
   void remove_source_reference() nothrow @safe @nogc {
-    auto newState = state_.atomicOp!"-="(source_ref_increment);
-    if (newState < (token_ref_increment)) {
-      // delete this;
-    }
+    state_.atomicFetchSub!(MemoryOrder.acq_rel)(source_ref_increment);
   }
 
   bool request_stop() nothrow @safe {
@@ -361,20 +355,15 @@ private:
   }
 
   void unlock() nothrow @safe @nogc {
-    state_.atomicOp!"-="(locked_flag);
+    state_.atomicFetchSub!(MemoryOrder.rel)(locked_flag);
   }
 
   void unlock_and_increment_token_ref_count() nothrow @safe @nogc {
-    state_.atomicOp!"-="(locked_flag - token_ref_increment);
+    state_.atomicFetchSub!(MemoryOrder.rel)(locked_flag - token_ref_increment);
   }
 
   void unlock_and_decrement_token_ref_count() nothrow @safe @nogc {
-    auto newState = state_.atomicOp!"-="(locked_flag + token_ref_increment);
-    // Check if new state is less than token_ref_increment which would
-    // indicate that this was the last reference.
-    if (newState < (locked_flag + token_ref_increment)) {
-      // delete this;
-    }
+    state_.atomicFetchSub!(MemoryOrder.acq_rel)(locked_flag + token_ref_increment);
   }
 
   enum stop_requested_flag = 1L;
