@@ -207,7 +207,7 @@ shared static this() {
 @models!(ThreadSender, isSender)
 struct ThreadSender {
   alias Value = void;
-  private struct Op(Receiver) {
+  static struct Op(Receiver) {
     private Receiver receiver;
     void start() @trusted nothrow {
       import concurrency.utils : closure;
