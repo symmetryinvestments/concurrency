@@ -45,7 +45,10 @@ private struct RetryReceiver(Receiver, Sender, Logic) {
       receiver.setError(e);
     else {
       try {
-        sender.connect(this).start();
+        // TODO: we connect on the heap here but we can probably do something smart...
+        // Maybe we can store the new Op in the RetryOp struct
+        // From what I gathered that is what libunifex does
+        sender.connectHeap(this).start();
       } catch (Exception e) {
         receiver.setError(e);
       }
@@ -56,11 +59,14 @@ private struct RetryReceiver(Receiver, Sender, Logic) {
   }
 }
 
-private struct Op(Receiver, Sender, Logic) {
-  Sender sender;
-  RetryReceiver!(Receiver, Sender, Logic) receiver;
+private struct RetryOp(Receiver, Sender, Logic) {
+  alias Op = OpType!(Sender, RetryReceiver!(Receiver, Sender, Logic));
+  Op op;
+  this(Sender sender, RetryReceiver!(Receiver, Sender, Logic) receiver) {
+    op = sender.connect(receiver);
+  }
   void start() @safe nothrow {
-    sender.connect(receiver).start();
+    op.start();
   }
 }
 
@@ -70,6 +76,6 @@ struct RetrySender(Sender, Logic) if (models!(Sender, isSender)) {
   Sender sender;
   Logic logic;
   auto connect(Receiver)(Receiver receiver) {
-    return Op!(Receiver, Sender, Logic)(sender, RetryReceiver!(Receiver, Sender, Logic)(sender, receiver, logic));
+    return RetryOp!(Receiver, Sender, Logic)(sender, RetryReceiver!(Receiver, Sender, Logic)(sender, receiver, logic));
   }
 }
