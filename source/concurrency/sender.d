@@ -61,7 +61,7 @@ struct ValueSender(T) {
     Receiver receiver;
     static if (!is(T == void))
       T value;
-    void start() {
+    void start() @safe {
       import concurrency.receiver : setValueOrError;
       static if (!is(T == void))
         receiver.setValueOrError(value);

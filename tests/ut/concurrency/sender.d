@@ -39,7 +39,7 @@ import unit_threaded;
 
 @("sync_wait.thread.then.exception")
 @safe unittest {
-  bool delegate() shared dg = () shared { throw new Exception("Exceptions are rethrown"); };
+  bool delegate() @safe shared dg = () shared { throw new Exception("Exceptions are rethrown"); };
   ThreadSender()
     .then(dg)
     .sync_wait()

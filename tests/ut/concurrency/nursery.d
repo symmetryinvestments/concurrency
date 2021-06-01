@@ -123,7 +123,7 @@ unittest {
   auto nursery = new shared Nursery();
 
   auto thread1 = ThreadSender()
-    .withStopToken((StopToken stopToken) shared {
+    .withStopToken((StopToken stopToken) shared @trusted {
           while(!stopToken.isStopRequested)
             Thread.yield();
       })
@@ -145,7 +145,7 @@ unittest {
   auto nursery = new shared Nursery();
 
   auto thread1 = ThreadSender()
-    .withStopToken((StopToken stopToken) shared {
+    .withStopToken((StopToken stopToken) shared @trusted {
         while(!stopToken.isStopRequested)
           Thread.yield();
       })

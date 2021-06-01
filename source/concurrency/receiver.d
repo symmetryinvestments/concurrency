@@ -59,7 +59,7 @@ struct ThrowingNullReceiver(T) {
     void setValue(T t) @safe { throw new Exception("ThrowingNullReceiver"); }
 }
 
-void setValueOrError(Receiver)(auto ref Receiver receiver) {
+void setValueOrError(Receiver)(auto ref Receiver receiver) @safe {
   import std.traits;
   static if (hasFunctionAttributes!(receiver.setValue, "nothrow")) {
     receiver.setValue();
@@ -72,7 +72,7 @@ void setValueOrError(Receiver)(auto ref Receiver receiver) {
   }
 }
 
-void setValueOrError(Receiver, T)(auto ref Receiver receiver, auto ref T value) {
+void setValueOrError(Receiver, T)(auto ref Receiver receiver, auto ref T value) @safe {
   import std.traits;
   static if (hasFunctionAttributes!(receiver.setValue, "nothrow")) {
     receiver.setValue(value);

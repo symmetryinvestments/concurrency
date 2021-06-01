@@ -33,7 +33,7 @@ struct OutOfBandValueSender(T) {
 
 @("ignoreErrors.sync_wait.value")
 @safe unittest {
-  bool delegate() shared dg = () shared { throw new Exception("Exceptions are rethrown"); };
+  bool delegate() @safe shared dg = () shared { throw new Exception("Exceptions are rethrown"); };
   ThreadSender()
     .then(dg)
     .ignoreError()
@@ -51,7 +51,7 @@ unittest {
 unittest {
   race(ValueSender!int(4), ValueSender!int(5)).sync_wait.should == 4;
   auto fastThread = ThreadSender().then(() shared => 1);
-  auto slowThread = ThreadSender().then(() shared { Thread.sleep(50.msecs); return 2; });
+  auto slowThread = ThreadSender().then(() shared @trusted { Thread.sleep(50.msecs); return 2; });
   race(fastThread, slowThread).sync_wait.should == 1;
   race(slowThread, fastThread).sync_wait.should == 1;
 }
@@ -76,14 +76,14 @@ unittest {
 
 @("race.exception.double")
 unittest {
-  auto slow = ThreadSender().then(() shared { Thread.sleep(50.msecs); throw new Exception("Slow"); });
+  auto slow = ThreadSender().then(() shared @trusted { Thread.sleep(50.msecs); throw new Exception("Slow"); });
   auto fast = ThreadSender().then(() shared { throw new Exception("Fast"); });
   race(slow, fast).sync_wait.shouldThrowWithMessage("Fast");
 }
 
 @("race.cancel-other")
 unittest {
-  auto waiting = ThreadSender().withStopToken((StopToken token){
+  auto waiting = ThreadSender().withStopToken((StopToken token) @trusted {
       while (!token.isStopRequested) { Thread.yield(); }
     });
   race(waiting, ValueSender!int(88)).sync_wait.get.should == 88;
@@ -91,12 +91,12 @@ unittest {
 
 @("race.cancel")
 unittest {
-  auto waiting = ThreadSender().withStopToken((StopToken token){
+  auto waiting = ThreadSender().withStopToken((StopToken token) @trusted {
       while (!token.isStopRequested) { Thread.yield(); }
     });
   auto nursery = new shared Nursery();
   nursery.run(race(waiting, waiting));
-  nursery.run(ThreadSender().then(() shared { Thread.sleep(50.msecs); nursery.stop(); }));
+  nursery.run(ThreadSender().then(() @trusted shared { Thread.sleep(50.msecs); nursery.stop(); }));
   nursery.sync_wait().should == false;
 }
 
@@ -147,13 +147,13 @@ unittest {
 
 @("whenAll.cancel")
 unittest {
-  auto waiting = ThreadSender().withStopToken((StopToken token){
+  auto waiting = ThreadSender().withStopToken((StopToken token) @trusted {
       while (!token.isStopRequested) { Thread.yield(); }
     });
   whenAll(waiting, DoneSender()).sync_wait.should == false;
   whenAll(ThrowingSender(), waiting).sync_wait.shouldThrow;
   whenAll(waiting, ThrowingSender()).sync_wait.shouldThrow;
-  auto waitingInt = ThreadSender().withStopToken((StopToken token){
+  auto waitingInt = ThreadSender().withStopToken((StopToken token) @trusted {
       while (!token.isStopRequested) { Thread.yield(); }
       return 42;
     });

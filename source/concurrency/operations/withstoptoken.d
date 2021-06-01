@@ -15,7 +15,7 @@ private struct STReceiver(Receiver, Value, Fun) {
   Receiver receiver;
   Fun fun;
   static if (is(Value == void)) {
-    void setValue() {
+    void setValue() @safe {
       static if (is(ReturnType!Fun == void)) {
         fun(receiver.getStopToken);
         receiver.setValueOrError();
@@ -23,7 +23,7 @@ private struct STReceiver(Receiver, Value, Fun) {
         receiver.setValueOrError(fun(receiver.getStopToken));
     }
   } else {
-    void setValue(Value value) {
+    void setValue(Value value) @safe {
       static if (is(ReturnType!Fun == void)) {
         fun(receiver.getStopToken, value);
         receiver.setValueOrError();
@@ -31,10 +31,10 @@ private struct STReceiver(Receiver, Value, Fun) {
         receiver.setValueOrError(fun(receiver.getStopToken, value));
     }
   }
-  void setDone() nothrow {
+  void setDone() nothrow @safe {
     receiver.setDone();
   }
-  void setError(Exception e) nothrow {
+  void setError(Exception e) nothrow @safe {
     receiver.setError(e);
   }
   mixin ForwardExtensionPoints!receiver;
