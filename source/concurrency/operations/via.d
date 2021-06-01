@@ -37,14 +37,18 @@ private struct ViaAReceiver(ValueB, ValueA, Receiver) {
 private struct ViaBReceiver(SenderA, ValueB, Receiver) {
   SenderA senderA;
   Receiver receiver;
-  static if (!is(ValueB == void))
+  static if (!is(ValueB == void)) {
+    OpType!(SenderA, ViaAReceiver!(ValueB, SenderA.Value, Receiver)) op;
     void setValue(ValueB val) {
-      senderA.connect(ViaAReceiver!(ValueB, SenderA.Value, Receiver)(val, receiver)).start();
+      op = senderA.connect(ViaAReceiver!(ValueB, SenderA.Value, Receiver)(val, receiver));
+      op.start();
     }
-  else
+  } else {
+    OpType!(SenderA, Receiver) op;
     void setValue() {
       senderA.connect(receiver).start();
     }
+  }
   void setDone() {
     receiver.setDone();
   }

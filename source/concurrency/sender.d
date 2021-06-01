@@ -1,6 +1,7 @@
 module concurrency.sender;
 
 import concepts;
+import std.traits : ReturnType;
 
 // A Sender represents something that completes with either:
 // 1. a value (which can be void)
@@ -232,3 +233,5 @@ struct VoidSender {
     return VoidOp!Receiver(receiver);
   }
 }
+
+alias OpType(Sender, Receiver) = ReturnType!(Sender.connect!Receiver);

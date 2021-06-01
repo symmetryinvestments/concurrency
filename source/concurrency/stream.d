@@ -2,7 +2,7 @@ module concurrency.stream;
 
 import concurrency.stoptoken;
 import concurrency.receiver;
-import concurrency.sender : isSender;
+import concurrency.sender : isSender, OpType;
 import concepts;
 import std.traits : hasFunctionAttributes;
 
@@ -355,7 +355,7 @@ auto take(Stream)(Stream stream, size_t n) if (models!(Stream, isStream)) {
     import concurrency.operations : withStopSource;
     import std.traits : ReturnType;
     alias SS = ReturnType!(withStopSource!(Properties.Sender));
-    alias Op = ReturnType!(SS.connect!(TakeReceiver!Receiver));
+    alias Op = OpType!(SS, TakeReceiver!Receiver);
     size_t n;
     Properties.DG dg;
     StopSource stopSource;
@@ -396,7 +396,7 @@ auto transform(Stream, Fun)(Stream stream, Fun fun) if (models!(Stream, isStream
   alias Properties = StreamProperties!Stream;
   alias DG = CollectDelegate!(ReturnType!Fun);
   static struct TransformStreamOp(Receiver) {
-    alias Op = ReturnType!(Properties.Sender.connect!Receiver);
+    alias Op = OpType!(Properties.Sender, Receiver);
     Fun fun;
     DG dg;
     Op op;
@@ -447,7 +447,7 @@ auto scan(Stream, ScanFn, Seed)(Stream stream, scope ScanFn scanFn, Seed seed) i
   alias Properties = StreamProperties!Stream;
   alias DG = CollectDelegate!(Seed);
   static struct ScanStreamOp(Receiver) {
-    alias Op = ReturnType!(Properties.Sender.connect!Receiver);
+    alias Op = OpType!(Properties.Sender, Receiver);
     ScanFn scanFn;
     Seed acc;
     DG dg;
@@ -491,7 +491,7 @@ auto sample(StreamBase, StreamTrigger)(StreamBase base, StreamTrigger trigger) i
   static struct ScanStreamOp(Receiver) {
     import std.traits : ReturnType;
     alias WhenAllSender = ReturnType!(whenAll!(CompleteWithCancellationSender!(PropertiesBase.Sender), CompleteWithCancellationSender!(PropertiesTrigger.Sender)));
-    alias Op = ReturnType!(WhenAllSender.connect!Receiver);
+    alias Op = OpType!(WhenAllSender, Receiver);
     DG dg;
     Op op;
     PropertiesBase.ElementType element;
@@ -531,7 +531,7 @@ auto via(Stream, Sender)(Stream stream, Sender sender) if (models!(Sender, isSen
   static struct ViaStreamOp(Receiver) {
     import std.traits : ReturnType;
     import concurrency.operations.via : senderVia = via;
-    alias Op = ReturnType!(ReturnType!(senderVia!(Properties.Sender, Sender)).connect!Receiver);
+    alias Op = OpType!(ReturnType!(senderVia!(Properties.Sender, Sender)), Receiver);
     Op op;
     this(Stream stream, Sender sender, DG dg, Receiver receiver) {
       op = stream.collect(dg).senderVia(sender).connect(receiver);
