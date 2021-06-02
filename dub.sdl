@@ -10,7 +10,7 @@ configuration "default" {
 	dflags "-dip1000" "-dip25"
 }
 configuration "unittest" {
-	dependency "unit-threaded" version=">=0.0.0"
+	dependency "unit-threaded" version=">=1.0.15"
 	targetType "executable"
 	mainSourceFile "tests/ut/ut_runner.d"
 	dflags "-dip1000" "-dip25"
@@ -24,7 +24,7 @@ configuration "nodip" {
 }
 
 configuration "unittest-asan" {
-	dependency "unit-threaded" version=">=0.0.0"
+	dependency "unit-threaded" version=">=1.0.15"
 	targetType "executable"
 	mainSourceFile "tests/ut/ut_runner.d"
 	dflags "-dip1000" "-dip25" "-fsanitize=address"

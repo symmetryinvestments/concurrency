@@ -3,6 +3,6 @@
 	"versions": {
 		"concepts": "0.0.8",
 		"mir-core": "1.1.62",
-		"unit-threaded": "1.0.11"
+		"unit-threaded": "1.0.15"
 	}
 }
