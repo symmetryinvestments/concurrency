@@ -68,7 +68,7 @@ Senders enjoy the following operations.
 
 - `withStopSource`. When applied after a Sender you can stop the Sender manually with the stopsource. It will still stop when the downstream receiver's StopToken is triggered.
 
-- `race`. Runs 2 Senders and completes with the value produced by the first to complete, after first cancelling and awaiting the others. When both Senders complete with an error, the first error is propagated. When both Senders complete with cancellation, `race` completes with cancellation as well.
+- `race`. Runs multiple Senders and completes with the value produced by the first to complete, after first cancelling and awaiting the others. When both Senders complete with an error, the first error is propagated. When both Senders complete with cancellation, `race` completes with cancellation as well.
 
 - `ignoreError`. Redirects the `setException` to `setDone`, so as not to trigger the downstream error path.
 
@@ -84,7 +84,7 @@ Senders enjoy the following operations.
 
 ## Streams
 
-A Stream is anything that has a `.collect` function that accepts a `shared` callable and returns a Sender. Once the Sender is connected and started the Stream will call the callable zero or more times before one of the three terminal functions of the Receiver is called.
+A Stream has a `.collect` function that accepts a `shared` callable and returns a Sender. Once the Sender is connected and started the Stream will call the callable zero or more times before one of the three terminal functions of the Receiver is called.
 
 An exception throw in the callable will cancel the stream and complete the Sender with that exception.
 
