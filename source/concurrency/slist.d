@@ -4,7 +4,7 @@ import core.atomic : atomicLoad, atomicExchange;
 import concurrency.utils : casWeak;
 
 /// A lock-free single linked list
-shared struct SList(T) {
+shared final class SList(T) {
   struct Node {
     shared(Node*) next;
     T payload;

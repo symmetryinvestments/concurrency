@@ -75,10 +75,11 @@ class SharedSender(Sender) if (models!(Sender, isSender)) {
     import std.traits : ReturnType;
     alias Op = OpType!(Sender, SharedSenderReceiver);
     SharedSender parent;
-    SList!DG dgs;
+    shared SList!DG dgs;
     Nullable!InternalValue value;
     Op op;
     this(SharedSender parent) {
+      this.dgs = new shared SList!DG;
       this.parent = parent;
     }
   }
@@ -106,7 +107,7 @@ class SharedSender(Sender) if (models!(Sender, isSender)) {
       with(state.parent.counter.lock(Flags.completed)) {
         release(oldState & (~0x3)); // release early and remove all ticks
         InternalValue v = state.value.get;
-        foreach(dg; state.dgs)
+        foreach(dg; state.dgs[])
           dg(v);
       }
     }
