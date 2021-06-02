@@ -225,8 +225,9 @@ struct VoidSender {
   alias Value = void;
   struct VoidOp(Receiver) {
     Receiver receiver;
-    void start() {
-      receiver.setValue();
+    void start() nothrow @safe {
+      import concurrency.receiver : setValueOrError;
+      receiver.setValueOrError();
     }
   }
   auto connect(Receiver)(Receiver receiver) {

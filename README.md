@@ -30,7 +30,7 @@ Most of the asynchronous tasks you will do involve writing your own `Sender`.
 
 Here is the implementation of the `ValueSender`.
 
-```
+```dlang
 /// A Sender that sends a single value of type T
 struct ValueSender(T) {
   alias Value = T;
@@ -79,6 +79,8 @@ Senders enjoy the following operations.
 - `retry`. It retries the underlying Sender until success or cancellation. The retry logic is customizable. Included is a Times, that will retry n times and then propagate the latest failure.
 
 - `completeWithCancellation`. Wraps the Sender and redirects the setValue termination to complete with cancellation. The Sender is not allowed to produce a Value.
+
+- `toShared`. Wraps a Sender in a SharedSender that forwards the same termination call to each connected Receiver.
 
 ## Streams
 
