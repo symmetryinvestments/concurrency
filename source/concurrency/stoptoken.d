@@ -127,7 +127,7 @@ private void spin_yield() nothrow @trusted @nogc {
 
 private struct stop_state {
   import core.thread : Thread;
-  import core.atomic : atomicStore, atomicLoad, MemoryOrder, atomicFetchSub, atomicFetchAdd;
+  import core.atomic : atomicStore, atomicLoad, MemoryOrder, atomicOp;
 
   static if (__traits(compiles, () { import core.atomic : casWeak; }) && __traits(compiles, () {
       import core.internal.atomic : atomicCompareExchangeWeakNoResult;
@@ -145,19 +145,27 @@ private struct stop_state {
 
 public:
   void add_token_reference() nothrow @safe @nogc {
-    state_.atomicFetchAdd!(MemoryOrder.raw)(token_ref_increment);
+    // TODO: want to use atomicFetchAdd but (proper) support is only recent
+    // state_.atomicFetchAdd!(MemoryOrder.raw)(token_ref_increment);
+    state_.atomicOp!"+="(token_ref_increment);
   }
 
   void remove_token_reference() nothrow @safe @nogc {
-    state_.atomicFetchSub!(MemoryOrder.acq_rel)(token_ref_increment);
+    // TODO: want to use atomicFetchSub but (proper) support is only recent
+    // state_.atomicFetchSub!(MemoryOrder.acq_rel)(token_ref_increment);
+    state_.atomicOp!"-="(token_ref_increment);
   }
 
   void add_source_reference() nothrow @safe @nogc {
-    state_.atomicFetchAdd!(MemoryOrder.raw)(source_ref_increment);
+    // TODO: want to use atomicFetchAdd but (proper) support is only recent
+    // state_.atomicFetchAdd!(MemoryOrder.raw)(source_ref_increment);
+    state_.atomicOp!"+="(source_ref_increment);
   }
 
   void remove_source_reference() nothrow @safe @nogc {
-    state_.atomicFetchSub!(MemoryOrder.acq_rel)(source_ref_increment);
+    // TODO: want to use atomicFetchSub but (proper) support is only recent
+    // state_.atomicFetchSub!(MemoryOrder.acq_rel)(source_ref_increment);
+    state_.atomicOp!"-="(source_ref_increment);
   }
 
   bool request_stop() nothrow @safe {
@@ -355,15 +363,21 @@ private:
   }
 
   void unlock() nothrow @safe @nogc {
-    state_.atomicFetchSub!(MemoryOrder.rel)(locked_flag);
+    // TODO: want to use atomicFetchSub but (proper) support is only recent
+    // state_.atomicFetchSub!(MemoryOrder.rel)(locked_flag);
+    state_.atomicOp!"-="(locked_flag);
   }
 
   void unlock_and_increment_token_ref_count() nothrow @safe @nogc {
-    state_.atomicFetchSub!(MemoryOrder.rel)(locked_flag - token_ref_increment);
+    // TODO: want to use atomicFetchSub but (proper) support is only recent
+    // state_.atomicFetchSub!(MemoryOrder.rel)(locked_flag - token_ref_increment);
+    state_.atomicOp!"-="(locked_flag - token_ref_increment);
   }
 
   void unlock_and_decrement_token_ref_count() nothrow @safe @nogc {
-    state_.atomicFetchSub!(MemoryOrder.acq_rel)(locked_flag + token_ref_increment);
+    // TODO: want to use atomicFetchSub but (proper) support is only recent
+    // state_.atomicFetchSub!(MemoryOrder.acq_rel)(locked_flag + token_ref_increment);
+    state_.atomicOp!"-="(locked_flag + token_ref_increment);
   }
 
   enum stop_requested_flag = 1L;
