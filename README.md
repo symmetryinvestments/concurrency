@@ -112,7 +112,6 @@ With the following operations:
 Most of the time you will need to write your own Stream however. The following helpers can speed that up:
 
 - `loopStream`. Takes a struct with a `loop` function and calls that with an `emit` and `stopToken` while ensuring the struct is alive during that.
-- `startStopStream`. Takes a struct with a `start` and `stop` function, calling `start` with an `emit` and `stopToken`, and `stop` when the stream is to end. The struct will be kept alive until after `stop` is called.
 - `fromStreamOp`. Constructs a full Stream given only a templated OperationalState. Allows passing in custom values into the OperationalState's constructor. Since Streams build on Senders they require a bit of boilerplate to setup, this helper eliminates that.
 
 ## Nursery

@@ -74,36 +74,6 @@ import core.atomic;
   g.should == 6;
 }
 
-@("startStop")
-unittest {
-  static struct StartStop {
-    import core.thread : Thread;
-    import core.atomic : atomicStore, atomicLoad;
-    import concurrency.utils : closure;
-    shared bool running;
-    Thread t;
-    void start(DG, StopToken)(DG emit, StopToken stopToken) @trusted {
-      running = true;
-      t = new Thread(cast(void delegate())closure((shared bool* running, DG emit) @trusted {
-            int i = 1;
-            while((*running).atomicLoad()) {
-              emit(i++);
-            }
-          }, &running, emit)).start();
-    }
-    void stop() @trusted {
-      running.atomicStore(false);
-      t.join();
-    }
-  }
-  shared int p;
-
-  auto stream = StartStop().startStopStream!int;
-  stream.take(2).collect((int i) shared { p.atomicOp!"+="(i); }).sync_wait().should == true;
-
-  p.should == 3;
-}
-
 @("toStreamObject")
 @safe unittest {
   import core.atomic : atomicOp;

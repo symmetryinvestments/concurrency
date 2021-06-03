@@ -136,55 +136,6 @@ template loopStream(E) {
   }
 }
 
-/// Helper to construct a Stream, useful if the Stream you are modeling has an external source that should be started/stopped
-template startStopStream(E) {
-  alias DG = CollectDelegate!(E);
-  auto startStopStream(T)(T t) {
-    static struct StartStopStream {
-      static assert(models!(typeof(this), isStream));
-      alias ElementType = E;
-      static struct StartStopOp(Receiver) {
-        T t;
-        DG dg;
-        Receiver receiver;
-        StopCallback cb;
-        void start() @trusted nothrow {
-          t.start(&emit, receiver.getStopToken);
-          cb = receiver.getStopToken.onStop(&(cast(shared)this).stop);
-        }
-        void emit(ElementType element) nothrow {
-          try {
-            dg(element);
-          } catch (Exception e) {
-            cb.dispose();
-            try { t.stop(); } catch (Exception e2) {}
-            receiver.setError(e);
-          }
-        }
-        void stop() shared @trusted nothrow {
-          try {
-            (cast()t).stop();
-          } catch (Exception e) {}
-          (cast()receiver).setDone();
-        }
-      }
-      static struct StartStopSender {
-        alias Value = void;
-        T t;
-        DG dg;
-        auto connect(Receiver)(Receiver receiver) {
-          return StartStopOp!(Receiver)(t, dg, receiver);
-        }
-      }
-      T t;
-      auto collect(DG dg) {
-        return StartStopSender(t, dg);
-      }
-    }
-    return StartStopStream(t);
-  }
-}
-
 /// Stream that emit the same value until cancelled
 auto infiniteStream(T)(T t) {
   alias DG = CollectDelegate!(T);
