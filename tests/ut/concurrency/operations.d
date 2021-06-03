@@ -162,6 +162,16 @@ unittest {
   whenAll(waitingInt, ThrowingSender()).sync_wait.shouldThrow;
 }
 
+@("whenAll.stop")
+unittest {
+  auto waiting = ThreadSender().withStopToken((StopToken token) @trusted {
+      while (!token.isStopRequested) { Thread.yield(); }
+    });
+  auto source = new StopSource();
+  auto stopper = just(source).then((StopSource source) shared => source.stop());
+  whenAll(waiting, stopper).withStopSource(source).sync_wait().shouldThrowWithMessage("Canceled");
+}
+
 @("retry")
 unittest {
   ValueSender!int(5).retry(Times(5)).sync_wait.should == 5;

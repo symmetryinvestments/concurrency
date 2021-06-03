@@ -107,6 +107,8 @@ class SharedSender(Sender) if (models!(Sender, isSender)) {
       with(state.parent.counter.lock(Flags.completed)) {
         release(oldState & (~0x3)); // release early and remove all ticks
         InternalValue v = state.value.get;
+        if (state.isStopRequested)
+          v = Done();
         foreach(dg; state.dgs[])
           dg(v);
       }
@@ -146,22 +148,23 @@ class SharedSender(Sender) if (models!(Sender, isSender)) {
         }
       }
     }
-    /// returns true if it is the last
+    /// returns false if it is the last
     bool remove(DG dg) {
-      with (counter.lock()) {
+      with (counter.lock(0, 0, Flags.tick)) {
         if (was(Flags.completed)) {
-          return false;
+          release(0-Flags.tick); // release early
+          return true;
         }
         if ((newState >> 2) == 0) {
           auto localStopSource = state;
-          release(Flags.tick); // release early
+          release(); // release early
           localStopSource.stop();
-          return true;
+          return false;
         } else {
           auto localReceiver = state;
-          release(Flags.tick); // release early
+          release(); // release early
           localReceiver.dgs.remove(dg);
-          return false;
+          return true;
         }
       }
     }

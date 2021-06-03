@@ -84,6 +84,22 @@ import core.atomic : atomicOp;
   race(s, s).sync_wait.should == 2;
 }
 
+@("toShared.via.thread")
+@safe unittest {
+  import concurrency.operations.toshared;
+
+  shared int g;
+
+  auto s = just(1)
+    .then((int i) @trusted shared { return g.atomicOp!"+="(1); })
+    .via(ThreadSender())
+    .toShared();
+
+  race(s, s).sync_wait.should == 1;
+  s.reset();
+  race(s, s).sync_wait.should == 2;
+}
+
 @("toShared.error")
 @safe unittest {
   shared int g;
@@ -127,18 +143,20 @@ import core.atomic : atomicOp;
   g.should == 2;
 }
 
-@("toShared.via.thread")
+@("toShared.stop")
 @safe unittest {
-  import concurrency.operations.toshared;
+  import concurrency.stoptoken;
+  import core.atomic : atomicStore, atomicLoad;
+  shared bool g;
 
-  shared int g;
+  auto waiting = ThreadSender().withStopToken((StopToken token) @trusted {
+      while (!token.isStopRequested) { }
+      g.atomicStore(true);
+    });
+  auto source = new StopSource();
+  auto stopper = just(source).then((StopSource source) shared { source.stop(); });
 
-  auto s = just(1)
-    .then((int i) @trusted shared { return g.atomicOp!"+="(1); })
-    .via(ThreadSender())
-    .toShared();
+  whenAll(waiting.toShared().withStopSource(source), stopper).sync_wait().should == false;
 
-  race(s, s).sync_wait.should == 1;
-  s.reset();
-  race(s, s).sync_wait.should == 2;
+  g.atomicLoad.should == true;
 }
