@@ -242,7 +242,7 @@ template OpType(Sender, Receiver) {
     static if (__traits(isTemplate, connect)) {
       alias GetOpType = ReturnType!(connect!Receiver);
     } else {
-      alias GetOpType = ReturnType!(Sender.init.connect(Receiver.init));
+      alias GetOpType = ReturnType!(connect(Receiver.init));
     }
   }
   alias overloads = __traits(getOverloads, Sender, "connect", true);

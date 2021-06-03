@@ -109,8 +109,6 @@ class Nursery : StopSource {
     auto op = sender.connectHeap(NurseryReceiver!(Sender.Value)(this, id));
 
     mutex.lock_nothrow();
-    // TODO: might also use the receiver as key instead of a wrapping ulong
-    // TODO: use op directly instead of op.start()
     operations ~= cast(shared) Node(op, id);
     atomicOp!"+="(busy, 1);
     bool hasStarted = this.receiver !is null;
