@@ -17,7 +17,7 @@ private struct ThenReceiver(Receiver, Value, Fun) {
   Receiver receiver;
   Fun fun;
   static if (is(Value == void)) {
-    void setValue() {
+    void setValue() @safe {
       static if (is(ReturnType!Fun == void)) {
         fun();
         receiver.setValue();
@@ -25,7 +25,7 @@ private struct ThenReceiver(Receiver, Value, Fun) {
         receiver.setValue(fun());
     }
   } else {
-    void setValue(Value value) {
+    void setValue(Value value) @safe {
       static if (is(ReturnType!Fun == void)) {
         fun(value);
         receiver.setValue();
@@ -33,10 +33,10 @@ private struct ThenReceiver(Receiver, Value, Fun) {
         receiver.setValue(fun(value));
     }
   }
-  void setDone() nothrow {
+  void setDone() @safe nothrow {
     receiver.setDone();
   }
-  void setError(Exception e) nothrow {
+  void setError(Exception e) @safe nothrow {
     receiver.setError(e);
   }
   mixin ForwardExtensionPoints!receiver;
