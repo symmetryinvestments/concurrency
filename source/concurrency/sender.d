@@ -50,7 +50,7 @@ void checkSender(T)() @safe {
     void setDone() nothrow {}
     void setError(Exception e) nothrow {}
   }
-  auto op = t.connect(Receiver.init);
+  OpType!(T, Receiver) op = t.connect(Receiver.init);
 }
 enum isSender(T) = is(typeof(checkSender!T));
 
@@ -235,4 +235,17 @@ struct VoidSender {
   }
 }
 
-alias OpType(Sender, Receiver) = ReturnType!(Sender.connect!Receiver);
+template OpType(Sender, Receiver) {
+  import std.traits : ReturnType;
+  import std.meta : staticMap;
+  template GetOpType(alias connect) {
+    static if (__traits(isTemplate, connect)) {
+      alias GetOpType = ReturnType!(connect!Receiver);
+    } else {
+      alias GetOpType = ReturnType!(Sender.init.connect(Receiver.init));
+    }
+  }
+  alias overloads = __traits(getOverloads, Sender, "connect", true);
+  alias opTypes = staticMap!(GetOpType, overloads);
+  alias OpType = opTypes[0];
+}

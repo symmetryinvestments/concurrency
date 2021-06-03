@@ -39,10 +39,9 @@ private template Result(Senders...) {
 
 private struct RaceOp(Receiver, Senders...) {
   import std.meta : staticMap;
-  import std.traits : ReturnType;
   alias R = Result!(Senders);
   alias ElementReceiver(Sender) = RaceReceiver!(Receiver, Sender.Value, R);
-  alias ConnectResult(Sender) = ReturnType!(Sender.connect!(ElementReceiver!Sender));
+  alias ConnectResult(Sender) = OpType!(Sender, ElementReceiver!Sender);
   alias Ops = staticMap!(ConnectResult, Senders);
   Receiver receiver;
   State!R state;

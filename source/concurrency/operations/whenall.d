@@ -74,7 +74,7 @@ private struct WhenAllOp(Receiver, Senders...) {
   import std.meta : staticMap;
   alias R = WhenAllResult!(Senders);
   alias ElementReceiver(Sender) = WhenAllReceiver!(Receiver, Sender.Value, R);
-  alias ConnectResult(Sender) = ReturnType!(Sender.connect!(ElementReceiver!Sender));
+  alias ConnectResult(Sender) = OpType!(Sender, ElementReceiver!Sender);
   alias Ops = staticMap!(ConnectResult, Senders);
   Receiver receiver;
   WhenAllState!R state;
