@@ -539,3 +539,80 @@ auto errorStream(Exception e) {
   }
   return fromStreamOp!(void, void, ErrorStreamOp)(e);
 }
+
+/// A SharedStream is used for broadcasting values to zero or more receivers. Receivers can be added and removed at any time. The stream itself never completes, so receivers should themselves terminate their connection.
+auto sharedStream(T)() {
+  import concurrency.slist;
+  alias DG = CollectDelegate!(T);
+  return SharedStream!(T)(new shared SList!(SharedStream!(T).SubscriberDG));
+}
+
+shared struct SharedStream(T) {
+  alias SubscriberDG = void delegate(T) nothrow @safe shared;
+  import concurrency.slist;
+  private {
+    alias DG = CollectDelegate!T;
+    static struct Op(Receiver) {
+      shared SharedStream!T source;
+      DG dg;
+      Receiver receiver;
+      StopCallback cb;
+      void start() nothrow @trusted {
+        auto stopToken = receiver.getStopToken();
+        cb = stopToken.onStop(&(cast(shared)this).onStop);
+        if (stopToken.isStopRequested) {
+          cb.dispose();
+          receiver.setDone();
+        } else {
+          source.add(&(cast(shared)this).onItem);
+        }
+      }
+      void onStop() nothrow @safe shared {
+        with(unshared) {
+          source.remove(&this.onItem);
+          receiver.setDone();
+        }
+      }
+      void onItem(T element) nothrow @safe shared {
+        with(unshared) {
+          try {
+            dg(element);
+          } catch (Exception e) {
+            source.remove(&this.onItem);
+            cb.dispose();
+            receiver.setError(e);
+          }
+        }
+      }
+      private auto ref unshared() nothrow @trusted shared {
+        return cast()this;
+      }
+    }
+    static struct SharedStreamSender {
+      alias Value = void;
+      shared SharedStream!T source;
+      DG dg;
+      auto connect(Receiver)(Receiver receiver) @safe {
+        return Op!(Receiver)(source, dg, receiver);
+      }
+    }
+    shared SList!SubscriberDG dgs;
+  }
+  this(shared SList!SubscriberDG dgs) {
+    this.dgs = dgs;
+  }
+  void emit(T t) nothrow @trusted {
+    foreach(dg; dgs[])
+      dg(t);
+  }
+  private void remove(SubscriberDG dg) nothrow @trusted {
+    dgs.remove(dg);
+  }
+  private void add(SubscriberDG dg) nothrow @trusted {
+    dgs.pushBack(dg);
+  }
+  auto collect(DG dg) @safe {
+    return SharedStreamSender(this, dg);
+  }
+}
+

@@ -100,6 +100,7 @@ Currently there are the following Streams:
 - `intervalStream`. Emits every interval.
 - `doneStream`. Upon start immediately emits cancellation.
 - `errorStream`. Upon start immediately emits an error.
+- `sharedStream`. Is used for broadcasting values to zero or more receivers. Receivers can be added and removed at any time.
 
 With the following operations:
 

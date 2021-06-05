@@ -204,3 +204,23 @@ import core.atomic;
   p.should == 6;
 }
 
+@("sharedStream")
+@safe unittest {
+  import concurrency.thread;
+  import concurrency.operations.then;
+  import concurrency.operations.race;
+
+  auto source = sharedStream!int;
+
+  shared int p = 0;
+
+  auto emitter = ThreadSender().then(() shared {
+      source.emit(6);
+      source.emit(12);
+    });
+  auto collector = source.collect((int t) shared { p.atomicOp!"+="(t); });
+
+  race(collector, emitter).sync_wait().should == true;
+
+  p.atomicLoad.should == 18;
+}
