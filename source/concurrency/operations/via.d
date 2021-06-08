@@ -17,12 +17,12 @@ private struct ViaAReceiver(ValueB, ValueA, Receiver) {
   ValueB valueB;
   Receiver receiver;
   static if (!is(ValueA == void))
-    void setValue(ValueA valueA) {
+    void setValue(ValueA valueA) @trusted {
       import std.typecons : tuple;
       receiver.setValue(tuple(valueB, valueA));
     }
   else
-    void setValue() {
+    void setValue() @trusted {
       receiver.setValue(valueB);
     }
   void setDone() {
@@ -38,15 +38,12 @@ private struct ViaBReceiver(SenderA, ValueB, Receiver) {
   SenderA senderA;
   Receiver receiver;
   static if (!is(ValueB == void)) {
-    OpType!(SenderA, ViaAReceiver!(ValueB, SenderA.Value, Receiver)) op;
-    void setValue(ValueB val) {
-      op = senderA.connect(ViaAReceiver!(ValueB, SenderA.Value, Receiver)(val, receiver));
-      op.start();
+    void setValue(ValueB val) @trusted {
+      senderA.connectHeap(ViaAReceiver!(ValueB, SenderA.Value, Receiver)(val, receiver)).start();
     }
   } else {
-    OpType!(SenderA, Receiver) op;
-    void setValue() {
-      senderA.connect(receiver).start();
+    void setValue() @trusted {
+      senderA.connectHeap(receiver).start();
     }
   }
   void setDone() {
