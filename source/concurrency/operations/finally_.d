@@ -21,17 +21,17 @@ private struct FinallyReceiver(Value, Result, Receiver) {
     else return result;
   }
   static if (is(Value == void))
-    void setValue() {
+    void setValue() @safe {
       receiver.setValue(getResult());
     }
   else
-    void setValue(Value value) {
+    void setValue(Value value) @safe {
       receiver.setValue(getResult());
     }
-  void setDone() {
+  void setDone() @safe nothrow {
     receiver.setDone();
   }
-  void setError(Exception e) {
+  void setError(Exception e) @safe nothrow {
     receiver.setValue(getResult());
   }
   mixin ForwardExtensionPoints!receiver;
@@ -45,7 +45,7 @@ struct FinallySender(Sender, Result) if (models!(Sender, isSender)) {
     alias Value = Result;
   Sender sender;
   Result result;
-  auto connect(Receiver)(Receiver receiver) {
+  auto connect(Receiver)(Receiver receiver) @safe {
     return sender.connect(FinallyReceiver!(Sender.Value, Result, Receiver)(receiver, result));
   }
 }

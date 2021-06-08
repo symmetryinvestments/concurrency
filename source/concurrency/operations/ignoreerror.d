@@ -15,7 +15,7 @@ struct IESender(Sender) if (models!(Sender, isSender)) {
   static assert(models!(typeof(this), isSender));
   alias Value = Sender.Value;
   Sender sender;
-  auto connect(Receiver)(Receiver receiver) {
+  auto connect(Receiver)(Receiver receiver) @safe {
     return sender.connect(IEReceiver!(Sender.Value,Receiver)(receiver));
   }
 }
@@ -24,17 +24,17 @@ private struct IEReceiver(Value, Receiver) {
   import concurrency.receiver : setValueOrError;
   Receiver receiver;
   static if (is(Value == void))
-    void setValue() {
+    void setValue() @safe nothrow {
       receiver.setValueOrError();
     }
   else
-    void setValue(Value value) {
+    void setValue(Value value) @safe nothrow {
       receiver.setValueOrError(value);
     }
-  void setDone() {
+  void setDone() @safe nothrow {
     receiver.setDone();
   }
-  void setError(Exception e) {
+  void setError(Exception e) @safe nothrow {
     receiver.setDone();
   }
   mixin ForwardExtensionPoints!receiver;

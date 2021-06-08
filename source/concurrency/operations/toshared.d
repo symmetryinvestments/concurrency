@@ -149,7 +149,7 @@ class SharedSender(Sender) if (models!(Sender, isSender)) {
       }
     }
     /// returns false if it is the last
-    bool remove(DG dg) {
+    bool remove(DG dg) @safe nothrow {
       with (counter.lock(0, 0, Flags.tick)) {
         if (was(Flags.completed)) {
           release(0-Flags.tick); // release early
@@ -182,7 +182,7 @@ class SharedSender(Sender) if (models!(Sender, isSender)) {
   this(Sender sender) {
     this.sender = sender;
   }
-  auto connect(Receiver)(Receiver receiver) {
+  auto connect(Receiver)(Receiver receiver) @safe {
     return SharedSenderOp!Receiver(this, receiver);
   }
 }

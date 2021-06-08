@@ -17,18 +17,18 @@ private struct ViaAReceiver(ValueB, ValueA, Receiver) {
   ValueB valueB;
   Receiver receiver;
   static if (!is(ValueA == void))
-    void setValue(ValueA valueA) @trusted {
+    void setValue(ValueA valueA) @safe {
       import std.typecons : tuple;
       receiver.setValue(tuple(valueB, valueA));
     }
   else
-    void setValue() @trusted {
+    void setValue() @safe {
       receiver.setValue(valueB);
     }
-  void setDone() {
+  void setDone() @safe nothrow {
     receiver.setDone();
   }
-  void setError(Exception e) {
+  void setError(Exception e) @safe nothrow {
     receiver.setError(e);
   }
   mixin ForwardExtensionPoints!receiver;
@@ -38,18 +38,22 @@ private struct ViaBReceiver(SenderA, ValueB, Receiver) {
   SenderA senderA;
   Receiver receiver;
   static if (!is(ValueB == void)) {
-    void setValue(ValueB val) @trusted {
-      senderA.connectHeap(ViaAReceiver!(ValueB, SenderA.Value, Receiver)(val, receiver)).start();
+    OpType!(SenderA, ViaAReceiver!(ValueB, SenderA.Value, Receiver)) op;
+    void setValue(ValueB val) @safe {
+      op = senderA.connect(ViaAReceiver!(ValueB, SenderA.Value, Receiver)(val, receiver));
+      op.start();
     }
   } else {
-    void setValue() @trusted {
-      senderA.connectHeap(receiver).start();
+    OpType!(SenderA, Receiver) op;
+    void setValue() @safe {
+      op = senderA.connect(receiver);
+      op.start();
     }
   }
-  void setDone() {
+  void setDone() @safe nothrow {
     receiver.setDone();
   }
-  void setError(Exception e) {
+  void setError(Exception e) @safe nothrow {
     receiver.setError(e);
   }
   mixin ForwardExtensionPoints!receiver;
@@ -69,7 +73,7 @@ struct ViaSender(SenderA, SenderB) if (models!(SenderA, isSender) && models!(Sen
     import std.typecons : Tuple;
     alias Value = Tuple!Values;
   }
-  auto connect(Receiver)(Receiver receiver) {
+  auto connect(Receiver)(Receiver receiver) @safe {
     return senderB.connect(ViaBReceiver!(SenderA, SenderB.Value, Receiver)(senderA, receiver));
   }
 }

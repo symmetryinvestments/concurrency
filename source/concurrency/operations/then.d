@@ -48,7 +48,7 @@ struct ThenSender(Sender, Fun) if (models!(Sender, isSender)) {
   alias Value = ReturnType!fun;
   Sender sender;
   Fun fun;
-  auto connect(Receiver)(Receiver receiver) {
+  auto connect(Receiver)(Receiver receiver) @safe {
     alias R = ThenReceiver!(Receiver, Sender.Value, Fun);
     return sender.connect(R(receiver, fun));
   }

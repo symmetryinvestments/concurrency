@@ -24,22 +24,22 @@ private struct SSReceiver(Receiver, Value) {
     StopCallback[2] cbs;
   }
   static if (is(Value == void)) {
-    void setValue() {
+    void setValue() @safe {
       resetStopCallback();
       receiver.setValueOrError();
     }
   } else {
-    void setValue(Value value) {
+    void setValue(Value value) @safe {
       resetStopCallback();
       receiver.setValueOrError(value);
     }
   }
-  void setDone() nothrow {
+  void setDone() @safe nothrow {
     resetStopCallback();
     receiver.setDone();
   }
   // TODO: would be good if we only emit this function in the Sender actually could call it
-  void setError(Exception e) nothrow {
+  void setError(Exception e) @safe nothrow {
     resetStopCallback();
     receiver.setError(e);
   }
@@ -77,7 +77,7 @@ struct SSSender(Sender) if (models!(Sender, isSender)) {
   alias Value = Sender.Value;
   Sender sender;
   StopSource stopSource;
-  auto connect(Receiver)(Receiver receiver) {
+  auto connect(Receiver)(Receiver receiver) @safe {
     alias R = SSReceiver!(Receiver, Sender.Value);
     return sender.connect(R(receiver, stopSource));
   }

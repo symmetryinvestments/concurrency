@@ -8,7 +8,7 @@ import concepts;
 import std.traits;
 import concurrency.utils : spin_yield, casWeak;
 
-WhenAllSender!(Senders) whenAll(Senders...)(Senders senders) if (Senders.length > 1){
+WhenAllSender!(Senders) whenAll(Senders...)(Senders senders) if (Senders.length > 1) {
   return WhenAllSender!(Senders)(senders);
 }
 
@@ -86,7 +86,7 @@ private struct WhenAllOp(Receiver, Senders...) {
       ops[i] = senders[i].connect(WhenAllReceiver!(Receiver, Sender.Value, WhenAllResult!(Senders))(receiver, state, i, Senders.length));
     }
   }
-  void start() @trusted {
+  void start() @trusted nothrow {
     import concurrency.stoptoken : StopSource;
     if (receiver.getStopToken().isStopRequested) {
       receiver.setDone();
@@ -108,7 +108,7 @@ struct WhenAllSender(Senders...) if (allSatisfy!(ApplyRight!(models, isSender), 
   else
     alias Value = void;
   Senders senders;
-  auto connect(Receiver)(Receiver receiver) {
+  auto connect(Receiver)(Receiver receiver) @safe {
     return WhenAllOp!(Receiver, Senders)(receiver, senders);
   }
 }
@@ -141,7 +141,7 @@ private struct WhenAllReceiver(Receiver, InnerValue, Value) {
     return (state >> 3) == senderCount;
   }
   static if (!is(InnerValue == void))
-    void setValue(InnerValue value) {
+    void setValue(InnerValue value) @safe {
       with (state.bitfield.lock(Flags.value_produced, Counter.tick)) {
         state.value.setValue(value, senderIndex);
         release();
@@ -149,19 +149,19 @@ private struct WhenAllReceiver(Receiver, InnerValue, Value) {
       }
     }
   else
-    void setValue() {
+    void setValue() @safe {
       with (state.bitfield.update(Flags.value_produced, Counter.tick)) {
         process(newState);
       }
     }
-  void setDone() {
+  void setDone() @safe nothrow {
     with (state.bitfield.update(Flags.doneOrError_produced, Counter.tick)) {
       if (!isDoneOrErrorProduced(oldState))
         state.stop();
       process(newState);
     }
   }
-  void setError(Exception exception) {
+  void setError(Exception exception) @safe nothrow {
     with (state.bitfield.lock(Flags.doneOrError_produced, Counter.tick)) {
       if (!isDoneOrErrorProduced(oldState)) {
         state.exception = exception;

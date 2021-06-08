@@ -138,12 +138,8 @@ OperationalStateBase connectHeap(Sender, Receiver)(Sender sender, Receiver recei
     this(Sender sender, Receiver receiver) {
       state = sender.connect(receiver);
     }
-    void start() @trusted {
-      try {
-        state.start();
-      } catch (Exception e) {
-        receiver.setError(e);
-      }
+    void start() @safe nothrow {
+      state.start();
     }
   };
 }

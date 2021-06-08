@@ -49,7 +49,7 @@ class StreamObjectImpl(Stream) : StreamObjectBase!(Stream.ElementType) if (model
   }
   alias DG = CollectDelegate!(Stream.ElementType);
 
-  SenderObjectBase!void collect(DG dg) {
+  SenderObjectBase!void collect(DG dg) @safe {
     import concurrency.sender : toSenderObject;
     return stream.collect(dg).toSenderObject();
   }
@@ -123,12 +123,12 @@ template loopStream(E) {
         alias Value = void;
         T t;
         DG dg;
-        auto connect(Receiver)(Receiver receiver) {
+        auto connect(Receiver)(Receiver receiver) @safe {
           return LoopOp!(Receiver)(t, dg, receiver);
         }
       }
       T t;
-      auto collect(DG dg) {
+      auto collect(DG dg) @safe {
         return LoopSender(t, dg);
       }
     }
@@ -284,9 +284,9 @@ auto take(Stream)(Stream stream, size_t n) if (models!(Stream, isStream)) {
     Receiver receiver;
     StopSource stopSource;
     static if (is(Properties.Sender.Value == void))
-      void setValue() { receiver.setValue(); }
+      void setValue() @safe { receiver.setValue(); }
     else
-      void setValue(Properties.Sender.Value e) { receiver.setValue(e); }
+      void setValue(Properties.Sender.Value e) @safe { receiver.setValue(e); }
     void setDone() nothrow @safe {
       import concurrency.receiver : setValueOrError;
       static if (is(Properties.Sender.Value == void)) {
@@ -297,7 +297,7 @@ auto take(Stream)(Stream stream, size_t n) if (models!(Stream, isStream)) {
       } else
         receiver.setDone();
     }
-    void setError(Exception e) {
+    void setError(Exception e) nothrow @safe {
       receiver.setError(e);
     }
     mixin ForwardExtensionPoints!receiver;
@@ -333,7 +333,7 @@ auto take(Stream)(Stream stream, size_t n) if (models!(Stream, isStream)) {
           stopSource.stop();
       }
     }
-    void start() {
+    void start() nothrow @safe {
       op.start();
     }
   }
@@ -364,7 +364,7 @@ auto transform(Stream, Fun)(Stream stream, Fun fun) if (models!(Stream, isStream
       void item(Properties.ElementType t) {
         dg(fun(t));
       }
-    void start() {
+    void start() nothrow @safe {
       op.start();
     }
   }
@@ -385,7 +385,7 @@ auto fromStreamOp(StreamElementType, SenderValue, alias Op, Args...)(Args args) 
     static assert(models!(typeof(this), isStream));
     alias ElementType = StreamElementType;
     Args args;
-    auto collect(DG dg) {
+    auto collect(DG dg) @safe {
       return FromStreamSender(args, dg);
     }
   }
@@ -419,7 +419,7 @@ auto scan(Stream, ScanFn, Seed)(Stream stream, scope ScanFn scanFn, Seed seed) i
         acc = scanFn(acc, t);
         dg(acc);
       }
-    void start() {
+    void start() nothrow @safe {
       op.start();
     }
   }

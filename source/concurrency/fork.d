@@ -94,7 +94,7 @@ struct ForkSender {
     this.fun = fun;
     this.afterFork = afterFork;
   }
-  auto connect(Receiver)(Receiver receiver) {
+  auto connect(Receiver)(Receiver receiver) @safe {
     return new Operation!Receiver(executor, fun, receiver, afterFork);
   }
   static void reinitThreadLocks() {

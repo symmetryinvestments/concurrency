@@ -20,7 +20,6 @@ auto retry(Sender, Logic)(Sender sender, Logic logic) {
   return RetrySender!(Sender, Logic)(sender, logic);
 }
 
-
 private struct RetryReceiver(Receiver, Sender, Logic) {
   private {
     Sender sender;
@@ -75,7 +74,7 @@ struct RetrySender(Sender, Logic) if (models!(Sender, isSender)) {
   alias Value = Sender.Value;
   Sender sender;
   Logic logic;
-  auto connect(Receiver)(Receiver receiver) {
+  auto connect(Receiver)(Receiver receiver) @safe {
     return RetryOp!(Receiver, Sender, Logic)(sender, RetryReceiver!(Receiver, Sender, Logic)(sender, receiver, logic));
   }
 }

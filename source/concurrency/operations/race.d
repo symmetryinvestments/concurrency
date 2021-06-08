@@ -53,7 +53,7 @@ private struct RaceOp(Receiver, Senders...) {
       ops[i] = senders[i].connect(ElementReceiver!(Sender)(receiver, state, Senders.length));
     }
   }
-  void start() @trusted {
+  void start() @trusted nothrow {
     import concurrency.stoptoken : StopSource;
     if (receiver.getStopToken().isStopRequested) {
       receiver.setDone();
@@ -72,7 +72,7 @@ struct RaceSender(Senders...) if (allSatisfy!(ApplyRight!(models, isSender), Sen
   static assert(models!(typeof(this), isSender));
   alias Value = Result!(Senders);
   Senders senders;
-  auto connect(Receiver)(Receiver receiver) {
+  auto connect(Receiver)(Receiver receiver) @safe {
     return RaceOp!(Receiver, Senders)(receiver, senders);
   }
 }
@@ -115,7 +115,7 @@ private struct RaceReceiver(Receiver, InnerValue, Value) {
     return (state >> 3) == senderCount;
   }
   static if (!is(InnerValue == void))
-    void setValue(InnerValue value) {
+    void setValue(InnerValue value) @safe nothrow {
       with (state.bitfield.lock(Flags.value_produced, Counter.tick)) {
         if (!isValueProduced(oldState)) {
           state.value = Value(value);
@@ -128,7 +128,7 @@ private struct RaceReceiver(Receiver, InnerValue, Value) {
       }
     }
   else
-    void setValue() {
+    void setValue() @safe nothrow {
       with (state.bitfield.update(Flags.value_produced, Counter.tick)) {
         if (!isValueProduced(oldState)) {
           state.stop();
@@ -136,12 +136,12 @@ private struct RaceReceiver(Receiver, InnerValue, Value) {
         process(newState);
       }
     }
-  void setDone() {
+  void setDone() @safe nothrow {
     with (state.bitfield.update(Flags.doneOrError_produced, Counter.tick)) {
       process(newState);
     }
   }
-  void setError(Exception exception) {
+  void setError(Exception exception) @safe nothrow {
     with (state.bitfield.lock(Flags.doneOrError_produced, Counter.tick)) {
       if (!isDoneOrErrorProduced(oldState)) {
         state.exception = exception;
