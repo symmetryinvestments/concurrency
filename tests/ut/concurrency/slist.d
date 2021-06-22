@@ -14,7 +14,7 @@ import unit_threaded;
 @safe unittest {
   auto list = new shared SList!int;
 
-  auto filler = just(&list).then((shared SList!int* list) @safe shared {
+  auto filler = just(list).then((shared SList!int list) @safe shared {
       foreach(i; 0..100) {
         list.pushFront(i);
       }
@@ -29,7 +29,7 @@ import unit_threaded;
 @safe unittest {
   auto list = new shared SList!int;
 
-  auto filler = just(&list).then((shared SList!int* list) @safe shared {
+  auto filler = just(list).then((shared SList!int list) @safe shared {
       foreach(i; 0..100) {
         list.pushBack(i);
       }
@@ -47,12 +47,12 @@ import unit_threaded;
   foreach(i; 0..50)
     list.pushFront(1);
 
-  auto filler = just(&list).then((shared SList!int* list) @safe shared {
+  auto filler = just(list).then((shared SList!int list) @safe shared {
       foreach(i; 0..50) {
         list.pushFront(1);
       }
     }).via(ThreadSender());
-  auto remover = just(&list).then((shared SList!int* list) @safe shared {
+  auto remover = just(list).then((shared SList!int list) @safe shared {
       foreach(i; 0..50) {
         list.remove(1);
       }
@@ -67,12 +67,12 @@ import unit_threaded;
 @safe unittest {
   auto list = new shared SList!int;
 
-  auto filler = just(&list).then((shared SList!int* list) @safe shared {
+  auto filler = just(list).then((shared SList!int list) @safe shared {
       foreach(i; 0..100) {
         list.pushBack(1);
       }
     }).via(ThreadSender());
-  auto remover = just(&list).then((shared SList!int* list) @safe shared {
+  auto remover = just(list).then((shared SList!int list) @safe shared {
       int n = 0;
       while(n < 99)
         if (list.remove(1))
@@ -91,7 +91,7 @@ import unit_threaded;
   foreach(i; 0..100)
     list.pushFront(i);
 
-  auto remover = just(&list).then((shared SList!int* list) @safe shared {
+  auto remover = just(list).then((shared SList!int list) @safe shared {
       foreach(i; 0..100) {
         if (i % 10 > 4)
           list.remove(i);
@@ -111,13 +111,13 @@ import unit_threaded;
     foreach(i; 0..100)
       list.pushFront(i);
 
-  auto remover1 = just(&list).then((shared SList!int* list) @safe shared {
+  auto remover1 = just(list).then((shared SList!int list) @safe shared {
       foreach(i; 0..100) {
         if (i % 2 == 0)
           list.remove(i);
       }
     }).via(ThreadSender());
-  auto remover2 = just(&list).then((shared SList!int* list) @safe shared {
+  auto remover2 = just(list).then((shared SList!int list) @safe shared {
       foreach(i; 0..100) {
         if (i % 2 == 1)
           list.remove(i);

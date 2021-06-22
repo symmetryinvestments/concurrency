@@ -209,19 +209,21 @@ struct ThreadSender {
   alias Value = void;
   static struct Op(Receiver) {
     private Receiver receiver;
+    this(Receiver receiver) {
+      this.receiver = receiver;
+    }
     void start() @trusted nothrow {
-      import concurrency.utils : closure;
+      executeInNewThread(cast(VoidDelegate)&run);
+    }
+    void run() @trusted {
       import concurrency.receiver : setValueOrError;
-      executeInNewThread(closure((Receiver receiver) @safe {
-            (() @trusted {try {
-                receiver.setValueOrError();
-              } catch (Throwable t) {
-                import std.stdio;
-                stderr.writeln(t);
-                assert(0);
-              }
-            })();
-          }, receiver));
+      try {
+        receiver.setValueOrError();
+      } catch (Throwable t) {
+        import std.stdio;
+        stderr.writeln(t);
+        assert(0);
+      }
     }
   }
   auto connect(Receiver)(Receiver receiver) {

@@ -85,8 +85,7 @@ auto sync_wait_impl(Sender)(auto ref Sender sender, StopSource stopSource = null
     }
   }
 
-  /// we allow passing a scoped receiver because we know this sender will terminate before this function ends
-  auto op = (()@trusted => sender.connect(receiver))();
+  auto op = sender.connect(receiver);
   op.start();
 
   state.worker.start();

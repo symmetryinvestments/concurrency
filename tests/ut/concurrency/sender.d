@@ -160,3 +160,31 @@ import core.atomic : atomicOp;
 
   g.atomicLoad.should == true;
 }
+
+@("nvro")
+@safe unittest {
+  static struct Op(Receiver) {
+    Receiver receiver;
+    void* atConstructor;
+    @disable this(ref return scope typeof(this) rhs);
+    this(Receiver receiver) @trusted {
+      this.receiver = receiver;
+      atConstructor = cast(void*)&this;
+    }
+    void start() @trusted nothrow {
+      void* atStart = cast(void*)&this;
+      receiver.setValue(atConstructor == atStart);
+    }
+  }
+  static struct NRVOSender {
+    alias Value = bool;
+    auto connect(Receiver)(Receiver receiver) @safe {
+      return Op!Receiver(receiver);
+    }
+  }
+  NRVOSender().sync_wait().should == true;
+  NRVOSender().via(ThreadSender()).sync_wait().should == true;
+  whenAll(NRVOSender(),VoidSender()).sync_wait.should == true;
+  whenAll(VoidSender(),NRVOSender()).sync_wait.should == true;
+  race(NRVOSender(),NRVOSender()).sync_wait.should == true;
+}

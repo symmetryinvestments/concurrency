@@ -38,15 +38,17 @@ private struct ViaBReceiver(SenderA, ValueB, Receiver) {
   SenderA senderA;
   Receiver receiver;
   static if (!is(ValueB == void)) {
-    OpType!(SenderA, ViaAReceiver!(ValueB, SenderA.Value, Receiver)) op;
+    // OpType!(SenderA, ViaAReceiver!(ValueB, SenderA.Value, Receiver)) op;
     void setValue(ValueB val) @safe {
-      op = senderA.connect(ViaAReceiver!(ValueB, SenderA.Value, Receiver)(val, receiver));
+      // TODO: tried to allocate this on the stack, but failed...
+      auto op = senderA.connectHeap(ViaAReceiver!(ValueB, SenderA.Value, Receiver)(val, receiver));
       op.start();
     }
   } else {
-    OpType!(SenderA, Receiver) op;
+    // OpType!(SenderA, Receiver) op;
     void setValue() @safe {
-      op = senderA.connect(receiver);
+      // TODO: tried to allocate this on the stack, but failed...
+      auto op = senderA.connectHeap(receiver);
       op.start();
     }
   }

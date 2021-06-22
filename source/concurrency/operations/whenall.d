@@ -79,6 +79,8 @@ private struct WhenAllOp(Receiver, Senders...) {
   Receiver receiver;
   WhenAllState!R state;
   Ops ops;
+  @disable this(this);
+  @disable this(ref return scope typeof(this) rhs);
   this(Receiver receiver, Senders senders) {
     this.receiver = receiver;
     state = new WhenAllState!R();

@@ -46,6 +46,8 @@ private struct RaceOp(Receiver, Senders...) {
   Receiver receiver;
   State!R state;
   Ops ops;
+  @disable this(this);
+  @disable this(ref return scope typeof(this) rhs);
   this(Receiver receiver, Senders senders) {
     this.receiver = receiver;
     state = new State!(R)();

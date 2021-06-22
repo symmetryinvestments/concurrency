@@ -107,6 +107,13 @@ template loopStream(E) {
         T t;
         DG dg;
         Receiver receiver;
+        @disable this(ref return scope typeof(this) rhs);
+        @disable this(this);
+        this(T t, DG dg, Receiver receiver) {
+          this.t = t;
+          this.dg = dg;
+          this.receiver = receiver;
+        }
         void start() @safe nothrow {
           try {
             t.loop(dg, receiver.getStopToken);
@@ -311,6 +318,8 @@ auto take(Stream)(Stream stream, size_t n) if (models!(Stream, isStream)) {
     Properties.DG dg;
     StopSource stopSource;
     Op op;
+    @disable this(ref return scope typeof(this) rhs);
+    @disable this(this);
     private this(Stream stream, size_t n, Properties.DG dg, Receiver receiver) @trusted {
       stopSource = new StopSource();
       this.dg = dg;
@@ -351,6 +360,8 @@ auto transform(Stream, Fun)(Stream stream, Fun fun) if (models!(Stream, isStream
     Fun fun;
     DG dg;
     Op op;
+    @disable this(ref return scope typeof(this) rhs);
+    @disable this(this);
     this(Stream stream, Fun fun, DG dg, Receiver receiver) @trusted {
       this.fun = fun;
       this.dg = dg;
@@ -403,6 +414,8 @@ auto scan(Stream, ScanFn, Seed)(Stream stream, scope ScanFn scanFn, Seed seed) i
     Seed acc;
     DG dg;
     Op op;
+    @disable this(ref return scope typeof(this) rhs);
+    @disable this(this);
     this(Stream stream, ScanFn scanFn, Seed seed, DG dg, Receiver receiver) @trusted {
       this.scanFn = scanFn;
       this.acc = seed;
@@ -448,6 +461,8 @@ auto sample(StreamBase, StreamTrigger)(StreamBase base, StreamTrigger trigger) i
     PropertiesBase.ElementType element;
     shared SharedBitField!Flags state;
     shared size_t sampleState;
+    @disable this(ref return scope inout typeof(this) rhs);
+    @disable this(this);
     this(StreamBase base, StreamTrigger trigger, DG dg, Receiver receiver) @trusted {
       this.dg = dg;
       op = whenAll(base.collect(cast(PropertiesBase.DG)&item).completeWithCancellation,
@@ -484,6 +499,8 @@ auto via(Stream, Sender)(Stream stream, Sender sender) if (models!(Sender, isSen
     import concurrency.operations.via : senderVia = via;
     alias Op = OpType!(ReturnType!(senderVia!(Properties.Sender, Sender)), Receiver);
     Op op;
+    @disable this(ref return scope typeof(this) rhs);
+    @disable this(this);
     this(Stream stream, Sender sender, DG dg, Receiver receiver) {
       op = stream.collect(dg).senderVia(sender).connect(receiver);
     }

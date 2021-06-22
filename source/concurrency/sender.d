@@ -90,6 +90,7 @@ interface SenderObjectBase(T) {
   import concurrency.stoptoken;
   static assert (models!(typeof(this), isSender));
   alias Value = T;
+  alias Op = OperationObject;
   OperationObject connect(ReceiverObjectBase!(T) receiver) @safe;
   OperationObject connect(Receiver)(Receiver receiver) @safe {
     return connect(new class(receiver) ReceiverObjectBase!T {
@@ -156,8 +157,9 @@ class SenderObjectImpl(Sender) : SenderObjectBase!(Sender.Value) {
     auto state = sender.connectHeap(receiver);
     return OperationObject(cast(typeof(OperationObject._start))&state.start);
   }
-  auto connect(Receiver)(Receiver receiver) {
-    return sender.connect(receiver);
+  OperationObject connect(Receiver)(Receiver receiver) {
+    auto base = cast(SenderObjectBase!(Sender.Value))this;
+    return base.connect(receiver);
   }
 }
 
@@ -236,16 +238,20 @@ struct VoidSender {
 }
 
 template OpType(Sender, Receiver) {
-  import std.traits : ReturnType;
-  import std.meta : staticMap;
-  template GetOpType(alias connect) {
-    static if (__traits(isTemplate, connect)) {
-      alias GetOpType = ReturnType!(connect!Receiver);
-    } else {
-      alias GetOpType = ReturnType!(connect(Receiver.init));
+  static if (is(Sender.Op)) {
+    alias OpType = Sender.Op;
+  } else {
+    import std.traits : ReturnType;
+    import std.meta : staticMap;
+    template GetOpType(alias connect) {
+      static if (__traits(isTemplate, connect)) {
+        alias GetOpType = ReturnType!(connect!Receiver);//(Receiver.init));
+      } else {
+        alias GetOpType = ReturnType!(connect);//(Receiver.init));
+      }
     }
+    alias overloads = __traits(getOverloads, Sender, "connect", true);
+    alias opTypes = staticMap!(GetOpType, overloads);
+    alias OpType = opTypes[0];
   }
-  alias overloads = __traits(getOverloads, Sender, "connect", true);
-  alias opTypes = staticMap!(GetOpType, overloads);
-  alias OpType = opTypes[0];
 }

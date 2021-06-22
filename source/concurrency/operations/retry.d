@@ -61,6 +61,8 @@ private struct RetryReceiver(Receiver, Sender, Logic) {
 private struct RetryOp(Receiver, Sender, Logic) {
   alias Op = OpType!(Sender, RetryReceiver!(Receiver, Sender, Logic));
   Op op;
+  @disable this(ref return scope typeof(this) rhs);
+  @disable this(this);
   this(Sender sender, RetryReceiver!(Receiver, Sender, Logic) receiver) {
     op = sender.connect(receiver);
   }
