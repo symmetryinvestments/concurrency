@@ -188,3 +188,8 @@ import core.atomic : atomicOp;
   whenAll(VoidSender(),NRVOSender()).sync_wait.should == true;
   race(NRVOSender(),NRVOSender()).sync_wait.should == true;
 }
+
+@("justFrom")
+@safe unittest {
+  justFrom(() shared =>42).sync_wait.should == 42;
+}

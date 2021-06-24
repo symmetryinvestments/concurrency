@@ -1,7 +1,7 @@
 module concurrency.sender;
 
 import concepts;
-import std.traits : ReturnType;
+import std.traits : ReturnType, isCallable;
 
 // A Sender represents something that completes with either:
 // 1. a value (which can be void)
@@ -82,6 +82,45 @@ struct ValueSender(T) {
 
 ValueSender!T just(T)(T t) {
   return ValueSender!T(t);
+}
+
+struct JustFromSender(Fun) {
+  static assert (models!(typeof(this), isSender));
+  alias Value = ReturnType!fun;
+  static struct Op(Receiver) {
+    Receiver receiver;
+    Fun fun;
+    void start() @safe nothrow {
+      import std.traits : hasFunctionAttributes;
+      static if (hasFunctionAttributes!(Fun, "nothrow")) {
+        set();
+      } else {
+        try {
+          set();
+        } catch (Exception e) {
+          receiver.setError(e);
+        }
+      }
+    }
+    private void set() @safe {
+      import concurrency.receiver : setValueOrError;
+      static if (is(Value == void)) {
+        fun();
+        receiver.setValueOrError();
+      } else
+        receiver.setValueOrError(fun());
+    }
+  }
+  Fun fun;
+  Op!Receiver connect(Receiver)(Receiver receiver) @safe {
+    return Op!(Receiver)(receiver, fun);
+  }
+}
+
+JustFromSender!(Fun) justFrom(Fun)(Fun fun) if (isCallable!Fun) {
+  import std.traits : hasFunctionAttributes;
+  static assert (hasFunctionAttributes!(Fun, "shared"), "Function must be shared");
+  return JustFromSender!Fun(fun);
 }
 
 /// A polymorphic sender of type T
