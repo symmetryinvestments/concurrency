@@ -134,6 +134,13 @@ class Nursery : StopSource {
       shared Nursery nursery;
       StopCallback cb;
       ReceiverObject receiver;
+      @disable this(ref return scope typeof(this) rhs);
+      @disable this(this);
+      this(shared Nursery n, StopCallback cb, ReceiverObject r) {
+        nursery = n;
+        this.cb = cb;
+        receiver = r;
+      }
       void start() nothrow {
         nursery.setReceiver(receiver, cb);
       }

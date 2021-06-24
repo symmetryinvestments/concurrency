@@ -51,8 +51,25 @@ void checkSender(T)() @safe {
     void setError(Exception e) nothrow {}
   }
   OpType!(T, Receiver) op = t.connect(Receiver.init);
+  static if (!isValidOp!(T, Receiver))
+    pragma(msg, "Warning: ", T, "'s operation state is not returned via the stack");
 }
 enum isSender(T) = is(typeof(checkSender!T));
+
+/// It is ok for the operation state to be on the heap, but if it is on the stack we need to ensure any copies are elided. We can't be 100% sure (the compiler may still blit), but this is the best we can do.
+template isValidOp(Sender, Receiver) {
+  import std.traits : isPointer;
+  import std.meta : allSatisfy;
+  alias overloads = __traits(getOverloads, Sender, "connect", true);
+  template isRVO(alias connect) {
+    static if (__traits(isTemplate, connect))
+      enum isRVO = __traits(isReturnOnStack, connect!Receiver);
+    else
+      enum isRVO = __traits(isReturnOnStack, connect);
+  }
+  alias Op = OpType!(Sender, Receiver);
+  enum isValidOp = isPointer!Op || is(Op == OperationObject) || is(Op == class) || (allSatisfy!(isRVO, overloads) && !__traits(isPOD, Op));
+}
 
 /// A Sender that sends a single value of type T
 struct ValueSender(T) {
