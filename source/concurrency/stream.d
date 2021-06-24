@@ -441,8 +441,7 @@ auto scan(Stream, ScanFn, Seed)(Stream stream, scope ScanFn scanFn, Seed seed) i
 
 /// Forwards the latest value from the base stream every time the trigger stream produces a value. If the base stream hasn't produces a (new) value the trigger is ignored
 auto sample(StreamBase, StreamTrigger)(StreamBase base, StreamTrigger trigger) if (models!(StreamBase, isStream) && models!(StreamTrigger, isStream)) {
-  import concurrency.operations.whenall;
-  import concurrency.operations.completewithcancellation;
+  import concurrency.operations.whileall;
   import concurrency.bitfield : SharedBitField;
   enum Flags : size_t {
     locked = 0x1,
@@ -452,10 +451,10 @@ auto sample(StreamBase, StreamTrigger)(StreamBase base, StreamTrigger trigger) i
   alias PropertiesTrigger = StreamProperties!StreamTrigger;
   static assert(!is(PropertiesBase.ElementType == void), "No point in sampling a stream that procudes no values. Might as well use trigger directly");
   alias DG = PropertiesBase.DG;
-  static struct ScanStreamOp(Receiver) {
+  static struct SampleStreamOp(Receiver) {
     import std.traits : ReturnType;
-    alias WhenAllSender = ReturnType!(whenAll!(CompleteWithCancellationSender!(PropertiesBase.Sender), CompleteWithCancellationSender!(PropertiesTrigger.Sender)));
-    alias Op = OpType!(WhenAllSender, Receiver);
+    alias WhileAllSender = ReturnType!(whileAll!(PropertiesBase.Sender, PropertiesTrigger.Sender));
+    alias Op = OpType!(WhileAllSender, Receiver);
     DG dg;
     Op op;
     PropertiesBase.ElementType element;
@@ -465,8 +464,8 @@ auto sample(StreamBase, StreamTrigger)(StreamBase base, StreamTrigger trigger) i
     @disable this(this);
     this(StreamBase base, StreamTrigger trigger, DG dg, Receiver receiver) @trusted {
       this.dg = dg;
-      op = whenAll(base.collect(cast(PropertiesBase.DG)&item).completeWithCancellation,
-                   trigger.collect(cast(PropertiesTrigger.DG)&this.trigger).completeWithCancellation).connect(receiver);
+      op = whileAll(base.collect(cast(PropertiesBase.DG)&item),
+                    trigger.collect(cast(PropertiesTrigger.DG)&this.trigger)).connect(receiver);
     }
     void item(PropertiesBase.ElementType t) {
       import core.atomic : atomicOp;
@@ -488,7 +487,7 @@ auto sample(StreamBase, StreamTrigger)(StreamBase base, StreamTrigger trigger) i
       op.start();
     }
   }
-  return fromStreamOp!(PropertiesBase.ElementType, PropertiesBase.Value, ScanStreamOp)(base, trigger);
+  return fromStreamOp!(PropertiesBase.ElementType, PropertiesBase.Value, SampleStreamOp)(base, trigger);
 }
 
 auto via(Stream, Sender)(Stream stream, Sender sender) if (models!(Sender, isSender) && models!(Stream, isStream)) {
