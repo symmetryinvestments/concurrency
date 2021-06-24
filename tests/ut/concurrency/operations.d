@@ -232,3 +232,13 @@ unittest {
 @safe unittest {
   ValueSender!void().completeWithCancellation.sync_wait.should == false;
 }
+
+@("whileAll")
+@safe unittest {
+  auto waiting = ThreadSender().withStopToken((StopToken token) @trusted {
+      while (!token.isStopRequested) { Thread.yield(); }
+    });
+  whileAll(waiting, DoneSender()).sync_wait.should == true;
+  whileAll(waiting, just(42)).sync_wait.should == 42;
+  whileAll(waiting, ThrowingSender()).sync_wait.should == true;
+}

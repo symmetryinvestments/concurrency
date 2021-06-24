@@ -12,7 +12,7 @@ import std.traits;
 /// if both error out the first exception is propagated,
 /// uses mir.algebraic if the Sender value types differ
 RaceSender!(Senders) race(Senders...)(Senders senders) {
-  return RaceSender!(Senders)(senders);
+  return RaceSender!(Senders)(senders, false);
 }
 
 private template Result(Senders...) {
@@ -48,9 +48,9 @@ private struct RaceOp(Receiver, Senders...) {
   Ops ops;
   @disable this(this);
   @disable this(ref return scope typeof(this) rhs);
-  this(Receiver receiver, Senders senders) {
+  this(Receiver receiver, Senders senders, bool noDropouts) {
     this.receiver = receiver;
-    state = new State!(R)();
+    state = new State!(R)(noDropouts);
     foreach(i, Sender; Senders) {
       ops[i] = senders[i].connect(ElementReceiver!(Sender)(receiver, state, Senders.length));
     }
@@ -74,8 +74,9 @@ struct RaceSender(Senders...) if (allSatisfy!(ApplyRight!(models, isSender), Sen
   static assert(models!(typeof(this), isSender));
   alias Value = Result!(Senders);
   Senders senders;
+  bool noDropouts; // if true then we fail the moment one contender does, otherwise we keep running until one finishes
   auto connect(Receiver)(Receiver receiver) @safe {
-    return RaceOp!(Receiver, Senders)(receiver, senders);
+    return RaceOp!(Receiver, Senders)(receiver, senders, noDropouts);
   }
 }
 
@@ -86,6 +87,10 @@ private class State(Value) : StopSource {
     Value value;
   Exception exception;
   shared SharedBitField!Flags bitfield;
+  bool noDropouts;
+  this(bool noDropouts) {
+    this.noDropouts = noDropouts;
+  }
 }
 
 private enum Flags : size_t {
@@ -121,7 +126,7 @@ private struct RaceReceiver(Receiver, InnerValue, Value) {
       with (state.bitfield.lock(Flags.value_produced, Counter.tick)) {
         if (!isValueProduced(oldState)) {
           state.value = Value(value);
-          release();
+          release(); // must release before calling .stop
           state.stop();
         } else
           release();
@@ -140,6 +145,9 @@ private struct RaceReceiver(Receiver, InnerValue, Value) {
     }
   void setDone() @safe nothrow {
     with (state.bitfield.update(Flags.doneOrError_produced, Counter.tick)) {
+      if (state.noDropouts && !isDoneOrErrorProduced(oldState)) {
+        state.stop();
+      }
       process(newState);
     }
   }
@@ -147,6 +155,10 @@ private struct RaceReceiver(Receiver, InnerValue, Value) {
     with (state.bitfield.lock(Flags.doneOrError_produced, Counter.tick)) {
       if (!isDoneOrErrorProduced(oldState)) {
         state.exception = exception;
+        if (state.noDropouts) {
+          release(); // release before stop
+          state.stop();
+        }
       }
       release();
       process(newState);
