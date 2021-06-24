@@ -167,9 +167,10 @@ private struct WhenAllReceiver(Receiver, InnerValue, Value) {
     with (state.bitfield.lock(Flags.doneOrError_produced, Counter.tick)) {
       if (!isDoneOrErrorProduced(oldState)) {
         state.exception = exception;
+        release(); // must release before calling .stop
         state.stop();
-      }
-      release();
+      } else
+        release();
       process(newState);
     }
   }
