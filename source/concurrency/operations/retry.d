@@ -77,6 +77,8 @@ struct RetrySender(Sender, Logic) if (models!(Sender, isSender)) {
   Sender sender;
   Logic logic;
   auto connect(Receiver)(Receiver receiver) @safe {
-    return RetryOp!(Receiver, Sender, Logic)(sender, RetryReceiver!(Receiver, Sender, Logic)(sender, receiver, logic));
+    // ensure NRVO
+    auto op = RetryOp!(Receiver, Sender, Logic)(sender, RetryReceiver!(Receiver, Sender, Logic)(sender, receiver, logic));
+    return op;
   }
 }

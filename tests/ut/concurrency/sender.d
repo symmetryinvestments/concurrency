@@ -179,7 +179,9 @@ import core.atomic : atomicOp;
   static struct NRVOSender {
     alias Value = bool;
     auto connect(Receiver)(Receiver receiver) @safe {
-      return Op!Receiver(receiver);
+      // ensure NRVO
+      auto op = Op!Receiver(receiver);
+      return op;
     }
   }
   NRVOSender().sync_wait().should == true;

@@ -131,7 +131,9 @@ template loopStream(E) {
         T t;
         DG dg;
         auto connect(Receiver)(Receiver receiver) @safe {
-          return LoopOp!(Receiver)(t, dg, receiver);
+          // ensure NRVO
+          auto op = LoopOp!(Receiver)(t, dg, receiver);
+          return op;
         }
       }
       T t;
@@ -389,7 +391,9 @@ auto fromStreamOp(StreamElementType, SenderValue, alias Op, Args...)(Args args) 
     Args args;
     DG dg;
     auto connect(Receiver)(Receiver receiver) @safe {
-      return Op!(Receiver)(args, dg, receiver);
+      // ensure NRVO
+      auto op = Op!(Receiver)(args, dg, receiver);
+      return op;
     }
   }
   struct FromStream {
@@ -593,7 +597,9 @@ shared struct SharedStream(T) {
       shared SharedStream!T source;
       DG dg;
       auto connect(Receiver)(Receiver receiver) @safe {
-        return Op!(Receiver)(source, dg, receiver);
+        // ensure NRVO
+        auto op = Op!(Receiver)(source, dg, receiver);
+        return op;
       }
     }
     shared SList!SubscriberDG dgs;

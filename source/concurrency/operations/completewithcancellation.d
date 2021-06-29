@@ -30,6 +30,8 @@ struct CompleteWithCancellationSender(Sender) if (models!(Sender, isSender)) {
   alias Value = void;
   Sender sender;
   auto connect(Receiver)(Receiver receiver) @safe {
-    return sender.connect(CompleteWithCancellationReceiver!(Receiver)(receiver));
+    /// ensure NRVO
+    auto op = sender.connect(CompleteWithCancellationReceiver!(Receiver)(receiver));
+    return op;
   }
 }

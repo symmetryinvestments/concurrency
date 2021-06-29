@@ -76,7 +76,9 @@ struct ViaSender(SenderA, SenderB) if (models!(SenderA, isSender) && models!(Sen
     alias Value = Tuple!Values;
   }
   auto connect(Receiver)(Receiver receiver) @safe {
-    return senderB.connect(ViaBReceiver!(SenderA, SenderB.Value, Receiver)(senderA, receiver));
+    // ensure NRVO
+    auto op = senderB.connect(ViaBReceiver!(SenderA, SenderB.Value, Receiver)(senderA, receiver));
+    return op;
   }
 }
 

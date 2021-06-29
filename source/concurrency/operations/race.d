@@ -76,7 +76,9 @@ struct RaceSender(Senders...) if (allSatisfy!(ApplyRight!(models, isSender), Sen
   Senders senders;
   bool noDropouts; // if true then we fail the moment one contender does, otherwise we keep running until one finishes
   auto connect(Receiver)(Receiver receiver) @safe {
-    return RaceOp!(Receiver, Senders)(receiver, senders, noDropouts);
+    // ensure NRVO
+    auto op = RaceOp!(Receiver, Senders)(receiver, senders, noDropouts);
+    return op;
   }
 }
 

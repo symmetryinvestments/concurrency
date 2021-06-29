@@ -111,7 +111,9 @@ struct WhenAllSender(Senders...) if (allSatisfy!(ApplyRight!(models, isSender), 
     alias Value = void;
   Senders senders;
   auto connect(Receiver)(Receiver receiver) @safe {
-    return WhenAllOp!(Receiver, Senders)(receiver, senders);
+    // ensure NRVO
+    auto op = WhenAllOp!(Receiver, Senders)(receiver, senders);
+    return op;
   }
 }
 

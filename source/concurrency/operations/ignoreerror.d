@@ -16,7 +16,9 @@ struct IESender(Sender) if (models!(Sender, isSender)) {
   alias Value = Sender.Value;
   Sender sender;
   auto connect(Receiver)(Receiver receiver) @safe {
-    return sender.connect(IEReceiver!(Sender.Value,Receiver)(receiver));
+    // ensure NRVO
+    auto op = sender.connect(IEReceiver!(Sender.Value,Receiver)(receiver));
+    return op;
   }
 }
 

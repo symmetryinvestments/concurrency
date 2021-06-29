@@ -47,6 +47,8 @@ struct STSender(Sender, Fun) if (models!(Sender, isSender)) {
   Fun fun;
   auto connect(Receiver)(Receiver receiver) @safe {
     alias R = STReceiver!(Receiver, Sender.Value, Fun);
-    return sender.connect(R(receiver, fun));
+    // ensure NRVO
+    auto op = sender.connect(R(receiver, fun));
+    return op;
   }
 }

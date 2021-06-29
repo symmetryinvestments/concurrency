@@ -46,7 +46,9 @@ struct FinallySender(Sender, Result) if (models!(Sender, isSender)) {
   Sender sender;
   Result result;
   auto connect(Receiver)(Receiver receiver) @safe {
-    return sender.connect(FinallyReceiver!(Sender.Value, Result, Receiver)(receiver, result));
+    // ensure NRVO
+    auto op = sender.connect(FinallyReceiver!(Sender.Value, Result, Receiver)(receiver, result));
+    return op;
   }
 }
 

@@ -183,6 +183,8 @@ class SharedSender(Sender) if (models!(Sender, isSender)) {
     this.sender = sender;
   }
   auto connect(Receiver)(Receiver receiver) @safe {
-    return SharedSenderOp!Receiver(this, receiver);
+    // ensure NRVO
+    auto op = SharedSenderOp!Receiver(this, receiver);
+    return op;
   }
 }

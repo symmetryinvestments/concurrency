@@ -25,7 +25,7 @@ jobs:
             ${{ runner.os }}-dub-
 
       - name: Run tests
-        run: dub test
+        run: dub -c=unittest-release
 
       - name: Build
         run: dub build
