@@ -192,90 +192,73 @@ auto arrayStream(T)(T[] arr) {
 
 import core.time : Duration;
 
-/// Stream that emits after each duration or until cancelled
 auto intervalStream(Duration duration) {
   alias DG = CollectDelegate!(void);
-  static struct Loop {
-    Duration duration;
-    void loop(StopToken)(DG emit, StopToken stopToken) @trusted {
-
-      if (stopToken.isStopRequested)
-        return;
-
-      // TODO: waiting should really be a feature of the scheduler, because it depends on if we are in a thread, fiber, coroutine or an eventloop
-      version (Windows) {
-        import core.sync.mutex : Mutex;
-        import core.sync.condition : Condition;
-
-        auto m = new Mutex();
-        auto cond = new Condition(m);
-        auto cb = stopToken.onStop(cast(void delegate() shared nothrow @safe)() nothrow @trusted {
-            m.lock_nothrow();
-            scope (exit)
-              m.unlock_nothrow();
-            try {
-              cond.notify();
-            }
-            catch (Exception e) {
-              assert(false, e.msg);
-            }
-          });
-        scope (exit)
-          cb.dispose();
-
-        m.lock_nothrow();
-        scope(exit) m.unlock_nothrow();
-        while (!cond.wait(duration)) {
-          m.unlock_nothrow();
-          emit();
-          m.lock_nothrow();
-        }
-        receiver.setDone();
-      } else version (linux) {
-        import core.sys.linux.timerfd;
-        import core.sys.linux.sys.eventfd;
-        import core.sys.posix.sys.select;
-        import std.exception : ErrnoException;
-        import core.sys.posix.unistd;
-        import core.stdc.errno;
-
-        shared int stopfd = eventfd(0, EFD_CLOEXEC);
-        if (stopfd == -1)
-          throw new ErrnoException("eventfd failed");
-
-        auto stopCb = stopToken.onStop(() shared @trusted {
-            ulong b = 1;
-            write(stopfd, &b, typeof(b).sizeof);
-          });
-        scope (exit) {
-          stopCb.dispose();
-          close(stopfd);
-        }
-
-      auto when = duration.split!("seconds", "usecs");
-      while(!stopToken.isStopRequested) {
-        fd_set read_fds;
-        FD_ZERO(&read_fds);
-        FD_SET(stopfd, &read_fds);
-        timeval tv;
-        tv.tv_sec = when.seconds;
-        tv.tv_usec = when.usecs;
-      retry:
-        const ret = select(stopfd + 1, &read_fds, null, null, &tv);
-        if (ret == 0) {
-          emit();
-        } else if (ret == -1) {
-          if (errno == EINTR || errno == EAGAIN)
-            goto retry;
-          throw new Exception("wtf select");
-        } else {
-          return;
-        }
+  static struct ItemReceiver(Op) {
+    Op* op;
+    void setValue() @safe {
+      try {
+        op.dg();
+        op.start();
+      } catch (Exception e) {
+        op.receiver.setError(e);
       }
-    } else static assert(0, "not supported");
+    }
+    void setDone() @safe nothrow {
+      op.receiver.setDone();
+    }
+    void setError(Exception e) @safe nothrow {
+      op.receiver.setError(e);
+    }
+    auto getStopToken() @safe {
+      return op.receiver.getStopToken();
+    }
+    auto getScheduler() @safe {
+      return op.receiver.getScheduler();
     }
   }
-  return Loop(duration).loopStream!void;
+  static struct Op(Receiver) {
+    import std.traits : ReturnType;
+    Duration duration;
+    DG dg;
+    Receiver receiver;
+    alias SchedulerAfterSender = ReturnType!(SchedulerType!(Receiver).scheduleAfter);
+    alias Op = OpType!(SchedulerAfterSender, ItemReceiver!(typeof(this)));
+    Op op;
+    @disable this(this);
+    @disable this(ref return scope typeof(this) rhs);
+    this(Duration duration, DG dg, Receiver receiver) {
+      this.duration = duration;
+      this.dg = dg;
+      this.receiver = receiver;
+    }
+    void start() @trusted nothrow {
+      try {
+        op = receiver.getScheduler().scheduleAfter(duration).connect(ItemReceiver!(typeof(this))(&this));
+        op.start();
+      } catch (Exception e) {
+        receiver.setError(e);
+      }
+    }
+  }
+  static struct Sender {
+    alias Value = void;
+    Duration duration;
+    DG dg;
+    auto connect(Receiver)(Receiver receiver) @safe {
+      // ensure NRVO
+      auto op = Op!(Receiver)(duration, dg, receiver);
+      return op;
+    }
+  }
+  static struct IntervalStream {
+    alias ElementType = void;
+    Duration duration;
+    auto collect(DG dg) @safe {
+      return Sender(duration, dg);
+    }
+  }
+  return IntervalStream(duration);
 }
 
 template StreamProperties(Stream) {
@@ -620,5 +603,10 @@ shared struct SharedStream(T) {
   auto collect(DG dg) @safe {
     return SharedStreamSender(this, dg);
   }
+}
+
+template SchedulerType(Receiver) {
+  import std.traits : ReturnType;
+  alias SchedulerType = ReturnType!(Receiver.getScheduler);
 }
 

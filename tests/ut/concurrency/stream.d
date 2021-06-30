@@ -18,11 +18,10 @@ import core.atomic;
 @("timerStream")
 @safe unittest {
   import concurrency.operations : withStopSource, whenAll, via;
-  import concurrency.thread : ThreadSender;
   import core.time : msecs;
   shared int s = 0, f = 0;
   auto source = new shared StopSource();
-  auto slow = 10.msecs.intervalStream().collect(() shared { s.atomicOp!"+="(1); source.stop(); }).withStopSource(source).via(ThreadSender());
+  auto slow = 10.msecs.intervalStream().collect(() shared { s.atomicOp!"+="(1); source.stop(); }).withStopSource(source);
   auto fast = 3.msecs.intervalStream().collect(() shared { f.atomicOp!"+="(1); });
   whenAll(slow, fast).sync_wait(source).should == false;
   s.should == 1;
@@ -166,35 +165,78 @@ import core.atomic;
   errorStream(new Exception("Too bad")).take(1).collect(()shared{}).sync_wait().shouldThrowWithMessage("Too bad");
 }
 
-@("sample.slower")
+@("sample.trigger.stop")
 @safe unittest {
-  import concurrency.thread;
   import core.time;
-
-  shared int p = 0;
-
-  7.msecs
-    .intervalStream()
-    .via(ThreadSender())
+  auto sampler = 7.msecs.intervalStream()
     .scan((int acc) => acc+1, 0)
     .sample(10.msecs.intervalStream().take(3))
+    .collect((int i) shared {})
+    .sync_wait().should == true;
+}
+
+@("sample.slower")
+@safe unittest {
+  import core.time;
+  import concurrency.operations : withScheduler, whenAll;
+  import concurrency.sender : justFrom;
+
+  shared int p = 0;
+  import concurrency.scheduler : ManualTimeWorker;
+
+  auto worker = new shared ManualTimeWorker();
+
+  auto sampler = 7.msecs
+    .intervalStream()
+    .scan((int acc) => acc+1, 0)
+    .sample(10.msecs.intervalStream())
     .take(3)
     .collect((int i) shared { p.atomicOp!"+="(i); })
-    .sync_wait().should == true;
+    .withScheduler(worker.getScheduler);
+
+  auto driver = justFrom(() shared {
+      worker.advance(7.msecs);
+      p.atomicLoad.should == 0;
+      worker.timeUntilNextEvent().should == 3.msecs;
+
+      worker.advance(3.msecs);
+      p.atomicLoad.should == 1;
+      worker.timeUntilNextEvent().should == 4.msecs;
+
+      worker.advance(4.msecs);
+      p.atomicLoad.should == 1;
+      worker.timeUntilNextEvent().should == 6.msecs;
+
+      worker.advance(6.msecs);
+      p.atomicLoad.should == 3;
+      worker.timeUntilNextEvent().should == 1.msecs;
+
+      worker.advance(1.msecs);
+      p.atomicLoad.should == 3;
+      worker.timeUntilNextEvent().should == 7.msecs;
+
+      worker.advance(7.msecs);
+      p.atomicLoad.should == 3;
+      worker.timeUntilNextEvent().should == 2.msecs;
+
+      worker.advance(2.msecs);
+      p.atomicLoad.should == 7;
+      worker.timeUntilNextEvent().should == null;
+    });
+
+  whenAll(sampler, driver).sync_wait().should == true;
 
   p.should == 7;
 }
 
 @("sample.faster")
 @safe unittest {
-  import concurrency.thread;
   import core.time;
 
   shared int p = 0;
 
   7.msecs
     .intervalStream()
-    .via(ThreadSender())
     .scan((int acc) => acc+1, 0)
     .sample(3.msecs.intervalStream())
     .take(3)
@@ -206,9 +248,8 @@ import core.atomic;
 
 @("sharedStream")
 @safe unittest {
-  import concurrency.thread;
-  import concurrency.operations.then;
-  import concurrency.operations.race;
+  import concurrency.operations : then, race;
+  import concurrency.thread : ThreadSender;
 
   auto source = sharedStream!int;
 
