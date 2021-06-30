@@ -2,6 +2,7 @@ module concurrency.sender;
 
 import concepts;
 import std.traits : ReturnType, isCallable;
+import core.time : Duration;
 
 // A Sender represents something that completes with either:
 // 1. a value (which can be void)
@@ -41,6 +42,7 @@ import std.traits : ReturnType, isCallable;
 
 /// checks that T is a Sender
 void checkSender(T)() @safe {
+  import concurrency.scheduler : SchedulerObjectBase;
   T t = T.init;
   struct Receiver {
     static if (is(T.Value == void))
@@ -49,6 +51,7 @@ void checkSender(T)() @safe {
       void setValue(T.Value) {}
     void setDone() nothrow {}
     void setError(Exception e) nothrow {}
+    SchedulerObjectBase getScheduler() nothrow { return null; }
   }
   OpType!(T, Receiver) op = t.connect(Receiver.init);
   static if (!isValidOp!(T, Receiver))
@@ -143,7 +146,8 @@ JustFromSender!(Fun) justFrom(Fun)(Fun fun) if (isCallable!Fun) {
 /// A polymorphic sender of type T
 interface SenderObjectBase(T) {
   import concurrency.receiver;
-  import concurrency.stoptoken;
+  import concurrency.scheduler : SchedulerObjectBase;
+  import concurrency.stoptoken : StopTokenObject, stopTokenObject;
   static assert (models!(typeof(this), isSender));
   alias Value = T;
   alias Op = OperationObject;
@@ -171,6 +175,10 @@ interface SenderObjectBase(T) {
       }
       StopTokenObject getStopToken() nothrow {
         return stopTokenObject(receiver.getStopToken());
+      }
+      SchedulerObjectBase getScheduler() nothrow @safe {
+        import concurrency.scheduler : toSchedulerObject;
+        return receiver.getScheduler().toSchedulerObject;
       }
     });
   }
@@ -310,4 +318,17 @@ template OpType(Sender, Receiver) {
     alias opTypes = staticMap!(GetOpType, overloads);
     alias OpType = opTypes[0];
   }
+}
+
+/// A sender that delays before calling setValue
+struct DelaySender {
+  alias Value = void;
+  Duration dur;
+  auto connect(Receiver)(Receiver receiver) {
+    return receiver.getScheduler().scheduleAfter(dur).connect(receiver);
+  }
+}
+
+auto delay(Duration dur) {
+  return DelaySender(dur);
 }

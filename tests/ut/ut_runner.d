@@ -10,6 +10,7 @@ int main(string[] args)
                         "ut.concurrency.pressure",
                         "ut.concurrency.pressure2",
                         "ut.concurrency.stream",
-                        "ut.concurrency.slist"
+                        "ut.concurrency.slist",
+                        "ut.concurrency.scheduler",
                         );
 }

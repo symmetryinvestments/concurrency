@@ -12,11 +12,16 @@ import mir.algebraic : Algebraic, Nullable, match;
 /// The underlying Sender is connected and started only once. It can be explicitely `reset` so that it connects and starts the underlying Sender the next time it is connected and started. Calling `reset` when the underlying Sender hasn't completed is a no-op.
 /// When the last receiver triggers its stoptoken while the underlying Sender is still running, the latter will be cancelled and one termination function of the former will be called after the latter is completed. (This is to ensure structured concurrency, otherwise tasks could be left running without anyone awaiting them).
 /// This operation is useful when you have multiple tasks that all depend on one shared task. It allows you to write the shared task as a regular Sender and simply apply a `.toShared`.
-auto toShared(Sender)(Sender sender) {
-  return new SharedSender!(Sender)(sender);
+auto toShared(Sender, Scheduler)(Sender sender, Scheduler scheduler) {
+  return new SharedSender!(Sender, Scheduler)(sender, scheduler);
 }
 
-class SharedSender(Sender) if (models!(Sender, isSender)) {
+auto toShared(Sender)(Sender sender) {
+  static struct NullScheduler {}
+  return new SharedSender!(Sender, NullScheduler)(sender, NullScheduler());
+}
+
+class SharedSender(Sender, Scheduler) if (models!(Sender, isSender)) {
   import std.traits : ReturnType;
   import concurrency.slist;
   import concurrency.bitfield;
@@ -85,6 +90,7 @@ class SharedSender(Sender) if (models!(Sender, isSender)) {
   }
   static struct SharedSenderReceiver {
     SharedSenderState state;
+    Scheduler scheduler;
     static if (is(Sender.Value == void))
       void setValue() @safe {
         state.value = InternalValue(ValueRep());
@@ -116,9 +122,13 @@ class SharedSender(Sender) if (models!(Sender, isSender)) {
     StopToken getStopToken() @safe nothrow {
       return StopToken(state);
     }
+    Scheduler getScheduler() @safe nothrow {
+      return scheduler;
+    }
   }
   private {
     Sender sender;
+    Scheduler scheduler;
     SharedSenderState state;
     enum Flags {
       locked = 0x1,
@@ -138,7 +148,7 @@ class SharedSender(Sender) if (models!(Sender, isSender)) {
             this.state = localState;
             release(); // release early
             localState.dgs.pushBack(dg);
-            localState.op = sender.connect(SharedSenderReceiver(localState));
+            localState.op = sender.connect(SharedSenderReceiver(localState, scheduler));
             localState.op.start();
           } else {
             auto localState = state;
@@ -179,8 +189,9 @@ class SharedSender(Sender) if (models!(Sender, isSender)) {
         release(Flags.completed);
     }
   }
-  this(Sender sender) {
+  this(Sender sender, Scheduler scheduler) {
     this.sender = sender;
+    this.scheduler = scheduler;
   }
   auto connect(Receiver)(Receiver receiver) @safe {
     // ensure NRVO

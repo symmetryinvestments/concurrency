@@ -63,6 +63,7 @@ private struct SSReceiver(Receiver, Value) {
     }
     return StopToken(combinedSource);
   }
+  mixin ForwardExtensionPoints!receiver;
   private void resetStopCallback() {
     import core.atomic;
     if (atomicExchange(&this.combinedSource, cast(StopSource)null)) {

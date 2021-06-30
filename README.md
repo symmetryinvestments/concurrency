@@ -115,6 +115,14 @@ Most of the time you will need to write your own Stream however. The following h
 - `loopStream`. Takes a struct with a `loop` function and calls that with an `emit` and `stopToken` while ensuring the struct is alive during that.
 - `fromStreamOp`. Constructs a full Stream given only a templated OperationalState. Allows passing in custom values into the OperationalState's constructor. Since Streams build on Senders they require a bit of boilerplate to setup, this helper eliminates that.
 
+## Scheduler
+
+Schedulers create Senders that run on specific execution contexts. A Sender can query a Receiver to get a Scheduler and from there can schedule additional tasks to be ran immediately or after a certain Duration.
+
+`sync_wait` automatically inserts a `LocalThreadScheduler` with a timingwheels implementation to fulfull the Scheduler contract. This means that by default any Sender can schedule timers that run on the thread that awaits the whole chain.
+
+For testing purposes there is a `ManualTimeScheduler` which can be used to advance the timingwheels manually.
+
 ## Nursery
 
 A place where Senders can be awaited in. Senders placed in the Nursery are started only when the Nursery is started.

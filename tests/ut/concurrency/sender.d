@@ -161,6 +161,16 @@ import core.atomic : atomicOp;
   g.atomicLoad.should == true;
 }
 
+@("toShared.scheduler")
+@safe unittest {
+  import core.time : msecs;
+  // by default toShared doesn't support scheduling
+  static assert(!__traits(compiles, { DelaySender(1.msecs).toShared().sync_wait().should == true; }));
+  // have to pass scheduler explicitly
+  import concurrency.scheduler : localThreadScheduler;
+  DelaySender(1.msecs).toShared(localThreadScheduler).sync_wait().should == true;
+}
+
 @("nvro")
 @safe unittest {
   static struct Op(Receiver) {
@@ -194,4 +204,12 @@ import core.atomic : atomicOp;
 @("justFrom")
 @safe unittest {
   justFrom(() shared =>42).sync_wait.should == 42;
+}
+
+@("delay")
+@safe unittest {
+  import core.time : msecs;
+
+  race(delay(2.msecs).then(() shared => 2),
+       delay(1.msecs).then(() shared => 1)).sync_wait.should == 1;
 }

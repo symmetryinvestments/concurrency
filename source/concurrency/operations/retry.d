@@ -53,9 +53,7 @@ private struct RetryReceiver(Receiver, Sender, Logic) {
       }
     }
   }
-  auto getStopToken() nothrow @safe {
-    return receiver.getStopToken();
-  }
+  mixin ForwardExtensionPoints!receiver;
 }
 
 private struct RetryOp(Receiver, Sender, Logic) {

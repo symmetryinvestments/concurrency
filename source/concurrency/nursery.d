@@ -3,6 +3,7 @@ module concurrency.nursery;
 import concurrency.stoptoken : StopSource, StopToken, StopCallback, onStop;
 import concurrency.thread : LocalThreadExecutor;
 import concurrency.receiver : getStopToken;
+import concurrency.scheduler : SchedulerObjectBase;
 import std.typecons : Nullable;
 
 /// A Nursery is a place for senders to be ran in, while being a Sender itself.
@@ -46,6 +47,10 @@ class Nursery : StopSource {
 
   StopToken getStopToken() nothrow @trusted shared {
     return StopToken(cast(Nursery)this);
+  }
+
+  private auto getScheduler() nothrow @trusted shared {
+    return (cast()receiver).getScheduler();
   }
 
   private void setError(Exception e, size_t id) nothrow @safe shared {
@@ -129,6 +134,10 @@ class Nursery : StopSource {
       void setValue() @safe { receiver.setValue(); }
       void setDone() nothrow @safe { receiver.setDone(); }
       void setError(Exception e) nothrow @safe { receiver.setError(e); }
+      SchedulerObjectBase getScheduler() nothrow @safe {
+        import concurrency.scheduler : toSchedulerObject;
+        return receiver.getScheduler().toSchedulerObject();
+      }
     }
     static struct Op {
       shared Nursery nursery;
@@ -170,6 +179,7 @@ private interface ReceiverObject {
   void setValue() @safe;
   void setDone() nothrow @safe;
   void setError(Exception e) nothrow @safe;
+  SchedulerObjectBase getScheduler() nothrow @safe;
 }
 
 private struct NurseryReceiver(Value) {
@@ -206,5 +216,9 @@ private struct NurseryReceiver(Value) {
 
   auto getStopToken() @safe {
     return nursery.getStopToken();
+  }
+
+  auto getScheduler() @safe {
+    return nursery.getScheduler();
   }
 }

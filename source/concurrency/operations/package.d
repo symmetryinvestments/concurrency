@@ -12,3 +12,4 @@ public import concurrency.operations.retry;
 public import concurrency.operations.completewithcancellation;
 public import concurrency.operations.toshared;
 public import concurrency.operations.whileall;
+public import concurrency.operations.withscheduler;

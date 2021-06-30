@@ -26,11 +26,15 @@ mixin template ForwardExtensionPoints(alias receiver) {
   auto getStopToken() nothrow @safe {
     return receiver.getStopToken();
   }
+  auto getScheduler() nothrow @safe {
+    return receiver.getScheduler();
+  }
 }
 
 /// A polymorphic receiver of type T
 interface ReceiverObjectBase(T) {
   import concurrency.stoptoken : StopTokenObject;
+  import concurrency.scheduler : SchedulerObjectBase;
   static assert (models!(ReceiverObjectBase!T, isReceiver));
   static if (is(T == void))
     void setValue() @safe;
@@ -39,6 +43,7 @@ interface ReceiverObjectBase(T) {
   void setDone() nothrow @safe;
   void setError(Exception e) nothrow @safe;
   StopTokenObject getStopToken() nothrow @safe;
+  SchedulerObjectBase getScheduler() nothrow @safe;
 }
 
 struct NullReceiver(T) {

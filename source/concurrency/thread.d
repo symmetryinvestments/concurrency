@@ -4,6 +4,7 @@ import concurrency.executor;
 import concurrency.scheduler;
 import concurrency.sender;
 import concepts;
+import core.sync.semaphore : Semaphore;
 
 LocalThreadExecutor getLocalThreadExecutor() @safe {
   static LocalThreadExecutor localThreadExecutor;
@@ -54,28 +55,88 @@ class LocalThreadExecutor : Executor {
 }
 
 package struct LocalThreadWorker {
-  import std.concurrency : Tid, thisTid, send, receive;
+  import core.time : Duration, msecs, hnsecs;
+  import std.concurrency : Tid, thisTid, send, receive, receiveTimeout;
+
+  static struct AddTimer {
+    Timer timer;
+    Duration dur;
+  }
+  static struct Timer {
+    VoidDelegate dg;
+    ulong id_;
+    ulong id() { return id_; }
+  }
+  static struct RemoveTimer {
+    Timer timer;
+    shared Semaphore semaphore;
+  }
+
   private {
     Tid tid;
     shared int counter;
+    shared ulong nextTimerId;
   }
 
   this(LocalThreadExecutor e) @safe {
     this.tid = e.tid;
   }
 
-  this(this) @disable;
+  this(Tid tid) @safe {
+    this.tid = tid;
+  }
 
   void start() @trusted {
     assert(isInContext); // start can only be called on the thread
+    import concurrency.timingwheels;
+    import std.datetime.systime : Clock;
+    TimingWheels!Timer wheels;
+    auto ticks = 1.msecs; // represents the granularity
+    wheels.init();
     bool running = true;
+    auto addTimerHandler = (AddTimer cmd) scope {
+      auto real_now = Clock.currStdTime;
+      auto tw_now = wheels.currStdTime(ticks);
+      auto delay = (real_now - tw_now).hnsecs;
+      auto at = (cmd.dur + delay)/ticks;
+      wheels.schedule(cmd.timer, at);
+    };
+    auto removeTimerHandler = (RemoveTimer cmd) scope {
+      wheels.cancel(cmd.timer);
+      if (cmd.semaphore !is null)
+        (cast()cmd.semaphore).notify;
+    };
     while (running) {
       VoidFunction vFunc = null;
       VoidDelegate vDel = null;
-      receive((VoidFunction fn) => vFunc = fn,
-              (VoidDelegate dg) => vDel = dg,
-              (bool _){running = false;});
-      /// work has to be run outside of receive (else the lock inside receive will be kept and then we cannot have work push new work)
+      import std.meta : AliasSeq;
+      alias handlers = AliasSeq!((VoidFunction fn) => vFunc = fn,
+                                 (VoidDelegate dg) => vDel = dg,
+                                 addTimerHandler,
+                                 removeTimerHandler,
+                                 (bool _){running = false;}
+                                 );
+      auto nextTrigger = wheels.timeUntilNextEvent(ticks, Clock.currStdTime);
+      bool handleIt = false;
+      if (nextTrigger.isNull()) {
+        receive(handlers);
+        goto handleIt;
+      } else {
+        if (nextTrigger.get > 0.msecs) {
+          if (receiveTimeout(nextTrigger.get, handlers)) {
+            goto handleIt;
+          }
+        }
+        int advance = wheels.ticksToCatchUp(ticks, Clock.currStdTime);
+        if (advance > 0) {
+          auto wr = wheels.advance(advance);
+          foreach(t; wr.timers) {
+            t.dg();
+          }
+        }
+        continue;
+      }
+    handleIt:
       if (vFunc !is null) {
         vFunc();
       }
@@ -84,6 +145,27 @@ package struct LocalThreadWorker {
       }
     }
     // TODO: do we want to drain all VoidFunction/VoidDelegates here?
+  }
+
+  void schedule(VoidDelegate dg) {
+    tid.send(dg);
+  }
+
+  Timer addTimer(VoidDelegate dg, Duration dur) @trusted {
+    import core.atomic : atomicOp;
+    ulong id = nextTimerId.atomicOp!("+=")(1);
+    Timer timer = Timer(dg, id);
+    tid.send(AddTimer(timer, dur));
+    return timer;
+  }
+
+  void cancelTimer(Timer timer) @trusted {
+    Semaphore semaphore;
+    if (!isInContext)
+      semaphore = localSemaphore();
+    tid.send(RemoveTimer(timer, cast(shared)semaphore));
+    if (semaphore !is null)
+      semaphore.wait();
   }
 
   void stop() nothrow @trusted {
@@ -97,6 +179,13 @@ package struct LocalThreadWorker {
   bool isInContext() @trusted {
     return thisTid == cast()tid;
   }
+}
+
+package Semaphore localSemaphore() {
+  static Semaphore semaphore;
+  if (semaphore is null)
+    semaphore = new Semaphore();
+  return semaphore;
 }
 
 package void executeInNewThread(VoidFunction fn) @system nothrow {
@@ -167,10 +256,7 @@ auto executeAndWait(Executor, Work, Args...)(Executor executor, Work work, Args 
   if (executor.isInContext)
     return work(args);
 
-  static Semaphore semaphore;
-  if (semaphore is null)
-    semaphore = new Semaphore();
-  auto localSemaphore = semaphore;
+  Semaphore semaphore = localSemaphore();
 
   alias RT = ReturnType!Work;
   struct Context {
@@ -190,7 +276,7 @@ auto executeAndWait(Executor, Work, Args...)(Executor executor, Work work, Args 
       }
     }
   }
-  Context c = Context(work, args, localSemaphore);
+  Context c = Context(work, args, semaphore);
   executor.execute(cast(VoidDelegate)&c.run);
   semaphore.wait();
   static if (!is(RT == void)) {
@@ -229,9 +315,4 @@ struct ThreadSender {
   auto connect(Receiver)(Receiver receiver) {
     return Op!(Receiver)(receiver);
   }
-}
-
-@models!(ThreadScheduler, isScheduler)
-struct ThreadScheduler {
-  auto schedule() { return ThreadSender(); }
 }

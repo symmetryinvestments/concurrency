@@ -242,3 +242,36 @@ unittest {
   whileAll(waiting, just(42)).sync_wait.should == 42;
   whileAll(waiting, ThrowingSender()).sync_wait.should == true;
 }
+
+@("on.ManualTimeWorker")
+@safe unittest {
+  import concurrency.scheduler : ManualTimeWorker;
+
+  auto worker = new shared ManualTimeWorker();
+  auto driver = just(worker).then((shared ManualTimeWorker worker) shared {
+      worker.timeUntilNextEvent().should == 10.msecs;
+      worker.advance(5.msecs);
+      worker.timeUntilNextEvent().should == 5.msecs;
+      worker.advance(5.msecs);
+      worker.timeUntilNextEvent().should == null;
+    });
+  auto timer = DelaySender(10.msecs).withScheduler(worker.getScheduler);
+
+  whenAll(timer, driver).sync_wait().should == true;
+}
+
+@("on.ManualTimeWorker.cancel")
+@safe unittest {
+  import concurrency.scheduler : ManualTimeWorker;
+
+  auto worker = new shared ManualTimeWorker();
+  auto source = new StopSource();
+  auto driver = just(source).then((StopSource source) shared {
+      worker.timeUntilNextEvent().should == 10.msecs;
+      source.stop();
+      worker.timeUntilNextEvent().should == null;
+    });
+  auto timer = DelaySender(10.msecs).withScheduler(worker.getScheduler);
+
+  whenAll(timer, driver).sync_wait(source).should == false;
+}

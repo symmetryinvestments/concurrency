@@ -52,6 +52,10 @@ package struct SyncWaitReceiver2(Value, bool isNoThrow) {
   auto getStopToken() nothrow @safe @nogc {
     return StopToken(state.stopSource);
   }
+  auto getScheduler() nothrow @safe {
+    import concurrency.scheduler : SchedulerAdapter;
+    return SchedulerAdapter!(LocalThreadWorker*)(&state.worker);
+  }
 }
 
 auto sync_wait(Sender, StopSource)(auto ref Sender sender, StopSource stopSource) {
