@@ -138,8 +138,8 @@ struct JustFromSender(Fun) {
 }
 
 JustFromSender!(Fun) justFrom(Fun)(Fun fun) if (isCallable!Fun) {
-  import std.traits : hasFunctionAttributes;
-  static assert (hasFunctionAttributes!(Fun, "shared"), "Function must be shared");
+  import std.traits : hasFunctionAttributes, isFunction, isFunctionPointer;
+  static assert (isFunction!Fun || isFunctionPointer!Fun || hasFunctionAttributes!(Fun, "shared"), "Function must be shared");
   return JustFromSender!Fun(fun);
 }
 
