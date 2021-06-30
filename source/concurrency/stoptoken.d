@@ -20,6 +20,11 @@ class StopSource {
   bool isStopRequested() nothrow @trusted @nogc shared {
     return (cast(StopSource)this).isStopRequested();
   }
+
+  /// resets the internal state, only do this if you are sure nothing else is looking at this...
+  void reset() @system @nogc {
+    this.state = stop_state();
+  }
 }
 
 struct StopToken {

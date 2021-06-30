@@ -5,6 +5,7 @@ import concurrency;
 import unit_threaded;
 import concurrency.stoptoken;
 import core.atomic;
+import concurrency.thread : ThreadSender;
 
 // TODO: it would be good if we can get the Sender .collect returns to be scoped if the delegates are.
 
@@ -249,7 +250,6 @@ import core.atomic;
 @("sharedStream")
 @safe unittest {
   import concurrency.operations : then, race;
-  import concurrency.thread : ThreadSender;
 
   auto source = sharedStream!int;
 
@@ -264,4 +264,182 @@ import core.atomic;
   race(collector, emitter).sync_wait().should == true;
 
   p.atomicLoad.should == 18;
+}
+
+@("throttling.throttleLast")
+@safe unittest {
+  import core.time;
+
+  shared int p = 0;
+
+  1.msecs
+    .intervalStream()
+    .scan((int acc) => acc+1, 0)
+    .throttleLast(3.msecs)
+    .take(6)
+    .collect((int i) shared { p.atomicOp!"+="(i); })
+    .sync_wait().should == true;
+
+  p.atomicLoad.shouldBeGreaterThan(40);
+}
+
+@("throttling.throttleLast.arrayStream")
+@safe unittest {
+  import core.time;
+
+  shared int p = 0;
+
+  [1,2,3].arrayStream()
+    .throttleLast(30.msecs)
+    .collect((int i) shared { p.atomicOp!"+="(i); })
+    .sync_wait().should == true;
+
+  p.atomicLoad.should == 3;
+}
+
+@("throttling.throttleLast.exception")
+@safe unittest {
+  import core.time;
+
+  1.msecs
+    .intervalStream()
+    .throttleLast(10.msecs)
+    .collect(() shared { throw new Exception("Bla"); })
+    .sync_wait().shouldThrowWithMessage("Bla");
+}
+
+@("throttling.throttleLast.thread")
+@safe unittest {
+  import core.time;
+
+  shared int p = 0;
+
+  1.msecs
+    .intervalStream()
+    .via(ThreadSender())
+    .scan((int acc) => acc+1, 0)
+    .throttleLast(3.msecs)
+    .take(6)
+    .collect((int i) shared { p.atomicOp!"+="(i); })
+    .sync_wait().should == true;
+
+  p.atomicLoad.shouldBeGreaterThan(40);
+}
+
+@("throttling.throttleLast.thread.arrayStream")
+@safe unittest {
+  import core.time;
+
+  shared int p = 0;
+
+  [1,2,3].arrayStream()
+    .via(ThreadSender())
+    .throttleLast(30.msecs)
+    .collect((int i) shared { p.atomicOp!"+="(i); })
+    .sync_wait().should == true;
+
+  p.atomicLoad.should == 3;
+}
+
+@("throttling.throttleLast.thread.exception")
+@safe unittest {
+  import core.time;
+
+  1.msecs
+    .intervalStream()
+    .via(ThreadSender())
+    .throttleLast(10.msecs)
+    .collect(() shared { throw new Exception("Bla"); })
+    .sync_wait().shouldThrowWithMessage("Bla");
+}
+
+@("throttling.throttleFirst")
+@safe unittest {
+  import core.time;
+  import concurrency.scheduler : ManualTimeWorker;
+  import concurrency.operations : withScheduler, whenAll;
+  import concurrency.sender : justFrom;
+
+  shared int p = 0;
+  auto worker = new shared ManualTimeWorker();
+
+  auto throttled = 1.msecs
+    .intervalStream()
+    .scan((int acc) => acc+1, 0)
+    .throttleFirst(3.msecs)
+    .take(2)
+    .collect((int i) shared { p.atomicOp!"+="(i); })
+    .withScheduler(worker.getScheduler);
+
+  auto driver = justFrom(() shared {
+      p.atomicLoad.should == 0;
+
+      worker.advance(1.msecs);
+      p.atomicLoad.should == 1;
+
+      worker.advance(1.msecs);
+      p.atomicLoad.should == 1;
+
+      worker.advance(1.msecs);
+      p.atomicLoad.should == 1;
+
+      worker.advance(1.msecs);
+      p.atomicLoad.should == 5;
+
+      worker.timeUntilNextEvent().should == null;
+    });
+  whenAll(throttled, driver).sync_wait().should == true;
+
+  p.should == 5;
+}
+
+@("throttling.debounce")
+@safe unittest {
+  import core.time;
+  import concurrency.scheduler : ManualTimeWorker;
+  import concurrency.operations : withScheduler, whenAll;
+  import concurrency.sender : justFrom;
+
+  shared int p = 0;
+  auto worker = new shared ManualTimeWorker();
+  auto source = sharedStream!int;
+
+  auto throttled = source
+    .debounce(3.msecs)
+    .take(2)
+    .collect((int i) shared { p.atomicOp!"+="(i); })
+    .withScheduler(worker.getScheduler);
+
+  auto driver = justFrom(() shared {
+      source.emit(1);
+      p.atomicLoad.should == 0;
+      worker.timeUntilNextEvent().should == 3.msecs;
+
+      worker.advance(3.msecs);
+      p.atomicLoad.should == 1;
+
+      source.emit(2);
+      p.atomicLoad.should == 1;
+      worker.timeUntilNextEvent().should == 3.msecs;
+
+      source.emit(3);
+      p.atomicLoad.should == 1;
+      worker.timeUntilNextEvent().should == 3.msecs;
+
+      worker.advance(1.msecs);
+      p.atomicLoad.should == 1;
+      worker.timeUntilNextEvent().should == 2.msecs;
+
+      source.emit(4);
+      p.atomicLoad.should == 1;
+      worker.timeUntilNextEvent().should == 3.msecs;
+
+      worker.advance(3.msecs);
+      p.atomicLoad.should == 5;
+
+      worker.timeUntilNextEvent().should == null;
+    });
+  whenAll(throttled, driver).sync_wait().should == true;
+
+  p.should == 5;
 }

@@ -109,6 +109,9 @@ With the following operations:
 - `scan`. Applies an accumulator function with seed to each value.
 - `sample`. Forwards the latest value of the base Stream every time the trigger Stream emits a value. If the base stream hasn't produced a (new) value the trigger is ignored.
 - `via`. Starts the Stream on the context of another Sender.
+- `throttleFirst`. Limits a Stream by starting a cooldown period after each value during which no newer values are emitted.
+- `throttleLast`. Like `throttleFirst` but only emits the latest value after the cooldown.
+- `debounce`. Limits a Stream by only emitting the last value after the Stream has not emitted for a duration.
 
 Most of the time you will need to write your own Stream however. The following helpers can speed that up:
 
