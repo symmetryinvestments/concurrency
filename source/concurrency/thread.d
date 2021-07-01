@@ -144,7 +144,15 @@ package struct LocalThreadWorker {
         vDel();
       }
     }
-    // TODO: do we want to drain all VoidFunction/VoidDelegates here?
+    version (unittest) {
+      import std.variant : Variant;
+      import core.time : seconds;
+      while(receiveTimeout(seconds(-1),(Variant v){
+            import std.stdio;
+            writeln("Got unwanted message ", v);
+            assert(0);
+          })) {}
+    }
   }
 
   void schedule(VoidDelegate dg) {
@@ -161,8 +169,9 @@ package struct LocalThreadWorker {
 
   void cancelTimer(Timer timer) @trusted {
     Semaphore semaphore;
-    if (!isInContext)
+    if (!isInContext) {
       semaphore = localSemaphore();
+    }
     tid.send(RemoveTimer(timer, cast(shared)semaphore));
     if (semaphore !is null)
       semaphore.wait();
@@ -181,7 +190,7 @@ package struct LocalThreadWorker {
   }
 }
 
-package Semaphore localSemaphore() {
+private Semaphore localSemaphore() {
   static Semaphore semaphore;
   if (semaphore is null)
     semaphore = new Semaphore();

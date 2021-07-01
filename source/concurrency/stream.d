@@ -197,8 +197,16 @@ auto intervalStream(Duration duration) {
   static struct ItemReceiver(Op) {
     Op* op;
     void setValue() @safe {
+      if (op.receiver.getStopToken.isStopRequested) {
+        op.receiver.setDone();
+        return;
+      }
       try {
         op.dg();
+        if (op.receiver.getStopToken.isStopRequested) {
+          op.receiver.setDone();
+          return;
+        }
         op.start();
       } catch (Exception e) {
         op.receiver.setError(e);
@@ -629,7 +637,7 @@ enum ThrottleTimerLogic: uint {
   rearm // reset the timer on new items
 };
 
-/// throttleFirst forwards one item and then enters a cooldown period during which it ignores subsequent items
+/// throttleFirst forwards one item and then enters a cooldown period during which it ignores items
 auto throttleFirst(Stream)(Stream s, Duration d) {
   return throttling!(Stream, ThrottleEmitLogic.first, ThrottleTimerLogic.noop)(s, d);
 }
@@ -672,13 +680,7 @@ auto throttling(Stream, ThrottleEmitLogic emitLogic, ThrottleTimerLogic timerLog
       }
     }
     void setError(Exception e) nothrow @safe {
-      with (state.flags.lock(ThrottleFlags.doneOrError_produced, ThrottleFlags.counter)) {
-        if ((oldState & ThrottleFlags.doneOrError_produced) == 0) {
-          state.exception = e;
-        }
-        release();
-        state.process(newState);
-      }
+      state.setError(e);
     }
     auto getStopToken() {
       return StopToken(state.stopSource);
@@ -689,29 +691,22 @@ auto throttling(Stream, ThrottleEmitLogic emitLogic, ThrottleTimerLogic timerLog
   }
   static struct TimerReceiver(Op) {
     Op* state;
-    static if (!is(Properties.ElementType == void))
-      void setValue() @safe {
-        with (state.flags.lock()) {
-          if (was(ThrottleFlags.timerRearming))
-            return;
+    void setValue() @safe {
+      with (state.flags.lock()) {
+        if (was(ThrottleFlags.timerRearming))
+          return;
 
-          static if (emitLogic == ThrottleEmitLogic.last)
-            auto item = state.item;
-          release(ThrottleFlags.timerArmed);
-          static if (emitLogic == ThrottleEmitLogic.last)
-            state.dg(item);
+        static if (!is(Properties.ElementType == void) && emitLogic == ThrottleEmitLogic.last)
+          auto item = state.item;
+        release(ThrottleFlags.timerArmed);
+        static if (emitLogic == ThrottleEmitLogic.last) {
+          static if (!is(Properties.ElementType == void))
+            state.push(item);
+          else
+            state.push();
         }
       }
-    else
-      void setValue() @safe {
-        with (state.flags.lock()) {
-          if (was(ThrottleFlags.timerRearming))
-            return;
-          release(ThrottleFlags.timerArmed);
-          static if (emitLogic == ThrottleEmitLogic.last)
-            state.dg();
-        }
-      }
+    }
     void setDone() @safe nothrow {
       // TODO: would be nice if we can merge in next update...
       if ((state.flags.load!(MemoryOrder.acq) & ThrottleFlags.timerRearming) > 0)
@@ -724,13 +719,7 @@ auto throttling(Stream, ThrottleEmitLogic emitLogic, ThrottleTimerLogic timerLog
       // TODO: would be nice if we can merge in next lock...
       if ((state.flags.load!(MemoryOrder.acq) & ThrottleFlags.timerRearming) > 0)
         return;
-      with (state.flags.lock(ThrottleFlags.doneOrError_produced, ThrottleFlags.counter)) {
-        if ((oldState & ThrottleFlags.doneOrError_produced) == 0) {
-          state.exception = e;
-        }
-        release();
-        state.process(newState);
-      }
+      state.setError(e);
     }
     auto getStopToken() {
       return StopToken(state.timerStopSource);
@@ -773,15 +762,32 @@ auto throttling(Stream, ThrottleEmitLogic emitLogic, ThrottleTimerLogic timerLog
         private void onItem() {
           with (flags.update(ThrottleFlags.timerArmed)) {
             if ((oldState & ThrottleFlags.timerArmed) == 0) {
-              static if (emitLogic == ThrottleEmitLogic.first)
-                dg();
+              static if (emitLogic == ThrottleEmitLogic.first) {
+                if (!push(t))
+                  return;
+              }
               armTimer();
             } else {
               static if (timerLogic == ThrottleTimerLogic.rearm) {
-                release();
+                // release();
                 rearmTimer();
               }
             }
+          }
+        }
+        private bool push() {
+          try {
+            dg();
+            return true;
+          } catch (Exception e) {
+            with (flags.lock(ThrottleFlags.doneOrError_produced)) {
+              if ((oldState & ThrottleFlags.doneOrError_produced) == 0) {
+                exception = e;
+              }
+              release();
+              process(newState);
+            }
+            return false;
           }
         }
       } else {
@@ -791,8 +797,10 @@ auto throttling(Stream, ThrottleEmitLogic emitLogic, ThrottleTimerLogic timerLog
               item = t;
             release();
             if ((oldState & ThrottleFlags.timerArmed) == 0) {
-              static if (emitLogic == ThrottleEmitLogic.first)
-                dg(t);
+              static if (emitLogic == ThrottleEmitLogic.first) {
+                if (!push(t))
+                  return;
+              }
               armTimer();
             } else {
               static if (timerLogic == ThrottleTimerLogic.rearm) {
@@ -800,6 +808,30 @@ auto throttling(Stream, ThrottleEmitLogic emitLogic, ThrottleTimerLogic timerLog
               }
             }
           }
+        }
+        private bool push(Properties.ElementType t) {
+          try {
+            dg(t);
+            return true;
+          } catch (Exception e) {
+            with (flags.lock(ThrottleFlags.doneOrError_produced)) {
+              if ((oldState & ThrottleFlags.doneOrError_produced) == 0) {
+                exception = e;
+              }
+              release();
+              process(newState);
+            }
+            return false;
+          }
+        }
+      }
+      private void setError(Exception e) {
+        with (flags.lock(ThrottleFlags.doneOrError_produced, ThrottleFlags.counter)) {
+          if ((oldState & ThrottleFlags.doneOrError_produced) == 0) {
+            exception = e;
+          }
+          release();
+          process(newState);
         }
       }
       void armTimer() {
