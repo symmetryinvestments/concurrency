@@ -13,3 +13,4 @@ public import concurrency.operations.completewithcancellation;
 public import concurrency.operations.toshared;
 public import concurrency.operations.whileall;
 public import concurrency.operations.withscheduler;
+public import concurrency.operations.on;

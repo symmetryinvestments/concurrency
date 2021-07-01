@@ -316,3 +316,84 @@ struct ThreadSender {
     return Op!(Receiver)(receiver);
   }
 }
+
+struct StdTaskPool {
+  import std.parallelism : Task, TaskPool;
+  TaskPool pool;
+  @disable this(ref return scope typeof(this) rhs);
+  @disable this(this);
+  this(TaskPool pool) @safe {
+    this.pool = pool;
+  }
+  ~this() nothrow @trusted {
+    try {
+      pool.finish(true);
+    } catch (Exception e) {
+      // can't really happen
+      assert(0);
+    }
+  }
+  auto getScheduler() scope @safe {
+    return StdTaskPoolProtoScheduler(pool);
+  }
+}
+
+StdTaskPool stdTaskPool(size_t nWorkers = 0) @safe {
+  import std.parallelism : TaskPool;
+  return StdTaskPool(new TaskPool(nWorkers));
+}
+
+struct StdTaskPoolProtoScheduler {
+  import std.parallelism : TaskPool;
+  TaskPool pool;
+  auto schedule() {
+    return TaskPoolSender(pool);
+  }
+  auto withBaseScheduler(Scheduler)(Scheduler scheduler) {
+    return StdTaskPoolScheduler!(Scheduler)(pool, scheduler);
+  }
+}
+
+private struct StdTaskPoolScheduler(Scheduler) {
+  import std.parallelism : TaskPool;
+  import core.time : Duration;
+  TaskPool pool;
+  Scheduler scheduler;
+  auto schedule() {
+    return TaskPoolSender(pool);
+  }
+  auto scheduleAfter(Duration run) {
+    import concurrency.operations : via;
+    return schedule().via(scheduler.scheduleAfter(run));
+  }
+}
+
+private struct TaskPoolSender {
+  import std.parallelism : Task, TaskPool, scopedTask;
+  import std.traits : ReturnType;
+  alias Value = void;
+  TaskPool pool;
+  static struct Op(Receiver) {
+    static void setValue(Receiver receiver) @safe nothrow {
+      import concurrency.receiver : setValueOrError;
+      receiver.setValueOrError();
+    }
+    TaskPool pool;
+    alias TaskType = ReturnType!(scopedTask!(setValue, Receiver));
+    TaskType task;
+    this(Receiver receiver, TaskPool pool) @trusted {
+      task = scopedTask!(setValue)(receiver);
+      this.pool = pool;
+    }
+    void start() @safe nothrow {
+      try {
+        pool.put(task);
+      } catch (Exception e) {
+        task.args[0].setError(e);
+      }
+    }
+  }
+  auto connect(Receiver)(Receiver receiver) @safe {
+    return Op!(Receiver)(receiver, pool);
+  }
+}

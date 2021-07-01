@@ -120,11 +120,15 @@ Most of the time you will need to write your own Stream however. The following h
 
 ## Scheduler
 
-Schedulers create Senders that run on specific execution contexts. A Sender can query a Receiver to get a Scheduler and from there can schedule additional tasks to be ran immediately or after a certain Duration.
+Schedulers create Senders that run on specific execution contexts. A Sender can query a Receiver with `.getScheduler()` to get a Scheduler and from there can schedule additional tasks to be ran immediately or after a certain `Duration`.
 
 `sync_wait` automatically inserts a `LocalThreadScheduler` with a timingwheels implementation to fulfull the Scheduler contract. This means that by default any Sender can schedule timers that run on the thread that awaits the whole chain.
 
 For testing purposes there is a `ManualTimeScheduler` which can be used to advance the timingwheels manually.
+
+### ThreadPool
+
+`stdTaskPool` creates a RAII thread pool where Senders can be scheduled on using the `.on` scheduling operator. Both the sender scheduled will run in the thread pool as well any additional scheduled Senders using `getScheduler`. It uses the std.parallelism's `TaskPool` implementation underneath.
 
 ## Nursery
 
