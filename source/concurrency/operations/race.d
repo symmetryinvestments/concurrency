@@ -48,14 +48,14 @@ private struct RaceOp(Receiver, Senders...) {
   Ops ops;
   @disable this(this);
   @disable this(ref return scope typeof(this) rhs);
-  this(Receiver receiver, Senders senders, bool noDropouts) {
+  this(Receiver receiver, return Senders senders, bool noDropouts) @trusted scope {
     this.receiver = receiver;
     state = new State!(R)(noDropouts);
     foreach(i, Sender; Senders) {
       ops[i] = senders[i].connect(ElementReceiver!(Sender)(receiver, state, Senders.length));
     }
   }
-  void start() @trusted nothrow {
+  void start() @trusted nothrow scope {
     import concurrency.stoptoken : StopSource;
     if (receiver.getStopToken().isStopRequested) {
       receiver.setDone();
@@ -75,7 +75,7 @@ struct RaceSender(Senders...) if (allSatisfy!(ApplyRight!(models, isSender), Sen
   alias Value = Result!(Senders);
   Senders senders;
   bool noDropouts; // if true then we fail the moment one contender does, otherwise we keep running until one finishes
-  auto connect(Receiver)(Receiver receiver) @safe {
+  auto connect(Receiver)(return Receiver receiver) @safe scope return {
     // ensure NRVO
     auto op = RaceOp!(Receiver, Senders)(receiver, senders, noDropouts);
     return op;

@@ -61,10 +61,10 @@ private struct RetryOp(Receiver, Sender, Logic) {
   Op op;
   @disable this(ref return scope typeof(this) rhs);
   @disable this(this);
-  this(Sender sender, RetryReceiver!(Receiver, Sender, Logic) receiver) {
+  this(Sender sender, return RetryReceiver!(Receiver, Sender, Logic) receiver) @trusted scope {
     op = sender.connect(receiver);
   }
-  void start() @safe nothrow {
+  void start() @trusted nothrow scope {
     op.start();
   }
 }
@@ -74,7 +74,7 @@ struct RetrySender(Sender, Logic) if (models!(Sender, isSender)) {
   alias Value = Sender.Value;
   Sender sender;
   Logic logic;
-  auto connect(Receiver)(Receiver receiver) @safe {
+  auto connect(Receiver)(return Receiver receiver) @safe scope return {
     // ensure NRVO
     auto op = RetryOp!(Receiver, Sender, Logic)(sender, RetryReceiver!(Receiver, Sender, Logic)(sender, receiver, logic));
     return op;

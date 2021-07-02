@@ -78,7 +78,7 @@ struct SSSender(Sender) if (models!(Sender, isSender)) {
   alias Value = Sender.Value;
   Sender sender;
   StopSource stopSource;
-  auto connect(Receiver)(Receiver receiver) @safe {
+  auto connect(Receiver)(return Receiver receiver) @safe scope return {
     alias R = SSReceiver!(Receiver, Sender.Value);
     // ensure NRVO
     auto op = sender.connect(R(receiver, stopSource));

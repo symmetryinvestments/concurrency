@@ -88,7 +88,7 @@ private struct WhenAllOp(Receiver, Senders...) {
       ops[i] = senders[i].connect(WhenAllReceiver!(Receiver, Sender.Value, WhenAllResult!(Senders))(receiver, state, i, Senders.length));
     }
   }
-  void start() @trusted nothrow {
+  void start() @trusted nothrow scope {
     import concurrency.stoptoken : StopSource;
     if (receiver.getStopToken().isStopRequested) {
       receiver.setDone();
@@ -110,7 +110,7 @@ struct WhenAllSender(Senders...) if (allSatisfy!(ApplyRight!(models, isSender), 
   else
     alias Value = void;
   Senders senders;
-  auto connect(Receiver)(Receiver receiver) @safe {
+  auto connect(Receiver)(return Receiver receiver) @safe scope return {
     // ensure NRVO
     auto op = WhenAllOp!(Receiver, Senders)(receiver, senders);
     return op;

@@ -9,8 +9,9 @@ import std.traits;
 import mir.algebraic : Algebraic, Nullable, match;
 
 /// Wraps a Sender in a SharedSender. A SharedSender allows many receivers to connect to the same underlying Sender, forwarding the same termination call to each receiver.
-/// The underlying Sender is connected and started only once. It can be explicitely `reset` so that it connects and starts the underlying Sender the next time it is connected and started. Calling `reset` when the underlying Sender hasn't completed is a no-op.
+/// The underlying Sender is connected and started only once. It can be explicitely `reset` so that it connects and starts the underlying Sender the next time it started. Calling `reset` when the underlying Sender hasn't completed is a no-op.
 /// When the last receiver triggers its stoptoken while the underlying Sender is still running, the latter will be cancelled and one termination function of the former will be called after the latter is completed. (This is to ensure structured concurrency, otherwise tasks could be left running without anyone awaiting them).
+/// If an receiver is connected after the underlying Sender has already been completed, that receiver will have one of its termination functions called immediately.
 /// This operation is useful when you have multiple tasks that all depend on one shared task. It allows you to write the shared task as a regular Sender and simply apply a `.toShared`.
 auto toShared(Sender, Scheduler)(Sender sender, Scheduler scheduler) {
   return new SharedSender!(Sender, Scheduler)(sender, scheduler);
@@ -38,7 +39,7 @@ class SharedSender(Sender, Scheduler) if (models!(Sender, isSender)) {
     SharedSender parent;
     Receiver receiver;
     StopCallback cb;
-    void start() nothrow @trusted {
+    void start() nothrow @trusted scope {
       parent.add(&(cast(shared)this).onValue);
       cb = receiver.getStopToken.onStop(&(cast(shared)this).onStop);
     }
@@ -62,6 +63,9 @@ class SharedSender(Sender, Scheduler) if (models!(Sender, isSender)) {
               else
                 receiver.setValue(v);
             } catch (Exception e) {
+              /// TODO: dispose needs to be called in all cases, except
+              /// this onValue can sometimes be called immediately,
+              /// leaving no room to set cb.dispose...
               cb.dispose();
               receiver.setError(e);
             }
@@ -193,7 +197,7 @@ class SharedSender(Sender, Scheduler) if (models!(Sender, isSender)) {
     this.sender = sender;
     this.scheduler = scheduler;
   }
-  auto connect(Receiver)(Receiver receiver) @safe {
+  auto connect(Receiver)(return Receiver receiver) @safe scope return {
     // ensure NRVO
     auto op = SharedSenderOp!Receiver(this, receiver);
     return op;

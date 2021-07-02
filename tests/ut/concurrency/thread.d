@@ -28,3 +28,19 @@ import core.atomic : atomicOp;
   auto ts = whenAll(scheduledTask, scheduledTask).sync_wait();
   ts[0].shouldNotEqual(ts[1]);
 }
+
+@("stdTaskPool.scope")
+@safe unittest {
+  void disappearScheduler(StdTaskPoolProtoScheduler p) @safe;
+  void disappearSender(Sender)(Sender s) @safe;
+
+  auto pool = stdTaskPool(2);
+
+  auto scheduledTask = VoidSender().on(pool.getScheduler);
+
+  // ensure we can't leak the scheduler
+  static assert(!__traits(compiles, disappearScheduler(pool.getScheduler)));
+
+  // ensure we can't leak a sender that scheduled on the scoped pool
+  static assert(!__traits(compiles, disappearSender(scheduledTask)));
+}

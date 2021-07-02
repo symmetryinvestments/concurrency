@@ -123,11 +123,11 @@ class Nursery : StopSource {
       op.start();
   }
 
-  auto connect(Receiver)(Receiver receiver) @trusted {
+  auto connect(Receiver)(return Receiver receiver) @trusted scope {
     return (cast(shared)this).connect(receiver);
   }
 
-  auto connect(Receiver)(Receiver receiver) shared {
+  auto connect(Receiver)(Receiver receiver) shared scope @safe {
     final class ReceiverImpl : ReceiverObject {
       Receiver receiver;
       this(Receiver receiver) { this.receiver = receiver; }
@@ -150,12 +150,12 @@ class Nursery : StopSource {
         this.cb = cb;
         receiver = r;
       }
-      void start() nothrow {
+      void start() nothrow scope @trusted {
         nursery.setReceiver(receiver, cb);
       }
     }
     auto stopToken = receiver.getStopToken();
-    auto cb = stopToken.onStop(() shared nothrow @trusted => cast(void)this.stop());
+    auto cb = (()@trusted => stopToken.onStop(() shared nothrow @trusted => cast(void)this.stop()))();
     return Op(this, cb, new ReceiverImpl(receiver));
   }
 

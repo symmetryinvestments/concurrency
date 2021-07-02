@@ -66,7 +66,7 @@ struct SchedulerAdapter(Worker) {
     static struct ScheduleSender {
       alias Value = void;
       Worker worker;
-      auto connect(Receiver)(Receiver receiver) {
+      auto connect(Receiver)(return Receiver receiver) @safe scope return {
         // ensure NRVO
         auto op = ScheduleOp!(Receiver)(worker, receiver);
         return op;
@@ -130,7 +130,7 @@ struct ScheduleAfterSender(Worker) {
   alias Value = void;
   Worker worker;
   Duration dur;
-  auto connect(Receiver)(Receiver receiver) {
+  auto connect(Receiver)(return Receiver receiver) @safe return scope {
     // ensure NRVO
     auto op = ScheduleAfterOp!(Worker, Receiver)(worker, dur, receiver);
     return op;

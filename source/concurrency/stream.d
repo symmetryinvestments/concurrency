@@ -114,7 +114,7 @@ template loopStream(E) {
           this.dg = dg;
           this.receiver = receiver;
         }
-        void start() @safe nothrow {
+        void start() @trusted nothrow scope {
           try {
             t.loop(dg, receiver.getStopToken);
           } catch (Exception e) {
@@ -130,7 +130,7 @@ template loopStream(E) {
         alias Value = void;
         T t;
         DG dg;
-        auto connect(Receiver)(Receiver receiver) @safe {
+        auto connect(Receiver)(return Receiver receiver) @safe scope return {
           // ensure NRVO
           auto op = LoopOp!(Receiver)(t, dg, receiver);
           return op;
@@ -253,7 +253,7 @@ auto intervalStream(Duration duration) {
     alias Value = void;
     Duration duration;
     DG dg;
-    auto connect(Receiver)(Receiver receiver) @safe {
+    auto connect(Receiver)(return Receiver receiver) @safe scope return {
       // ensure NRVO
       auto op = Op!(Receiver)(duration, dg, receiver);
       return op;
@@ -313,7 +313,7 @@ auto take(Stream)(Stream stream, size_t n) if (models!(Stream, isStream)) {
     Op op;
     @disable this(ref return scope typeof(this) rhs);
     @disable this(this);
-    private this(Stream stream, size_t n, Properties.DG dg, Receiver receiver) @trusted {
+    private this(return Stream stream, size_t n, Properties.DG dg, return Receiver receiver) @trusted scope {
       stopSource = new StopSource();
       this.dg = dg;
       this.n = n;
@@ -335,7 +335,7 @@ auto take(Stream)(Stream stream, size_t n) if (models!(Stream, isStream)) {
           stopSource.stop();
       }
     }
-    void start() nothrow @safe {
+    void start() nothrow @trusted scope {
       op.start();
     }
   }
@@ -381,7 +381,7 @@ auto fromStreamOp(StreamElementType, SenderValue, alias Op, Args...)(Args args) 
     alias Value = SenderValue;
     Args args;
     DG dg;
-    auto connect(Receiver)(Receiver receiver) @safe {
+    auto connect(Receiver)(return Receiver receiver) @safe scope return {
       // ensure NRVO
       auto op = Op!(Receiver)(args, dg, receiver);
       return op;
@@ -457,7 +457,7 @@ auto sample(StreamBase, StreamTrigger)(StreamBase base, StreamTrigger trigger) i
     shared size_t sampleState;
     @disable this(ref return scope inout typeof(this) rhs);
     @disable this(this);
-    this(StreamBase base, StreamTrigger trigger, DG dg, Receiver receiver) @trusted {
+    this(StreamBase base, StreamTrigger trigger, DG dg, return Receiver receiver) @trusted scope {
       this.dg = dg;
       op = whileAll(base.collect(cast(PropertiesBase.DG)&item),
                     trigger.collect(cast(PropertiesTrigger.DG)&this.trigger)).connect(receiver);
@@ -588,7 +588,7 @@ shared struct SharedStream(T) {
       alias Value = void;
       shared SharedStream!T source;
       DG dg;
-      auto connect(Receiver)(Receiver receiver) @safe {
+      auto connect(Receiver)(return Receiver receiver) @safe scope return {
         // ensure NRVO
         auto op = Op!(Receiver)(source, dg, receiver);
         return op;
@@ -750,7 +750,7 @@ auto throttling(Stream, ThrottleEmitLogic emitLogic, ThrottleTimerLogic timerLog
       shared SharedBitField!ThrottleFlags flags;
       @disable this(ref return scope inout typeof(this) rhs);
       @disable this(this);
-      this(Stream stream, Duration dur, DG dg, Receiver receiver) @trusted {
+      this(return Stream stream, Duration dur, DG dg, Receiver receiver) @trusted scope {
         this.dur = dur;
         this.dg = dg;
         this.receiver = receiver;
@@ -897,7 +897,7 @@ auto throttling(Stream, ThrottleEmitLogic emitLogic, ThrottleTimerLogic timerLog
         stopSource.stop();
         timerStopSource.stop();
       }
-      void start() @trusted nothrow {
+      void start() @trusted nothrow scope {
         cb = receiver.getStopToken().onStop(cast(void delegate() nothrow @safe shared)&this.stop); // butt ugly cast, but it won't take the second overload
         op.start();
       }

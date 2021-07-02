@@ -22,12 +22,14 @@ struct OutOfBandValueSender(T) {
     void run() {
       receiver.setValue(value);
     }
-    void start() @trusted {
+    void start() @trusted scope {
       auto value = new Thread(&this.run).start();
     }
   }
-  auto connect(Receiver)(Receiver receiver) {
-    return Op!(Receiver)(receiver, value);
+  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+    // ensure NRVO
+    auto op = Op!(Receiver)(receiver, value);
+    return op;
   }
 }
 
@@ -189,8 +191,10 @@ unittest {
           receiver.setValue();
       }
     }
-    auto connect(Receiver)(Receiver receiver) {
-      return Op!(Receiver)(receiver, n++ < t);
+    auto connect(Receiver)(return Receiver receiver) @safe scope return {
+      // ensure NRVO
+      auto op = Op!(Receiver)(receiver, n++ < t);
+      return op;
     }
   }
   Sender().retry(Times(5)).sync_wait.should == true;

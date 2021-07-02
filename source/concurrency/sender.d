@@ -92,11 +92,13 @@ struct ValueSender(T) {
   }
   static if (!is(T == void))
     T value;
-  Op!Receiver connect(Receiver)(Receiver receiver) {
+  Op!Receiver connect(Receiver)(return Receiver receiver) @safe scope return {
+    // ensure NRVO
     static if (!is(T == void))
-      return Op!(Receiver)(receiver, value);
+      auto op = Op!(Receiver)(receiver, value);
     else
-      return Op!(Receiver)(receiver);
+      auto op = Op!(Receiver)(receiver);
+    return op;
   }
 }
 
@@ -132,8 +134,10 @@ struct JustFromSender(Fun) {
     }
   }
   Fun fun;
-  Op!Receiver connect(Receiver)(Receiver receiver) @safe {
-    return Op!(Receiver)(receiver, fun);
+  Op!Receiver connect(Receiver)(return Receiver receiver) @safe scope return {
+    // ensure NRVO
+    auto op = Op!(Receiver)(receiver, fun);
+    return op;
   }
 }
 
@@ -152,7 +156,7 @@ interface SenderObjectBase(T) {
   alias Value = T;
   alias Op = OperationObject;
   OperationObject connect(ReceiverObjectBase!(T) receiver) @safe;
-  OperationObject connect(Receiver)(Receiver receiver) @safe {
+  OperationObject connect(Receiver)(return Receiver receiver) @trusted scope {
     return connect(new class(receiver) ReceiverObjectBase!T {
       Receiver receiver;
       this(Receiver receiver) {
@@ -245,8 +249,10 @@ struct ThrowingSender {
       receiver.setError(new Exception("ThrowingSender"));
     }
   }
-  auto connect(Receiver)(Receiver receiver) {
-    return Op!Receiver(receiver);
+  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+    // ensure NRVO
+    auto op = Op!Receiver(receiver);
+    return op;
   }
 }
 
@@ -280,8 +286,10 @@ struct DoneSender {
       receiver.setDone();
     }
   }
-  auto connect(Receiver)(Receiver receiver) {
-    return DoneOp!(Receiver)(receiver);
+  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+    // ensure NRVO
+    auto op = DoneOp!(Receiver)(receiver);
+    return op;
   }
 }
 
@@ -296,8 +304,10 @@ struct VoidSender {
       receiver.setValueOrError();
     }
   }
-  auto connect(Receiver)(Receiver receiver) {
-    return VoidOp!Receiver(receiver);
+  auto connect(Receiver)(return Receiver receiver) @safe scope return{
+    // ensure NRVO
+    auto op = VoidOp!Receiver(receiver);
+    return op;
   }
 }
 
@@ -324,8 +334,10 @@ template OpType(Sender, Receiver) {
 struct DelaySender {
   alias Value = void;
   Duration dur;
-  auto connect(Receiver)(Receiver receiver) {
-    return receiver.getScheduler().scheduleAfter(dur).connect(receiver);
+  auto connect(Receiver)(return Receiver receiver) @safe return scope {
+    // ensure NRVO
+    auto op = receiver.getScheduler().scheduleAfter(dur).connect(receiver);
+    return op;
   }
 }
 

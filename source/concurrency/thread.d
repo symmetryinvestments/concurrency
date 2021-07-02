@@ -307,7 +307,7 @@ struct ThreadSender {
     this(Receiver receiver) {
       this.receiver = receiver;
     }
-    void start() @trusted nothrow {
+    void start() @trusted nothrow scope {
       executeInNewThread(cast(VoidDelegate)&run);
     }
     void run() @trusted {
@@ -321,8 +321,10 @@ struct ThreadSender {
       }
     }
   }
-  auto connect(Receiver)(Receiver receiver) {
-    return Op!(Receiver)(receiver);
+  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+    // ensure NRVO
+    auto op = Op!(Receiver)(receiver);
+    return op;
   }
 }
 
@@ -331,10 +333,10 @@ struct StdTaskPool {
   TaskPool pool;
   @disable this(ref return scope typeof(this) rhs);
   @disable this(this);
-  this(TaskPool pool) @safe {
+  this(TaskPool pool) @safe scope {
     this.pool = pool;
   }
-  ~this() nothrow @trusted {
+  ~this() nothrow @trusted scope {
     try {
       pool.finish(true);
     } catch (Exception e) {
@@ -378,7 +380,7 @@ private struct StdTaskPoolScheduler(Scheduler) {
 }
 
 private struct TaskPoolSender {
-  import std.parallelism : Task, TaskPool, scopedTask;
+  import std.parallelism : Task, TaskPool, scopedTask, task;
   import std.traits : ReturnType;
   alias Value = void;
   TaskPool pool;
@@ -388,21 +390,25 @@ private struct TaskPoolSender {
       receiver.setValueOrError();
     }
     TaskPool pool;
-    alias TaskType = ReturnType!(scopedTask!(setValue, Receiver));
-    TaskType task;
-    this(Receiver receiver, TaskPool pool) @trusted {
-      task = scopedTask!(setValue)(receiver);
+    alias TaskType = typeof(task!setValue(Receiver.init));
+    TaskType myTask;
+    @disable this(ref return scope typeof(this) rhs);
+    @disable this(this);
+    this(Receiver receiver, TaskPool pool) @safe return scope {
+      myTask = task!(setValue)(receiver);
       this.pool = pool;
     }
-    void start() @safe nothrow {
+    void start() @trusted nothrow scope {
       try {
-        pool.put(task);
+        pool.put(myTask);
       } catch (Exception e) {
-        task.args[0].setError(e);
+        myTask.args[0].setError(e);
       }
     }
   }
-  auto connect(Receiver)(Receiver receiver) @safe {
-    return Op!(Receiver)(receiver, pool);
+  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+    // ensure NRVO
+    auto op = Op!(Receiver)(receiver, pool);
+    return op;
   }
 }

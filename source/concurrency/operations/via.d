@@ -75,7 +75,7 @@ struct ViaSender(SenderA, SenderB) if (models!(SenderA, isSender) && models!(Sen
     import std.typecons : Tuple;
     alias Value = Tuple!Values;
   }
-  auto connect(Receiver)(Receiver receiver) @safe {
+  auto connect(Receiver)(return Receiver receiver) @trusted scope return {
     // ensure NRVO
     auto op = senderB.connect(ViaBReceiver!(SenderA, SenderB.Value, Receiver)(senderA, receiver));
     return op;

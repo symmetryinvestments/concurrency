@@ -41,7 +41,7 @@ struct WithSchedulerSender(Sender, Scheduler) if (models!(Sender, isSender)) {
   alias Value = Sender.Value;
   Sender sender;
   Scheduler scheduler;
-  auto connect(Receiver)(Receiver receiver) @safe {
+  auto connect(Receiver)(return Receiver receiver) @safe scope return {
     alias R = WithSchedulerReceiver!(Receiver, Sender.Value, Scheduler);
     // ensure NRVO
     auto op = sender.connect(R(receiver, scheduler));
