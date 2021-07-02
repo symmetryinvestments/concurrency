@@ -126,7 +126,7 @@ class SharedSender(Sender, Scheduler) if (models!(Sender, isSender)) {
     StopToken getStopToken() @safe nothrow {
       return StopToken(state);
     }
-    Scheduler getScheduler() @safe nothrow {
+    Scheduler getScheduler() @safe nothrow scope {
       return scheduler;
     }
   }
