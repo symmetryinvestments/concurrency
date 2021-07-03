@@ -443,3 +443,47 @@ import concurrency.thread : ThreadSender;
 
   p.should == 5;
 }
+
+@("slide")
+@trusted unittest {
+  import std.stdio;
+  import std.functional : toDelegate;
+  import std.algorithm : sum;
+  shared int p;
+
+  [1,2,3,4,5,6,7].arrayStream
+    .slide(3)
+    .collect((int[] a) @safe shared { p.atomicOp!"+="(a.sum); })
+    .sync_wait();
+
+  p.should == 60;
+
+  [1,2].arrayStream
+    .slide(3)
+    .collect((int[] a) @safe shared { p.atomicOp!"+="(a.sum); })
+    .sync_wait();
+
+  p.should == 60;
+}
+
+@("slide.step")
+@trusted unittest {
+  import std.stdio;
+  import std.functional : toDelegate;
+  import std.algorithm : sum;
+  shared int p;
+
+  [1,2,3,4,5,6,7].arrayStream
+    .slide(3, 2)
+    .collect((int[] a) @safe shared { p.atomicOp!"+="(a.sum); })
+    .sync_wait();
+
+  p.should == 36;
+
+  [1,2].arrayStream
+    .slide(2, 2)
+    .collect((int[] a) @safe shared { p.atomicOp!"+="(a.sum); })
+    .sync_wait();
+
+  p.should == 39;
+}
