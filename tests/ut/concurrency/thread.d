@@ -22,10 +22,10 @@ import core.atomic : atomicOp;
   auto task = justFrom(&fun);
   auto scheduledTask = task.on(pool.getScheduler);
 
-  task.sync_wait().should == thisThreadID;
-  scheduledTask.sync_wait().shouldNotEqual(thisThreadID);
+  task.syncWait.value.should == thisThreadID;
+  scheduledTask.syncWait.value.shouldNotEqual(thisThreadID);
 
-  auto ts = whenAll(scheduledTask, scheduledTask).sync_wait();
+  auto ts = whenAll(scheduledTask, scheduledTask).syncWait.value;
   ts[0].shouldNotEqual(ts[1]);
 }
 

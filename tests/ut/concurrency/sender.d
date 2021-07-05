@@ -8,9 +8,9 @@ import concurrency.receiver;
 import unit_threaded;
 import core.atomic : atomicOp;
 
-@("sync_wait.value")
+@("syncWait.value")
 @safe unittest {
-  ValueSender!(int)(5).sync_wait().shouldEqual(5);
+  ValueSender!(int)(5).syncWait.value.shouldEqual(5);
 }
 
 @("value.start.attributes.1")
@@ -25,41 +25,41 @@ import core.atomic : atomicOp;
 
 @("value.void")
 @safe unittest {
-  ValueSender!void().sync_wait().should == true;
+  ValueSender!void().syncWait().isOk.should == true;
 }
 
-@("sync_wait.thread")
+@("syncWait.thread")
 @safe unittest {
-  ThreadSender().sync_wait().shouldEqual(true);
+  ThreadSender().syncWait.isOk.should == true;
 }
 
-@("sync_wait.thread.then.value")
+@("syncWait.thread.then.value")
 @safe unittest {
-  ThreadSender().then(() shared => 2*3).sync_wait().shouldEqual(6);
+  ThreadSender().then(() shared => 2*3).syncWait.value.shouldEqual(6);
 }
 
-@("sync_wait.thread.then.exception")
+@("syncWait.thread.then.exception")
 @safe unittest {
   bool delegate() @safe shared dg = () shared { throw new Exception("Exceptions are rethrown"); };
   ThreadSender()
     .then(dg)
-    .sync_wait()
-    .shouldThrow();
+    .syncWait()
+    .isError.should == true;
 }
 
 @("toSenderObject.value")
 @safe unittest {
-  ValueSender!(int)(4).toSenderObject.sync_wait().shouldEqual(4);
+  ValueSender!(int)(4).toSenderObject.syncWait.value.shouldEqual(4);
 }
 
 @("toSenderObject.thread")
 @safe unittest {
-  ThreadSender().then(() shared => 2*3+1).toSenderObject.sync_wait().shouldEqual(7);
+  ThreadSender().then(() shared => 2*3+1).toSenderObject.syncWait.value.shouldEqual(7);
 }
 
 @("via.threadsender.error")
 @safe unittest {
-  ThrowingSender().via(ThreadSender()).sync_wait().shouldThrow();
+  ThrowingSender().via(ThreadSender()).syncWait().isError.should == true;
 }
 
 @("toShared.basic")
@@ -72,16 +72,16 @@ import core.atomic : atomicOp;
     .then((int i) @trusted shared { return g.atomicOp!"+="(1); })
     .toShared();
 
-  whenAll(s, s).sync_wait.should == tuple(1,1);
-  race(s, s).sync_wait.should == 1;
-  s.sync_wait.should == 1;
-  s.sync_wait.should == 1;
+  whenAll(s, s).syncWait.value.should == tuple(1,1);
+  race(s, s).syncWait.value.should == 1;
+  s.syncWait.value.should == 1;
+  s.syncWait.value.should == 1;
 
   s.reset();
-  s.sync_wait.should == 2;
-  s.sync_wait.should == 2;
-  whenAll(s, s).sync_wait.should == tuple(2,2);
-  race(s, s).sync_wait.should == 2;
+  s.syncWait.value.should == 2;
+  s.syncWait.value.should == 2;
+  whenAll(s, s).syncWait.value.should == tuple(2,2);
+  race(s, s).syncWait.value.should == 2;
 }
 
 @("toShared.via.thread")
@@ -95,9 +95,9 @@ import core.atomic : atomicOp;
     .via(ThreadSender())
     .toShared();
 
-  race(s, s).sync_wait.should == 1;
+  race(s, s).syncWait.value.should == 1;
   s.reset();
-  race(s, s).sync_wait.should == 2;
+  race(s, s).syncWait.value.should == 2;
 }
 
 @("toShared.error")
@@ -108,16 +108,16 @@ import core.atomic : atomicOp;
     .then(() @trusted shared { g.atomicOp!"+="(1); throw new Exception("Error"); })
     .toShared();
 
-  s.sync_wait().shouldThrowWithMessage("Error");
+  s.syncWait.assumeOk.shouldThrowWithMessage("Error");
   g.should == 1;
-  s.sync_wait().shouldThrowWithMessage("Error");
+  s.syncWait.assumeOk.shouldThrowWithMessage("Error");
   g.should == 1;
 
-  race(s, s).sync_wait.shouldThrowWithMessage("Error");
+  race(s, s).syncWait.assumeOk.shouldThrowWithMessage("Error");
   g.should == 1;
 
   s.reset();
-  s.sync_wait.shouldThrowWithMessage("Error");
+  s.syncWait.assumeOk.shouldThrowWithMessage("Error");
   g.should == 2;
 }
 
@@ -130,16 +130,16 @@ import core.atomic : atomicOp;
          .then(() @trusted shared { g.atomicOp!"+="(1); }))
     .toShared();
 
-  s.sync_wait().should == false;
+  s.syncWait.isCancelled.should == true;
   g.should == 1;
-  s.sync_wait().should == false;
+  s.syncWait.isCancelled.should == true;
   g.should == 1;
 
-  race(s, s).sync_wait.should == false;
+  race(s, s).syncWait.isCancelled.should == true;
   g.should == 1;
 
   s.reset();
-  s.sync_wait.should == false;
+  s.syncWait.isCancelled.should == true;
   g.should == 2;
 }
 
@@ -156,7 +156,7 @@ import core.atomic : atomicOp;
   auto source = new StopSource();
   auto stopper = just(source).then((StopSource source) shared { source.stop(); });
 
-  whenAll(waiting.toShared().withStopSource(source), stopper).sync_wait().should == false;
+  whenAll(waiting.toShared().withStopSource(source), stopper).syncWait.isCancelled.should == true;
 
   g.atomicLoad.should == true;
 }
@@ -165,10 +165,10 @@ import core.atomic : atomicOp;
 @safe unittest {
   import core.time : msecs;
   // by default toShared doesn't support scheduling
-  static assert(!__traits(compiles, { DelaySender(1.msecs).toShared().sync_wait().should == true; }));
+  static assert(!__traits(compiles, { DelaySender(1.msecs).toShared().syncWait().isOk.should == true; }));
   // have to pass scheduler explicitly
   import concurrency.scheduler : localThreadScheduler;
-  DelaySender(1.msecs).toShared(localThreadScheduler).sync_wait().should == true;
+  DelaySender(1.msecs).toShared(localThreadScheduler).syncWait().isOk.should == true;
 }
 
 @("nvro")
@@ -194,16 +194,16 @@ import core.atomic : atomicOp;
       return op;
     }
   }
-  NRVOSender().sync_wait().should == true;
-  NRVOSender().via(ThreadSender()).sync_wait().should == true;
-  whenAll(NRVOSender(),VoidSender()).sync_wait.should == true;
-  whenAll(VoidSender(),NRVOSender()).sync_wait.should == true;
-  race(NRVOSender(),NRVOSender()).sync_wait.should == true;
+  NRVOSender().syncWait().isOk.should == true;
+  NRVOSender().via(ThreadSender()).syncWait().isOk.should == true;
+  whenAll(NRVOSender(),VoidSender()).syncWait.isOk.should == true;
+  whenAll(VoidSender(),NRVOSender()).syncWait.isOk.should == true;
+  race(NRVOSender(),NRVOSender()).syncWait.isOk.should == true;
 }
 
 @("justFrom")
 @safe unittest {
-  justFrom(() shared =>42).sync_wait.should == 42;
+  justFrom(() shared =>42).syncWait.value.should == 42;
 }
 
 @("delay")
@@ -211,5 +211,5 @@ import core.atomic : atomicOp;
   import core.time : msecs;
 
   race(delay(2.msecs).then(() shared => 2),
-       delay(1.msecs).then(() shared => 1)).sync_wait.should == 1;
+       delay(1.msecs).then(() shared => 1)).syncWait.value.should == 1;
 }

@@ -6,7 +6,7 @@ import concurrency.operations.whenall;
 import concurrency.operations.then;
 import concurrency.operations.via;
 import concurrency.thread : ThreadSender;
-import concurrency : sync_wait;
+import concurrency : syncWait;
 import std.range : walkLength;
 import unit_threaded;
 
@@ -20,7 +20,7 @@ import unit_threaded;
       }
     }).via(ThreadSender());
 
-  whenAll(filler, filler).sync_wait();
+  whenAll(filler, filler).syncWait();
 
   list[].walkLength.should == 200;
 }
@@ -35,7 +35,7 @@ import unit_threaded;
       }
     }).via(ThreadSender());
 
-  whenAll(filler, filler).sync_wait();
+  whenAll(filler, filler).syncWait();
 
   list[].walkLength.should == 200;
 }
@@ -58,7 +58,7 @@ import unit_threaded;
       }
     }).via(ThreadSender());
 
-  whenAll(filler, remover).sync_wait();
+  whenAll(filler, remover).syncWait();
 
   list[].walkLength.should == 50;
 }
@@ -79,7 +79,7 @@ import unit_threaded;
           n++;
     }).via(ThreadSender());
 
-  whenAll(filler, remover).sync_wait();
+  whenAll(filler, remover).syncWait();
 
   list[].walkLength.should == 1;
 }
@@ -98,7 +98,7 @@ import unit_threaded;
       }
     }).via(ThreadSender());
 
-  whenAll(remover, remover).sync_wait();
+  whenAll(remover, remover).syncWait();
 
   list[].walkLength.should == 50;
 }
@@ -124,7 +124,7 @@ import unit_threaded;
       }
     }).via(ThreadSender());
 
-  whenAll(remover1, remover2, remover1, remover2).sync_wait();
+  whenAll(remover1, remover2, remover1, remover2).syncWait();
 
   list[].walkLength.should == 0;
 }

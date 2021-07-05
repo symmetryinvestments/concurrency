@@ -10,12 +10,12 @@ import concurrency.scheduler;
 
 @("scheduleAfter")
 @safe unittest {
-  DelaySender(10.msecs).sync_wait();
+  DelaySender(10.msecs).syncWait;
 }
 
 @("scheduleAfter.cancel")
 @safe unittest {
-  race(DelaySender(10.msecs), DelaySender(3.msecs)).sync_wait();
+  race(DelaySender(10.msecs), DelaySender(3.msecs)).syncWait;
 }
 
 @("ManualTimeWorker")
@@ -85,5 +85,5 @@ import concurrency.scheduler;
       throw new Exception("halt");
     });
 
-  whenAll(sender, driver).sync_wait.shouldThrowWithMessage("halt");
+  whenAll(sender, driver).syncWait.assumeOk.shouldThrowWithMessage("halt");
 }

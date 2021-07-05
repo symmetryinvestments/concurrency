@@ -8,6 +8,6 @@ import unit_threaded;
 @("100.threads")
 unittest {
   foreach(i; 0..100) {
-    ThreadSender().then(() shared => 2*3).sync_wait().shouldEqual(6);
+    ThreadSender().then(() shared => 2*3).syncWait().value.shouldEqual(6);
   }
 }
