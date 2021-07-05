@@ -487,3 +487,8 @@ import concurrency.thread : ThreadSender;
 
   p.should == 39;
 }
+
+@("toList.arrayStream")
+@safe unittest {
+  [1,2,3].arrayStream.toList.syncWait.value.should == [1,2,3];
+}

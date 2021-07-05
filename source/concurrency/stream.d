@@ -952,3 +952,55 @@ auto slide(Stream)(Stream stream, size_t window, size_t step = 1) if (models!(St
   }
   return fromStreamOp!(Properties.ElementType[], Properties.Value, SlideStreamOp)(stream, window, step);
 }
+
+/// toList collects all the stream's values and emits the array as a Sender
+auto toList(Stream)(Stream stream) if (models!(Stream, isStream)) {
+  alias Properties = StreamProperties!Stream;
+  static assert(is(Properties.Value == void), "sender must produce void for toList to work");
+  static struct ToListReceiver(Op) {
+    Op* op;
+    void setValue() @safe {
+      op.receiver.setValue(op.arr);
+    }
+    void setDone() @safe nothrow {
+      op.receiver.setDone();
+    }
+    void setError(Exception e) nothrow @safe {
+      op.receiver.setError(e);
+    }
+    auto getStopToken() nothrow @safe {
+      return op.receiver.getStopToken();
+    }
+    auto getScheduler() nothrow @safe {
+      return op.receiver.getScheduler();
+    }
+  }
+  static struct ToListOp(Receiver) {
+    alias Op = OpType!(Properties.Sender, ToListReceiver!(typeof(this)));
+    Op op;
+    Receiver receiver;
+    Properties.ElementType[] arr;
+    @disable this(this);
+    @disable this(ref return scope typeof(this) rhs);
+    this(Stream stream, return Receiver receiver) @trusted scope return {
+      this.receiver = receiver;
+      op = stream.collect(cast(Properties.DG)&item).connect(ToListReceiver!(typeof(this))(&this));
+    }
+    void item(Properties.ElementType t) {
+      arr ~= t;
+    }
+    void start() nothrow @safe {
+      op.start();
+    }
+  }
+  static struct ToListSender {
+    alias Value = Properties.ElementType[];
+    Stream stream;
+    auto connect(Receiver)(return Receiver receiver) @safe scope return {
+      // ensure NRVO
+      auto op = ToListOp!(Receiver)(stream, receiver);
+      return op;
+    }
+  }
+  return ToListSender(stream);
+}
