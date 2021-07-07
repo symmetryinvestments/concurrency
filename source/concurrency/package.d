@@ -164,6 +164,19 @@ struct Result(T) {
   }
 }
 
+/// matches over the result of syncWait
+template match(Handlers...) {
+  // has to be separate because of dual-context limitation
+  auto match(T)(Result!T r) {
+    import mir.algebraic : match;
+    static if (is(T == void))
+      return r.result.match!(Handlers);
+    else
+      return r.result.match!((Result!(T).Value!(T) v) => v.value, (ref t) => t).match!(Handlers);
+  }
+}
+
+/// Start the Sender and waits until it completes, cancels, or has an error.
 auto syncWait(Sender, StopSource)(auto ref Sender sender, StopSource stopSource) {
   return syncWaitImpl(sender, (()@trusted=>cast()stopSource)());
 }

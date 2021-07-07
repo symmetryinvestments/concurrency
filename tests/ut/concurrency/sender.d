@@ -13,6 +13,16 @@ import core.atomic : atomicOp;
   ValueSender!(int)(5).syncWait.value.shouldEqual(5);
 }
 
+@("syncWait.match")
+@safe unittest {
+  ValueSender!(int)(5).syncWait.match!((int i) => true, (ref t) => false).should == true;
+}
+
+@("syncWait.match.void")
+@safe unittest {
+  VoidSender().syncWait.match!((typeof(null)) => true, (ref t) => false).should == true;
+}
+
 @("value.start.attributes.1")
 @safe nothrow @nogc unittest {
   ValueSender!(int)(5).connect(NullReceiver!int()).start();
