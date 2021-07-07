@@ -118,12 +118,15 @@ auto sync_wait_impl(Sender)(auto scope ref Sender sender, StopSource stopSource 
 struct Cancelled {}
 
 struct Result(T) {
-  import mir.algebraic : Algebraic, match;
+  import mir.algebraic : Algebraic, Nullable;
   static struct Value(T) {
     static if (!is(T == void))
       T value;
   }
-  Algebraic!(Value!T, Cancelled, Exception) result;
+  static if (is(T == void))
+    Nullable!(Cancelled, Exception) result;
+  else
+    Algebraic!(Value!T, Cancelled, Exception) result;
 
   static if (!is(T == void))
     this(T v) {
@@ -143,7 +146,10 @@ struct Result(T) {
     return result._is!Exception;
   }
   bool isOk() {
-    return result._is!(Value!T);
+    static if (is(T == void))
+      return result.isNull;
+    else
+      return result._is!(Value!T);
   }
   static if (!is(T == void))
     T value() {
@@ -153,7 +159,8 @@ struct Result(T) {
     return result.get!(Exception);
   }
   void assumeOk() {
-    result.match!((Exception e){ throw e;},(ref t){});
+    import mir.algebraic : match;
+    result.match!((Exception e){throw e;},(ref t){});
   }
 }
 
