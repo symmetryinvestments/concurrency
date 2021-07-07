@@ -1,4 +1,4 @@
-module concurrency.operations.whileall;
+module concurrency.operations.raceall;
 
 import concurrency;
 import concurrency.receiver;
@@ -12,6 +12,6 @@ import std.traits;
 /// Runs both Senders and propagates the value of whoever completes first
 /// if both error out the first exception is propagated,
 /// uses mir.algebraic if the Sender value types differ
-RaceSender!(Senders) whileAll(Senders...)(Senders senders) {
+RaceSender!(Senders) raceAll(Senders...)(Senders senders) {
   return RaceSender!(Senders)(senders, true);
 }

@@ -236,14 +236,14 @@ unittest {
   ValueSender!void().completeWithCancellation.syncWait.isCancelled.should == true;
 }
 
-@("whileAll")
+@("raceAll")
 @safe unittest {
   auto waiting = ThreadSender().withStopToken((StopToken token) @trusted {
       while (!token.isStopRequested) { Thread.yield(); }
     });
-  whileAll(waiting, DoneSender()).syncWait.isOk.should == true;
-  whileAll(waiting, just(42)).syncWait.value.should == 42;
-  whileAll(waiting, ThrowingSender()).syncWait.isOk.should == true;
+  raceAll(waiting, DoneSender()).syncWait.isOk.should == true;
+  raceAll(waiting, just(42)).syncWait.value.should == 42;
+  raceAll(waiting, ThrowingSender()).syncWait.isOk.should == true;
 }
 
 @("on.ManualTimeWorker")

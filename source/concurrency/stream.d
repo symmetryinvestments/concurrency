@@ -436,7 +436,7 @@ auto scan(Stream, ScanFn, Seed)(Stream stream, scope ScanFn scanFn, Seed seed) i
 
 /// Forwards the latest value from the base stream every time the trigger stream produces a value. If the base stream hasn't produces a (new) value the trigger is ignored
 auto sample(StreamBase, StreamTrigger)(StreamBase base, StreamTrigger trigger) if (models!(StreamBase, isStream) && models!(StreamTrigger, isStream)) {
-  import concurrency.operations.whileall;
+  import concurrency.operations.raceall;
   import concurrency.bitfield : SharedBitField;
   enum Flags : size_t {
     locked = 0x1,
@@ -448,8 +448,8 @@ auto sample(StreamBase, StreamTrigger)(StreamBase base, StreamTrigger trigger) i
   alias DG = PropertiesBase.DG;
   static struct SampleStreamOp(Receiver) {
     import std.traits : ReturnType;
-    alias WhileAllSender = ReturnType!(whileAll!(PropertiesBase.Sender, PropertiesTrigger.Sender));
-    alias Op = OpType!(WhileAllSender, Receiver);
+    alias RaceAllSender = ReturnType!(raceAll!(PropertiesBase.Sender, PropertiesTrigger.Sender));
+    alias Op = OpType!(RaceAllSender, Receiver);
     DG dg;
     Op op;
     PropertiesBase.ElementType element;
@@ -459,8 +459,8 @@ auto sample(StreamBase, StreamTrigger)(StreamBase base, StreamTrigger trigger) i
     @disable this(this);
     this(StreamBase base, StreamTrigger trigger, DG dg, return Receiver receiver) @trusted scope {
       this.dg = dg;
-      op = whileAll(base.collect(cast(PropertiesBase.DG)&item),
-                    trigger.collect(cast(PropertiesTrigger.DG)&this.trigger)).connect(receiver);
+      op = raceAll(base.collect(cast(PropertiesBase.DG)&item),
+                   trigger.collect(cast(PropertiesTrigger.DG)&this.trigger)).connect(receiver);
     }
     void item(PropertiesBase.ElementType t) {
       import core.atomic : atomicOp;

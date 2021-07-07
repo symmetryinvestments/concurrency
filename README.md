@@ -68,7 +68,9 @@ Senders enjoy the following operations.
 
 - `withStopSource`. When applied after a Sender you can stop the Sender manually with the stopsource. It will still stop when the downstream receiver's StopToken is triggered.
 
-- `race`. Runs multiple Senders and completes with the value produced by the first to complete, after first cancelling and awaiting the others. When both Senders complete with an error, the first error is propagated. When both Senders complete with cancellation, `race` completes with cancellation as well.
+- `race`. Runs multiple Senders and completes with the value produced by the first to complete, after first cancelling and awaiting the others. When all Senders complete with an error, the first error is propagated. When all Senders complete with cancellation, `race` completes with cancellation as well. Unlike `raceAll` it allows Senders to error or complete with cancellation as long as one is still running.
+
+- `raceAll`. Runs multiple Senders and completes with the value or error produced by the first to complete, after first cancelling and awaiting the others. Unlike `race` the only way it can complete with a value is if all Senders are still running at that one of them completes. So not only does it forward the first value, also the first error.
 
 - `ignoreError`. Redirects the `setException` to `setDone`, so as not to trigger the downstream error path.
 
