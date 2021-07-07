@@ -509,6 +509,8 @@ auto doneStream() {
   alias DG = CollectDelegate!void;
   static struct DoneStreamOp(Receiver) {
     Receiver receiver;
+    @disable this(ref return scope typeof(this) rhs);
+    @disable this(this);
     this(DG dg, Receiver receiver) {
       this.receiver = receiver;
     }
@@ -524,6 +526,8 @@ auto errorStream(Exception e) {
   static struct ErrorStreamOp(Receiver) {
     Exception e;
     Receiver receiver;
+    @disable this(ref return scope typeof(this) rhs);
+    @disable this(this);
     this(Exception e, DG dg, Receiver receiver) {
       this.e = e;
       this.receiver = receiver;
@@ -553,6 +557,8 @@ shared struct SharedStream(T) {
       DG dg;
       Receiver receiver;
       StopCallback cb;
+      @disable this(ref return scope typeof(this) rhs);
+      @disable this(this);
       void start() nothrow @trusted {
         auto stopToken = receiver.getStopToken();
         cb = stopToken.onStop(&(cast(shared)this).onStop);
