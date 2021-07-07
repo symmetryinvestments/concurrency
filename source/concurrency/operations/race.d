@@ -127,7 +127,10 @@ private struct RaceReceiver(Receiver, InnerValue, Value) {
     void setValue(InnerValue value) @safe nothrow {
       with (state.bitfield.lock(Flags.value_produced, Counter.tick)) {
         if (!isValueProduced(oldState)) {
-          state.value = Value(value);
+          static if (is(InnerValue == Value))
+            state.value = value;
+          else
+            state.value = Value(value);
           release(); // must release before calling .stop
           state.stop();
         } else
