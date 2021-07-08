@@ -1,5 +1,7 @@
 module ut.concurrency.fork;
 
+version (Posix):
+
 import concurrency;
 import concurrency.fork;
 import concurrency.thread;
