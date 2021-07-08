@@ -114,14 +114,7 @@ class SharedSender(Sender, Scheduler) if (models!(Sender, isSender)) {
       process();
     }
     private void process() @trusted {
-      with(state.parent.counter.lock(Flags.completed)) {
-        release(oldState & (~0x3)); // release early and remove all ticks
-        InternalValue v = state.value.get;
-        if (state.isStopRequested)
-          v = Done();
-        foreach(dg; state.dgs[])
-          dg(v);
-      }
+      state.parent.process();
     }
     StopToken getStopToken() @safe nothrow {
       return StopToken(state);
@@ -152,7 +145,12 @@ class SharedSender(Sender, Scheduler) if (models!(Sender, isSender)) {
             this.state = localState;
             release(); // release early
             localState.dgs.pushBack(dg);
-            localState.op = sender.connect(SharedSenderReceiver(localState, scheduler));
+            try {
+              localState.op = sender.connect(SharedSenderReceiver(localState, scheduler));
+            } catch (Exception e) {
+              state.value = InternalValue(e);
+              process();
+            }
             localState.op.start();
           } else {
             auto localState = state;
@@ -181,6 +179,16 @@ class SharedSender(Sender, Scheduler) if (models!(Sender, isSender)) {
           return true;
         }
       }
+    }
+  }
+  private void process() {
+    with(counter.lock(Flags.completed)) {
+      release(oldState & (~0x3)); // release early and remove all ticks
+      InternalValue v = state.value.get;
+      if (state.isStopRequested)
+        v = Done();
+      foreach(dg; state.dgs[])
+        dg(v);
     }
   }
   bool isCompleted() @trusted {
