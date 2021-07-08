@@ -963,37 +963,40 @@ auto slide(Stream)(Stream stream, size_t window, size_t step = 1) if (models!(St
 auto toList(Stream)(Stream stream) if (models!(Stream, isStream)) {
   alias Properties = StreamProperties!Stream;
   static assert(is(Properties.Value == void), "sender must produce void for toList to work");
-  static struct ToListReceiver(Op) {
-    Op* op;
+  static struct ToListReceiver(State) {
+    State* state;
     void setValue() @safe {
-      op.receiver.setValue(op.arr);
+      state.receiver.setValue(state.arr);
     }
     void setDone() @safe nothrow {
-      op.receiver.setDone();
+      state.receiver.setDone();
     }
     void setError(Exception e) nothrow @safe {
-      op.receiver.setError(e);
+      state.receiver.setError(e);
     }
     auto getStopToken() nothrow @safe {
-      return op.receiver.getStopToken();
+      return state.receiver.getStopToken();
     }
     auto getScheduler() nothrow @safe {
-      return op.receiver.getScheduler();
+      return state.receiver.getScheduler();
     }
   }
-  static struct ToListOp(Receiver) {
-    alias Op = OpType!(Properties.Sender, ToListReceiver!(typeof(this)));
-    Op op;
+  static struct State(Receiver) {
     Receiver receiver;
     Properties.ElementType[] arr;
+  }
+  static struct ToListOp(Receiver) {
+    State!Receiver state;
+    alias Op = OpType!(Properties.Sender, ToListReceiver!(State!Receiver));
+    Op op;
     @disable this(this);
     @disable this(ref return scope typeof(this) rhs);
     this(Stream stream, return Receiver receiver) @trusted scope return {
-      this.receiver = receiver;
-      op = stream.collect(cast(Properties.DG)&item).connect(ToListReceiver!(typeof(this))(&this));
+      state.receiver = receiver;
+      op = stream.collect(cast(Properties.DG)&item).connect(ToListReceiver!(State!Receiver)(&state));
     }
     void item(Properties.ElementType t) {
-      arr ~= t;
+      state.arr ~= t;
     }
     void start() nothrow @safe {
       op.start();

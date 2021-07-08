@@ -492,3 +492,12 @@ import concurrency.thread : ThreadSender;
 @safe unittest {
   [1,2,3].arrayStream.toList.syncWait.value.should == [1,2,3];
 }
+
+@("toList.arrayStream.whenAll")
+@safe unittest {
+  import concurrency.operations : withScheduler, whenAll;
+  import std.typecons : tuple;
+  auto s1 = [1,2,3].arrayStream.toList;
+  auto s2 = [2,3,4].arrayStream.toList;
+  whenAll(s1,s2).syncWait.value.should == tuple([1,2,3],[2,3,4]);
+}
