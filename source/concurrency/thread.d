@@ -333,8 +333,8 @@ struct StdTaskPool {
   TaskPool pool;
   @disable this(ref return scope typeof(this) rhs);
   @disable this(this);
-  this(TaskPool pool) @safe scope {
-    this.pool = pool;
+  this(TaskPool pool) @trusted scope shared {
+    this.pool = cast(shared)pool;
   }
   ~this() nothrow @trusted scope {
     try {
@@ -347,11 +347,14 @@ struct StdTaskPool {
   auto getScheduler() scope @safe {
     return StdTaskPoolProtoScheduler(pool);
   }
+  auto getScheduler() scope @trusted shared {
+    return StdTaskPoolProtoScheduler(cast()pool);
+  }
 }
 
-StdTaskPool stdTaskPool(size_t nWorkers = 0) @safe {
+shared(StdTaskPool) stdTaskPool(size_t nWorkers = 0) @safe {
   import std.parallelism : TaskPool;
-  return StdTaskPool(new TaskPool(nWorkers));
+  return shared StdTaskPool(new TaskPool(nWorkers));
 }
 
 struct StdTaskPoolProtoScheduler {
