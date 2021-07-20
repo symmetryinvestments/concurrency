@@ -347,7 +347,8 @@ auto take(Stream)(Stream stream, size_t n) if (models!(Stream, isStream)) {
 auto transform(Stream, Fun)(Stream stream, Fun fun) if (models!(Stream, isStream)) {
   import std.traits : ReturnType;
   alias Properties = StreamProperties!Stream;
-  alias DG = CollectDelegate!(ReturnType!Fun);
+  alias InnerElementType = ReturnType!Fun;
+  alias DG = CollectDelegate!(InnerElementType);
   static struct TransformStreamOp(Receiver) {
     alias Op = OpType!(Properties.Sender, Receiver);
     Fun fun;
@@ -362,11 +363,19 @@ auto transform(Stream, Fun)(Stream stream, Fun fun) if (models!(Stream, isStream
     }
     static if (is(Properties.ElementType == void))
       void item() {
-        dg(fun());
+        static if (is(InnerElementType == void)) {
+          fun();
+          dg();
+        } else
+          dg(fun());
       }
     else
       void item(Properties.ElementType t) {
-        dg(fun(t));
+        static if (is(InnerElementType == void)) {
+          fun(t);
+          dg();
+        } else
+          dg(fun(t));
       }
     void start() nothrow @safe {
       op.start();
