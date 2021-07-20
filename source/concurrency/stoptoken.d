@@ -33,6 +33,10 @@ struct StopToken {
     this.source = source;
   }
 
+  this(shared StopSource source) nothrow @trusted @nogc {
+    this.source = cast()source;
+  }
+
   bool isStopRequested() nothrow @safe @nogc {
     return source.isStopRequested();
   }
