@@ -109,9 +109,14 @@ unittest {
   VoidSender().via(ValueSender!int(4)).syncWait.value.should == 4;
 }
 
-@("then.value")
+@("then.value.delegate")
 @safe unittest {
   ValueSender!int(3).then((int i) shared => i*3).syncWait.value.shouldEqual(9);
+}
+
+@("then.value.function")
+@safe unittest {
+  ValueSender!int(3).then((int i) => i*3).syncWait.value.shouldEqual(9);
 }
 
 @("then.oob")

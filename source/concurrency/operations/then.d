@@ -5,15 +5,16 @@ import concurrency.receiver;
 import concurrency.sender;
 import concurrency.stoptoken;
 import concepts;
-import std.traits;
 
 auto then(Sender, Fun)(Sender sender, Fun fun) {
-  static assert (hasFunctionAttributes!(Fun, "shared"), "Function must be shared");
+  import std.traits : hasFunctionAttributes, isFunction, isFunctionPointer;
+  static assert (isFunction!Fun || isFunctionPointer!Fun || hasFunctionAttributes!(Fun, "shared"), "Function must be shared");
 
   return ThenSender!(Sender, Fun)(sender, fun);
 }
 
 private struct ThenReceiver(Receiver, Value, Fun) {
+  import std.traits : ReturnType;
   Receiver receiver;
   Fun fun;
   static if (is(Value == void)) {
