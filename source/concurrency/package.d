@@ -160,7 +160,10 @@ struct Result(T) {
   }
   void assumeOk() {
     import mir.algebraic : match;
-    result.match!((Exception e){throw e;},(ref t){});
+    static if (is(T == void))
+      result.match!((typeof(null)){},(Exception e){throw e;},(ref t){});
+    else
+      result.match!((Exception e){throw e;},(ref t){});
   }
 }
 
