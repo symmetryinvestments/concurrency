@@ -43,6 +43,7 @@ import core.time : Duration;
 /// checks that T is a Sender
 void checkSender(T)() @safe {
   import concurrency.scheduler : SchedulerObjectBase;
+  import concurrency.stoptoken : StopToken;
   T t = T.init;
   struct Receiver {
     static if (is(T.Value == void))
@@ -51,6 +52,7 @@ void checkSender(T)() @safe {
       void setValue(T.Value) {}
     void setDone() nothrow {}
     void setError(Exception e) nothrow {}
+    StopToken getStopToken() nothrow { return StopToken.init; }
     SchedulerObjectBase getScheduler() nothrow { return null; }
   }
   OpType!(T, Receiver) op = t.connect(Receiver.init);

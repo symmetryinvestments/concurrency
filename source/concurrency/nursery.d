@@ -101,7 +101,9 @@ class Nursery : StopSource {
       run(sender.get());
   }
 
-  void run(Sender)(Sender sender) shared @trusted if (isSender!Sender) {
+  void run(Sender)(Sender sender) shared @trusted {
+    import concepts;
+    static assert (models!(Sender, isSender));
     import std.typecons : Nullable;
     import core.atomic : atomicOp;
     import concurrency.sender : connectHeap;
