@@ -16,17 +16,30 @@ import concurrency.thread : ThreadSender;
   p.should == 6;
 }
 
-@("timerStream")
+@("intervalStream")
 @safe unittest {
-  import concurrency.operations : withStopSource, whenAll, via;
-  import core.time : msecs;
-  shared int s = 0, f = 0;
-  auto source = new shared StopSource();
-  auto slow = 10.msecs.intervalStream().collect(() shared { s.atomicOp!"+="(1); source.stop(); }).withStopSource(source);
-  auto fast = 3.msecs.intervalStream().collect(() shared { f.atomicOp!"+="(1); });
-  whenAll(slow, fast).syncWait(source).isCancelled.should == true;
-  s.should == 1;
-  f.shouldBeGreaterThan(1);
+  import core.time;
+  import concurrency.operations : withScheduler, whenAll;
+  import concurrency.sender : justFrom;
+  import concurrency.scheduler : ManualTimeWorker;
+
+  auto worker = new shared ManualTimeWorker();
+  auto interval = 5.msecs.intervalStream()
+    .take(2)
+    .collect(() shared {})
+    .withScheduler(worker.getScheduler);
+
+  auto driver = justFrom(() shared {
+      worker.timeUntilNextEvent().should == 5.msecs;
+      worker.advance(5.msecs);
+
+      worker.timeUntilNextEvent().should == 5.msecs;
+      worker.advance(5.msecs);
+
+      worker.timeUntilNextEvent().should == null;
+    });
+
+  whenAll(interval, driver).syncWait().isOk.should == true;
 }
 
 
