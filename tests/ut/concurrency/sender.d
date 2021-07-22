@@ -105,9 +105,12 @@ import core.atomic : atomicOp;
     .via(ThreadSender())
     .toShared();
 
-  race(s, s).syncWait.value.should == 1;
+  s.syncWait.value.should == 1;
+  s.syncWait.value.should == 1;
+
   s.reset();
-  race(s, s).syncWait.value.should == 2;
+  s.syncWait.value.should == 2;
+  s.syncWait.value.should == 2;
 }
 
 @("toShared.error")
