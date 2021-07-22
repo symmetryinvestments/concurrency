@@ -85,10 +85,10 @@ struct RaceSender(Senders...) if (allSatisfy!(ApplyRight!(models, isSender), Sen
 private class State(Value) : StopSource {
   import concurrency.bitfield;
   StopCallback cb;
+  shared SharedBitField!Flags bitfield;
   static if (!is(Value == void))
     Value value;
   Exception exception;
-  shared SharedBitField!Flags bitfield;
   bool noDropouts;
   this(bool noDropouts) {
     this.noDropouts = noDropouts;
