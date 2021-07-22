@@ -18,7 +18,10 @@ private struct STReceiver(Receiver, Value, Fun) {
     void setValue() @safe {
       static if (is(ReturnType!Fun == void)) {
         fun(receiver.getStopToken);
-        receiver.setValueOrError();
+        if (receiver.getStopToken.isStopRequested)
+          receiver.setDone();
+        else
+          receiver.setValueOrError();
       } else
         receiver.setValueOrError(fun(receiver.getStopToken));
     }
@@ -26,7 +29,10 @@ private struct STReceiver(Receiver, Value, Fun) {
     void setValue(Value value) @safe {
       static if (is(ReturnType!Fun == void)) {
         fun(receiver.getStopToken, value);
-        receiver.setValueOrError();
+        if (receiver.getStopToken.isStopRequested)
+          receiver.setDone();
+        else
+          receiver.setValueOrError();
       } else
         receiver.setValueOrError(fun(receiver.getStopToken, value));
     }

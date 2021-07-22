@@ -246,9 +246,9 @@ unittest {
   auto waiting = ThreadSender().withStopToken((StopToken token) @trusted {
       while (!token.isStopRequested) { Thread.yield(); }
     });
-  raceAll(waiting, DoneSender()).syncWait.isOk.should == true;
+  raceAll(waiting, DoneSender()).syncWait.isCancelled.should == true;
   raceAll(waiting, just(42)).syncWait.value.should == 42;
-  raceAll(waiting, ThrowingSender()).syncWait.isOk.should == true;
+  raceAll(waiting, ThrowingSender()).syncWait.isError.should == true;
 }
 
 @("on.ManualTimeWorker")
