@@ -166,9 +166,9 @@ struct Result(T) {
   void assumeOk() {
     import mir.algebraic : match;
     static if (is(T == void))
-      result.match!((typeof(null)){},(Exception e){throw e;},(ref t){});
+      result.match!((typeof(null)){},(Exception e){throw e;},(Cancelled c){throw cancelledException;});
     else
-      result.match!((Exception e){throw e;},(ref t){});
+      result.match!((Exception e){throw e;},(Cancelled c){throw cancelledException;},(ref t){});
   }
 }
 
