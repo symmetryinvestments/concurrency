@@ -153,6 +153,11 @@ struct Result(T) {
   }
   static if (!is(T == void))
     T value() {
+      static immutable cancelledExc = new Exception("Cancelled: ", T.stringof);
+      if (isCancelled)
+          throw cancelledExc;
+      if (isError)
+          throw error;
       return result.get!(Value!T).value;
     }
   Exception error() {
