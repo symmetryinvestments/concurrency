@@ -116,6 +116,7 @@ auto sync_wait_impl(Sender)(auto scope ref Sender sender, StopSource stopSource 
 }
 
 struct Cancelled {}
+static immutable cancelledException = new Exception("Cancelled");
 
 struct Result(T) {
   import mir.algebraic : Algebraic, Nullable;
@@ -153,11 +154,10 @@ struct Result(T) {
   }
   static if (!is(T == void))
     T value() {
-      static immutable cancelledExc = new Exception("Cancelled: ", T.stringof);
       if (isCancelled)
-          throw cancelledExc;
+        throw cancelledException;
       if (isError)
-          throw error;
+        throw error;
       return result.get!(Value!T).value;
     }
   Exception error() {
