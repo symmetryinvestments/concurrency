@@ -11,6 +11,8 @@ import core.atomic : atomicOp;
 @("syncWait.value")
 @safe unittest {
   ValueSender!(int)(5).syncWait.value.shouldEqual(5);
+  whenAll(just(5), ThrowingSender()).syncWait.value.shouldThrow();
+  whenAll(just(5), DoneSender()).syncWait.value.shouldThrow();
 }
 
 @("syncWait.assumeOk")
