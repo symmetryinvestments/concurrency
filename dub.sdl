@@ -24,11 +24,11 @@ configuration "unittest-release" {
 	dependency "unit-threaded" version=">=1.0.15"
 	targetType "executable"
 	mainSourceFile "tests/ut/ut_runner.d"
-	dflags "-dip1000" "-dip25"
+	dflags "-dip1000" "-dip25" "-g"
 	sourcePaths "source" "tests/ut"
 	importPaths "source" "tests/ut"
   # buildOptions "unittests"  "optimize"  "inline"
-  buildOptions "unittests"  "optimize"
+  buildOptions "unittests" "optimize"
 }
 configuration "nodip" {
 	targetType "library"

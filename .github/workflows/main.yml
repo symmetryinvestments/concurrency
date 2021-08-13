@@ -24,8 +24,28 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-dub-
 
-      - name: Run tests
-        run: dub -c=unittest-release
+      - name: Run tests linux
+        if: runner.os == 'Linux'
+        run: |
+          ulimit -c unlimited
+          echo "$PWD/core-dump/corefile-%e-%p-%t" | sudo tee /proc/sys/kernel/core_pattern
+          mkdir core-dump
+          sysctl kernel.core_pattern
+          ulimit -a
+          dub -c=unittest-release
+
+      - name: Run tests windows
+        if: runner.os != 'Linux'
+        run: |
+          dub -c=unittest-release
+
+      - uses: actions/upload-artifact@v2
+        if: ${{ failure() && runner.os == 'Linux' }}
+        with:
+          name: core-dump
+          path: |
+            ./core-dump/*
+            ./concurrency
 
       - name: Build
         run: dub build
