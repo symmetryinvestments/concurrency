@@ -51,7 +51,7 @@ shared final class SList(T) {
   }
 
   auto opSlice() return @safe {
-    return Iterator!T(head);
+    return Iterator!T(atomicLoad(head));
   }
 
   bool remove(T payload) @trusted {
