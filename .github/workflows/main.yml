@@ -32,12 +32,12 @@ jobs:
           mkdir core-dump
           sysctl kernel.core_pattern
           ulimit -a
-          dub -c=unittest-release -- -s
+          dub -c=unittest-release
 
       - name: Run tests windows
         if: runner.os != 'Linux'
         run: |
-          dub -c=unittest-release -- -s
+          dub -c=unittest-release
 
       - uses: actions/upload-artifact@v2
         if: ${{ failure() && runner.os == 'Linux' }}

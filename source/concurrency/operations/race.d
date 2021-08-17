@@ -121,11 +121,12 @@ private struct RaceReceiver(Receiver, InnerValue, Value) {
     return (state & Flags.doneOrError_produced) > 0;
   }
   private bool isLast(size_t state) {
-    return (state >> 3) == senderCount;
+    return (state >> 3) == atomicLoad(senderCount);
   }
   static if (!is(InnerValue == void))
     void setValue(InnerValue value) @safe nothrow {
       with (state.bitfield.lock(Flags.value_produced, Counter.tick)) {
+        bool last = isLast(newState);
         if (!isValueProduced(oldState)) {
           static if (is(InnerValue == Value))
             state.value = value;
@@ -136,28 +137,34 @@ private struct RaceReceiver(Receiver, InnerValue, Value) {
         } else
           release();
 
-        process(newState);
+        if (last)
+          process(newState);
       }
     }
   else
     void setValue() @safe nothrow {
       with (state.bitfield.update(Flags.value_produced, Counter.tick)) {
+        bool last = isLast(newState);
         if (!isValueProduced(oldState)) {
           state.stop();
         }
-        process(newState);
+        if (last)
+          process(newState);
       }
     }
   void setDone() @safe nothrow {
     with (state.bitfield.update(Flags.doneOrError_produced, Counter.tick)) {
+      bool last = isLast(newState);
       if (state.noDropouts && !isDoneOrErrorProduced(oldState)) {
         state.stop();
       }
-      process(newState);
+      if (last)
+        process(newState);
     }
   }
   void setError(Exception exception) @safe nothrow {
     with (state.bitfield.lock(Flags.doneOrError_produced, Counter.tick)) {
+      bool last = isLast(newState);
       if (!isDoneOrErrorProduced(oldState)) {
         state.exception = exception;
         if (state.noDropouts) {
@@ -166,14 +173,12 @@ private struct RaceReceiver(Receiver, InnerValue, Value) {
         }
       }
       release();
-      process(newState);
+      if (last)
+        process(newState);
     }
   }
   private void process(size_t newState) {
     import concurrency.receiver : setValueOrError;
-
-    if (!isLast(newState))
-      return;
 
     state.cb.dispose();
     if (receiver.getStopToken().isStopRequested)
