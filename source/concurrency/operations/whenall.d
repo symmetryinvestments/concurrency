@@ -142,44 +142,49 @@ private struct WhenAllReceiver(Receiver, InnerValue, Value) {
     return (state & Flags.doneOrError_produced) > 0;
   }
   private bool isLast(size_t state) {
-    return (state >> 3) == senderCount;
+    return (state >> 3) == atomicLoad(senderCount);
   }
   static if (!is(InnerValue == void))
     void setValue(InnerValue value) @safe {
       with (state.bitfield.lock(Flags.value_produced, Counter.tick)) {
+        bool last = isLast(newState);
         state.value.setValue(value, senderIndex);
         release();
-        process(newState);
+        if (last)
+          process(newState);
       }
     }
   else
     void setValue() @safe {
       with (state.bitfield.update(Flags.value_produced, Counter.tick)) {
-        process(newState);
+        bool last = isLast(newState);
+        if (last)
+          process(newState);
       }
     }
   void setDone() @safe nothrow {
     with (state.bitfield.update(Flags.doneOrError_produced, Counter.tick)) {
+      bool last = isLast(newState);
       if (!isDoneOrErrorProduced(oldState))
         state.stop();
-      process(newState);
+      if (last)
+        process(newState);
     }
   }
   void setError(Exception exception) @safe nothrow {
     with (state.bitfield.lock(Flags.doneOrError_produced, Counter.tick)) {
+      bool last = isLast(newState);
       if (!isDoneOrErrorProduced(oldState)) {
         state.exception = exception;
         release(); // must release before calling .stop
         state.stop();
       } else
         release();
-      process(newState);
+      if (last)
+        process(newState);
     }
   }
   private void process(size_t newState) {
-    if (!isLast(newState))
-      return;
-
     state.cb.dispose();
 
     if (receiver.getStopToken().isStopRequested)
