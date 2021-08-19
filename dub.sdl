@@ -6,7 +6,7 @@ license "MIT"
 dependency "mir-core" version="~>1.1.62"
 dependency "concepts" version="~>0.0.8"
 dependency "automem" version="==0.6.4"
-dependency "ikod-containers" version="==0.0.20"
+dependency "ikod-containers" version="==0.0.21"
 
 configuration "default" {
 	targetType "library"
