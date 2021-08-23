@@ -84,7 +84,7 @@ struct ValueSender(T) {
     Receiver receiver;
     static if (!is(T == void))
       T value;
-    void start() @safe {
+    void start() nothrow @trusted scope {
       import concurrency.receiver : setValueOrError;
       static if (!is(T == void))
         receiver.setValueOrError(value);
@@ -284,7 +284,7 @@ struct DoneSender {
   alias Value = void;
   static struct DoneOp(Receiver) {
     Receiver receiver;
-    void start() {
+    void start() nothrow @trusted scope {
       receiver.setDone();
     }
   }
@@ -301,7 +301,7 @@ struct VoidSender {
   alias Value = void;
   struct VoidOp(Receiver) {
     Receiver receiver;
-    void start() nothrow @safe {
+    void start() nothrow @trusted scope {
       import concurrency.receiver : setValueOrError;
       receiver.setValueOrError();
     }
