@@ -3,8 +3,10 @@ module concurrency.timer;
 import concurrency.stoptoken;
 import core.time : Duration;
 
+version (OSX) {} else
 /// waits for dur and returns true
 /// or false when stoptoken is triggered
+deprecated("use delay or scheduleAfter")
 bool wait(StopToken stopToken, Duration dur) nothrow @trusted {
   // this is a optimisation,
   // it will still work if a stop is triggered before the
