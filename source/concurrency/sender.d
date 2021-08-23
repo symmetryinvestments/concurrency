@@ -364,3 +364,140 @@ struct DelaySender {
 auto delay(Duration dur) {
   return DelaySender(dur);
 }
+
+struct PromiseSenderOp(T, Receiver) {
+  import concurrency.stoptoken;
+  alias Sender = PromiseSender!T;
+  alias InternalValue = Sender.InternalValue;
+  shared Sender parent;
+  Receiver receiver;
+  StopCallback cb;
+  void start() nothrow @trusted scope {
+    parent.add(&(cast(shared)this).onValue);
+    cb = receiver.getStopToken.onStop(&(cast(shared)this).onStop);
+  }
+  void onStop() nothrow @trusted shared {
+    with(unshared) {
+      parent.remove(&(cast(shared)this).onValue);
+      receiver.setDone();
+    }
+  }
+  void onValue(InternalValue value) nothrow @safe shared {
+    import mir.algebraic : match;
+    with(unshared) {
+      value.match!((Sender.ValueRep v){
+          try {
+            static if (is(Value == void))
+              receiver.setValue();
+            else
+              receiver.setValue(v);
+          } catch (Exception e) {
+            /// TODO: dispose needs to be called in all cases, except
+            /// this onValue can sometimes be called immediately,
+            /// leaving no room to set cb.dispose...
+            cb.dispose();
+            receiver.setError(e);
+          }
+        }, (Exception e){
+          receiver.setError(e);
+        }, (Sender.Done d){
+          receiver.setDone();
+        });
+    }
+  }
+  private auto ref unshared() @trusted nothrow shared {
+    return cast()this;
+  }
+}
+
+class PromiseSender(T) {
+  import std.traits : ReturnType;
+  import concurrency.slist;
+  import concurrency.bitfield;
+  import mir.algebraic : Algebraic, match, Nullable;
+  static assert(models!(typeof(this), isSender));
+  alias Value = T;
+  static if (is(Value == void)) {
+    static struct ValueRep{}
+  } else
+    alias ValueRep = Value;
+  static struct Done{}
+  alias InternalValue = Algebraic!(Exception, ValueRep, Done);
+  alias DG = void delegate(InternalValue) nothrow @safe shared;
+  private {
+    shared SList!DG dgs;
+    Nullable!InternalValue value;
+    enum Flags {
+      locked = 0x1,
+      completed = 0x2
+    }
+    SharedBitField!Flags counter;
+    void add(DG dg) @safe nothrow shared {
+      with(unshared) {
+        with(counter.lock()) {
+          if (was(Flags.completed)) {
+            auto val = value.get;
+            release(); // release early
+            dg(val);
+          } else {
+            dgs.pushBack(dg);
+          }
+        }
+      }
+    }
+    void remove(DG dg) @safe nothrow shared {
+      with (counter.lock()) {
+        if (was(Flags.completed)) {
+          release(); // release early
+        } else {
+          dgs.remove(dg);
+        }
+      }
+    }
+    private auto ref unshared() @trusted nothrow shared {
+      return cast()this;
+    }
+  }
+  private void pushImpl(P)(P t) @safe shared {
+    import std.exception : enforce;
+    with (counter.lock(Flags.completed)) {
+      enforce(!was(Flags.completed), "Can only complete once");
+      InternalValue val = InternalValue(t);
+      (cast()value) = val;
+      auto localDgs = dgs.release();
+      release();
+      foreach(dg; localDgs)
+        dg(val);
+    }
+  }
+  void cancel() @safe shared {
+    pushImpl(Done());
+  }
+  void error(Exception e) @safe shared {
+    pushImpl(e);
+  }
+  void fulfill(T t) @safe shared {
+    pushImpl(t);
+  }
+  bool isCompleted() @trusted shared {
+    import core.atomic : MemoryOrder;
+    return (counter.load!(MemoryOrder.acq) & Flags.completed) > 0;
+  }
+  this() {
+    this.dgs = new shared SList!DG;
+  }
+  auto connect(Receiver)(return Receiver receiver) @trusted scope {
+    // ensure NRVO
+    auto op = (cast(shared)this).connect(receiver);
+    return op;
+  }
+  auto connect(Receiver)(return Receiver receiver) @safe shared scope return {
+    // ensure NRVO
+    auto op = PromiseSenderOp!(T, Receiver)(this, receiver);
+    return op;
+  }
+}
+
+shared(PromiseSender!T) promise(T)() {
+  return new shared PromiseSender!T();
+}

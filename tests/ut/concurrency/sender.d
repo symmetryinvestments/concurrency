@@ -235,3 +235,34 @@ import core.atomic : atomicOp;
   race(delay(2.msecs).then(() shared => 2),
        delay(1.msecs).then(() shared => 1)).syncWait.value.should == 1;
 }
+
+@("promise.basic")
+@safe unittest {
+  auto prom = promise!int;
+  auto cont = prom.then((int i) => i * 2);
+  auto runner = justFrom(() shared => prom.fulfill(72));
+  
+  whenAll(cont, runner).syncWait.value.should == 144;
+}
+
+@("promise.double")
+@safe unittest {
+  import std.typecons : tuple;
+  auto prom = promise!int;
+  auto cont = prom.then((int i) => i * 2);
+  auto runner = justFrom(() shared => prom.fulfill(72));
+  
+  whenAll(cont, cont, runner).syncWait.value.should == tuple(144, 144);
+}
+
+@("promise.scheduler")
+@safe unittest {
+  import std.typecons : tuple;
+  auto prom = promise!int;
+  auto pool = stdTaskPool(2);
+
+  auto cont = prom.forwardOn(pool.getScheduler).then((int i) => i * 2);
+  auto runner = justFrom(() shared => prom.fulfill(72)).via(ThreadSender());
+  
+  whenAll(cont, cont, runner).syncWait.value.should == tuple(144, 144);
+}
