@@ -300,3 +300,13 @@ unittest {
   // but the sender can't leak now
   static assert(!__traits(compiles, disappearSender(sender)));
 }
+
+@("forwardOn")
+@safe unittest {
+  auto pool = stdTaskPool(2);
+
+  VoidSender().forwardOn(pool.getScheduler).syncWait.isOk.should == true;
+  ErrorSender(new Exception("bad news")).forwardOn(pool.getScheduler).syncWait.isError.should == true;
+DoneSender().forwardOn(pool.getScheduler).syncWait.isCancelled.should == true;
+ just(42).forwardOn(pool.getScheduler).syncWait.value.should == 42;
+}
