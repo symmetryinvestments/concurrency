@@ -19,6 +19,7 @@ import core.atomic : atomicOp;
 @safe unittest {
   ThrowingSender().syncWait.assumeOk.shouldThrow();
   DoneSender().syncWait.assumeOk.shouldThrow();
+  ErrorSender(new Exception("Failure")).syncWait.assumeOk.shouldThrow();
 }
 
 @("syncWait.match")

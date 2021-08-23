@@ -312,6 +312,24 @@ struct VoidSender {
     return op;
   }
 }
+/// A sender that always calls setError
+struct ErrorSender {
+  static assert (models!(typeof(this), isSender));
+  alias Value = void;
+  Exception exception;
+  static struct ErrorOp(Receiver) {
+    Receiver receiver;
+    Exception exception;
+    void start() nothrow @trusted scope {
+      receiver.setError(exception);
+    }
+  }
+  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+    // ensure NRVO
+    auto op = ErrorOp!(Receiver)(receiver, exception);
+    return op;
+  }
+}
 
 template OpType(Sender, Receiver) {
   static if (is(Sender.Op)) {

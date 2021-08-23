@@ -22,6 +22,7 @@ Currently we have the following Senders:
 - `ThrowingSender`. Always throws.
 - `DoneSender`. Always cancels.
 - `VoidSender`. Always calls setValue with no arguments.
+- `ErrorSender`. Always calls setError with supplied exception.
 
 ### Writing your own Sender
 
