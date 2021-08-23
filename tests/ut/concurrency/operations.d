@@ -62,13 +62,6 @@ unittest {
   race(ValueSender!int(4), ValueSender!int(5), ValueSender!int(6)).syncWait.value.should == 4;
 }
 
-@("race.oob")
-unittest {
-  auto oob = OutOfBandValueSender!int(43);
-  auto value = ValueSender!int(11);
-  race(oob, value).syncWait.value.should == 11;
-}
-
 @("race.exception.single")
 unittest {
   race(ThrowingSender(), ValueSender!int(5)).syncWait.value.should == 5;
