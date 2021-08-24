@@ -31,6 +31,7 @@ struct StopToken {
   private StopSource source;
   this(StopSource source) nothrow @safe @nogc {
     this.source = source;
+    isStopPossible = source !is null;
   }
 
   this(shared StopSource source) nothrow @trusted @nogc {
@@ -38,10 +39,10 @@ struct StopToken {
   }
 
   bool isStopRequested() nothrow @safe @nogc {
-    return source.isStopRequested();
+    return isStopPossible && source.isStopRequested();
   }
 
-  enum isStopPossible = true;
+  const bool isStopPossible;
 }
 
 struct NeverStopToken {
@@ -49,12 +50,10 @@ struct NeverStopToken {
   enum isStopPossible = false;
 }
 
-enum isStopToken(T) = true; // TODO:
-
-StopCallback onStop(StopToken)(auto ref StopToken stopToken, void delegate() nothrow @safe shared callback) nothrow @safe if (isStopToken!StopToken) {
+StopCallback onStop(StopToken)(StopToken stopToken, void delegate() nothrow @safe shared callback) nothrow @safe {
   import std.traits : hasMember;
   auto cb = new StopCallback(callback);
-  static if (stopToken.isStopPossible && hasMember!(StopToken, "source")) {
+  if (stopToken.isStopPossible) {
     if (stopToken.source.state.try_add_callback(cb, true))
       cb.source = stopToken.source;
   }
@@ -100,31 +99,16 @@ private:
   }
 }
 
-interface StopTokenObject {
-  bool isStopRequested() nothrow @safe;
-  bool isStopPossible() nothrow @safe;
-  StopCallback onStop(void delegate() nothrow @safe shared callback) nothrow @safe;
+deprecated("Use regular StopToken") alias StopTokenObject = StopToken;
+
+auto stopTokenObject(StopToken stopToken) {
+  return stopToken;
 }
 
-class StopTokenObjectImpl(StopToken) : StopTokenObject {
-  private StopToken token;
-  this(StopToken token) { this.token = token; }
-  bool isStopRequested() nothrow @safe {
-    return token.isStopRequested;
-  }
-  bool isStopPossible() nothrow @safe {
-    return token.isStopPossible;
-  }
-  StopCallback onStop(void delegate() nothrow @safe shared callback) nothrow @safe {
-    return token.onStop(callback);
-  }
+auto stopTokenObject(NeverStopToken stopToken) {
+  StopSource s = null;
+  return StopToken(s);
 }
-
-auto stopTokenObject(StopToken)(StopToken stopToken) {
-  return new StopTokenObjectImpl!(StopToken)(stopToken);
-}
-
-
 
 private void spin_yield() nothrow @trusted @nogc {
   // TODO: could use the pause asm instruction

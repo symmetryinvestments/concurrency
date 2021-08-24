@@ -157,7 +157,7 @@ JustFromSender!(Fun) justFrom(Fun)(Fun fun) if (isCallable!Fun) {
 interface SenderObjectBase(T) {
   import concurrency.receiver;
   import concurrency.scheduler : SchedulerObjectBase;
-  import concurrency.stoptoken : StopTokenObject, stopTokenObject;
+  import concurrency.stoptoken : StopToken, stopTokenObject;
   static assert (models!(typeof(this), isSender));
   alias Value = T;
   alias Op = OperationObject;
@@ -183,7 +183,7 @@ interface SenderObjectBase(T) {
       void setError(Exception e) nothrow {
         receiver.setError(e);
       }
-      StopTokenObject getStopToken() nothrow {
+      StopToken getStopToken() nothrow {
         return stopTokenObject(receiver.getStopToken());
       }
       SchedulerObjectBase getScheduler() nothrow @safe {
