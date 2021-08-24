@@ -104,8 +104,12 @@ struct ValueSender(T) {
   }
 }
 
-ValueSender!T just(T)(T t) {
-  return ValueSender!T(t);
+auto just(T...)(T t) {
+  import std.typecons : tuple, Tuple;
+  static if (T.length == 1)
+    return ValueSender!(T[0])(t);
+  else
+    return ValueSender!(Tuple!T)(tuple(t));
 }
 
 struct JustFromSender(Fun) {

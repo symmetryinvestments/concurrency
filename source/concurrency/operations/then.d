@@ -26,12 +26,22 @@ private struct ThenReceiver(Receiver, Value, Fun) {
         receiver.setValue(fun());
     }
   } else {
+    import std.typecons : isTuple;
+    enum isExpandable = isTuple!Value;
     void setValue(Value value) @safe {
       static if (is(ReturnType!Fun == void)) {
-        fun(value);
+        static if (isExpandable)
+          fun(value.expand);
+        else
+          fun(value);
         receiver.setValue();
-      } else
-        receiver.setValue(fun(value));
+      } else {
+        static if (isExpandable)
+          auto r = fun(value.expand);
+        else
+          auto r = fun(value);
+        receiver.setValue(r);
+      }
     }
   }
   void setDone() @safe nothrow {

@@ -266,3 +266,12 @@ import core.atomic : atomicOp;
   
   whenAll(cont, cont, runner).syncWait.value.should == tuple(144, 144);
 }
+
+@("just.tuple")
+@safe unittest {
+  import std.typecons : tuple;
+  import concurrency.stoptoken;
+  just(14, 52).syncWait.value.should == tuple(14, 52);
+  just(14, 53).then((int a, int b) => a*b).syncWait.value.should == 742;
+  just(14, 54).withStopToken((StopToken s, int a, int b) => a*b).syncWait.value.should == 756;
+}

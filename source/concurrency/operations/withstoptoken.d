@@ -26,15 +26,25 @@ private struct STReceiver(Receiver, Value, Fun) {
         receiver.setValueOrError(fun(receiver.getStopToken));
     }
   } else {
+    import std.typecons : isTuple;
+    enum isExpandable = isTuple!Value;
     void setValue(Value value) @safe {
       static if (is(ReturnType!Fun == void)) {
-        fun(receiver.getStopToken, value);
+        static if (isExpandable)
+          fun(receiver.getStopToken, value.expand);
+        else
+          fun(receiver.getStopToken, value);
         if (receiver.getStopToken.isStopRequested)
           receiver.setDone();
         else
           receiver.setValueOrError();
-      } else
-        receiver.setValueOrError(fun(receiver.getStopToken, value));
+      } else {
+        static if (isExpandable)
+          auto r = fun(receiver.getStopToken, value.expand);
+        else
+          auto r = fun(receiver.getStopToken, value);
+        receiver.setValueOrError(r);
+      }
     }
   }
   void setDone() nothrow @safe {
