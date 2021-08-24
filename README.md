@@ -15,7 +15,7 @@ See http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p0443r14.html for th
 
 Currently we have the following Senders:
 
-- `ValueSender`. Just produces a plain value.
+- `ValueSender`. Just produces a plain value. `just` is a convenient construction function for it.
 - `ThreadSender`. Calls the setValue function in the context of a new thread.
 - `Nursery`. A place to await multiple Senders.
 - `ForkSender`. Forks the program and executes the supplied function.
@@ -23,6 +23,7 @@ Currently we have the following Senders:
 - `DoneSender`. Always cancels.
 - `VoidSender`. Always calls setValue with no arguments.
 - `ErrorSender`. Always calls setError with supplied exception.
+- `PromiseSender`. Creates a promise-like object that can be fulfilled, canceled or errored manually. Useful for when the Sender/Receiver connection isn't statically known or very dynamic.
 
 ### Writing your own Sender
 
@@ -83,6 +84,8 @@ Senders enjoy the following operations.
 - `completeWithCancellation`. Wraps the Sender and redirects the setValue termination to complete with cancellation. The Sender is not allowed to produce a Value.
 
 - `toShared`. Wraps a Sender in a SharedSender that forwards the same termination call to each connected Receiver.
+
+- `forwardOn`. Run the completion of a Sender on a specific Scheduler.
 
 ## Streams
 
