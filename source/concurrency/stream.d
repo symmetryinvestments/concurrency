@@ -192,7 +192,7 @@ auto arrayStream(T)(T[] arr) {
 
 import core.time : Duration;
 
-auto intervalStream(Duration duration) {
+auto intervalStream(Duration duration, bool emitAtStart = false) {
   alias DG = CollectDelegate!(void);
   static struct ItemReceiver(Op) {
     Op* op;
@@ -207,7 +207,7 @@ auto intervalStream(Duration duration) {
           op.receiver.setDone();
           return;
         }
-        op.start();
+        op.load();
       } catch (Exception e) {
         op.receiver.setError(e);
       }
@@ -233,14 +233,29 @@ auto intervalStream(Duration duration) {
     alias SchedulerAfterSender = ReturnType!(SchedulerType!(Receiver).scheduleAfter);
     alias Op = OpType!(SchedulerAfterSender, ItemReceiver!(typeof(this)));
     Op op;
+    bool emitAtStart;
     @disable this(this);
     @disable this(ref return scope typeof(this) rhs);
-    this(Duration duration, DG dg, Receiver receiver) {
+    this(Duration duration, DG dg, Receiver receiver, bool emitAtStart) {
       this.duration = duration;
       this.dg = dg;
       this.receiver = receiver;
+      this.emitAtStart = emitAtStart;
     }
     void start() @trusted nothrow {
+      try {
+        if (emitAtStart) {
+          emitAtStart = false;
+          dg();
+          if (receiver.getStopToken.isStopRequested)
+            return;
+        }
+        load();
+      } catch (Exception e) {
+        receiver.setError(e);
+      }
+    }
+    private void load() @trusted nothrow {
       try {
         op = receiver.getScheduler().scheduleAfter(duration).connect(ItemReceiver!(typeof(this))(&this));
         op.start();
@@ -253,20 +268,22 @@ auto intervalStream(Duration duration) {
     alias Value = void;
     Duration duration;
     DG dg;
+    bool emitAtStart;
     auto connect(Receiver)(return Receiver receiver) @safe scope return {
       // ensure NRVO
-      auto op = Op!(Receiver)(duration, dg, receiver);
+      auto op = Op!(Receiver)(duration, dg, receiver, emitAtStart);
       return op;
     }
   }
   static struct IntervalStream {
     alias ElementType = void;
     Duration duration;
+    bool emitAtStart = false;
     auto collect(DG dg) @safe {
-      return Sender(duration, dg);
+      return Sender(duration, dg, emitAtStart);
     }
   }
-  return IntervalStream(duration);
+  return IntervalStream(duration, emitAtStart);
 }
 
 template StreamProperties(Stream) {
