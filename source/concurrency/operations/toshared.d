@@ -18,9 +18,12 @@ auto toShared(Sender, Scheduler)(Sender sender, Scheduler scheduler) {
 }
 
 auto toShared(Sender)(Sender sender) {
-  static struct NullScheduler {}
   return new SharedSender!(Sender, NullScheduler)(sender, NullScheduler());
 }
+
+private struct NullScheduler {}
+private struct Done{}
+private struct ValueRep{}
 
 class SharedSender(Sender, Scheduler) if (models!(Sender, isSender)) {
   import std.traits : ReturnType;
@@ -28,11 +31,8 @@ class SharedSender(Sender, Scheduler) if (models!(Sender, isSender)) {
   import concurrency.bitfield;
   static assert(models!(typeof(this), isSender));
   alias Value = Sender.Value;
-  static if (is(Value == void)) {
-    static struct ValueRep{}
-  } else
+  static if (!is(Value == void))
     alias ValueRep = Value;
-  static struct Done{}
   alias InternalValue = Algebraic!(Exception, ValueRep, Done);
   alias DG = void delegate(InternalValue) nothrow @safe shared;
   static struct SharedSenderOp(Receiver) {

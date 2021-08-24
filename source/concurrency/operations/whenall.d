@@ -22,7 +22,13 @@ private enum Counter : size_t {
   tick = 0x8
 }
 
-private template WhenAllResult(Senders...) {
+template SenderValues(Senders...) {
+  import std.meta;
+  alias SenderValue(T) = T.Value;
+  alias SenderValues = staticMap!(SenderValue, Senders);
+}
+
+private template WhenAllResult(SenderValues...) {
   import std.meta;
   import std.typecons;
   import mir.algebraic : Algebraic, Nullable;
@@ -38,8 +44,6 @@ private template WhenAllResult(Senders...) {
       alias Cummulative = AliasSeq!();
     }
   }
-  alias SenderValue(T) = T.Value;
-  alias SenderValues = staticMap!(SenderValue, Senders);
   alias ValueTypes = Filter!(NoVoid, SenderValues);
   static if (ValueTypes.length > 1)
     alias Values = Tuple!(Filter!(NoVoid, SenderValues));
@@ -72,7 +76,7 @@ private template WhenAllResult(Senders...) {
 
 private struct WhenAllOp(Receiver, Senders...) {
   import std.meta : staticMap;
-  alias R = WhenAllResult!(Senders);
+  alias R = WhenAllResult!(SenderValues!Senders);
   alias ElementReceiver(Sender) = WhenAllReceiver!(Receiver, Sender.Value, R);
   alias ConnectResult(Sender) = OpType!(Sender, ElementReceiver!Sender);
   alias Ops = staticMap!(ConnectResult, Senders);
@@ -85,7 +89,7 @@ private struct WhenAllOp(Receiver, Senders...) {
     this.receiver = receiver;
     state = new WhenAllState!R();
     foreach(i, Sender; Senders) {
-      ops[i] = senders[i].connect(WhenAllReceiver!(Receiver, Sender.Value, WhenAllResult!(Senders))(receiver, state, i, Senders.length));
+      ops[i] = senders[i].connect(WhenAllReceiver!(Receiver, Sender.Value, R)(receiver, state, i, Senders.length));
     }
   }
   void start() @trusted nothrow scope {
@@ -104,7 +108,7 @@ private struct WhenAllOp(Receiver, Senders...) {
 import std.meta : allSatisfy, ApplyRight;
 
 struct WhenAllSender(Senders...) if (allSatisfy!(ApplyRight!(models, isSender), Senders)) {
-  alias Result = WhenAllResult!(Senders);
+  alias Result = WhenAllResult!(SenderValues!Senders);
   static if (hasMember!(Result, "values"))
     alias Value = typeof(Result.values);
   else
