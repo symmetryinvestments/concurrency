@@ -39,7 +39,7 @@ private struct SSReceiver(Receiver, Value) {
     receiver.setDone();
   }
   // TODO: would be good if we only emit this function in the Sender actually could call it
-  void setError(Exception e) @safe nothrow {
+  void setError(Throwable e) @safe nothrow {
     resetStopCallback();
     receiver.setError(e);
   }

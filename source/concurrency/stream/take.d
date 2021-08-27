@@ -31,8 +31,8 @@ struct TakeReceiver(Receiver, Value) {
     } else
       receiver.setDone();
   }
-  void setError(Exception e) nothrow @safe {
-    receiver.setError(e);
+  void setError(Throwable t) nothrow @safe {
+    receiver.setError(t);
   }
   mixin ForwardExtensionPoints!receiver;
 }

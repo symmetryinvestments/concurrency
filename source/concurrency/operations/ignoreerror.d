@@ -36,7 +36,7 @@ private struct IEReceiver(Value, Receiver) {
   void setDone() @safe nothrow {
     receiver.setDone();
   }
-  void setError(Exception e) @safe nothrow {
+  void setError(Throwable e) @safe nothrow {
     receiver.setDone();
   }
   mixin ForwardExtensionPoints!receiver;

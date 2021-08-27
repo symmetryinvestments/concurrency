@@ -126,7 +126,7 @@ private class WhenAllState(Value) : StopSource {
   StopCallback cb;
   static if (is(typeof(Value.values)))
     Value value;
-  Exception exception;
+  Throwable exception;
   shared SharedBitField!Flags bitfield;
 }
 
@@ -175,7 +175,7 @@ private struct WhenAllReceiver(Receiver, InnerValue, Value) {
         process(newState);
     }
   }
-  void setError(Exception exception) @safe nothrow {
+  void setError(Throwable exception) @safe nothrow {
     with (state.bitfield.lock(Flags.doneOrError_produced, Counter.tick)) {
       bool last = isLast(newState);
       if (!isDoneOrErrorProduced(oldState)) {

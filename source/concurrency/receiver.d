@@ -41,14 +41,14 @@ interface ReceiverObjectBase(T) {
   else
     void setValue(T value = T.init) @safe;
   void setDone() nothrow @safe;
-  void setError(Exception e) nothrow @safe;
+  void setError(Throwable e) nothrow @safe;
   StopToken getStopToken() nothrow @safe;
   SchedulerObjectBase getScheduler() nothrow @safe;
 }
 
 struct NullReceiver(T) {
   void setDone() nothrow @safe @nogc {}
-  void setError(Exception e) nothrow @safe @nogc {}
+  void setError(Throwable e) nothrow @safe @nogc {}
   static if (is(T == void))
     void setValue() nothrow @safe @nogc {}
   else
@@ -57,7 +57,7 @@ struct NullReceiver(T) {
 
 struct ThrowingNullReceiver(T) {
   void setDone() nothrow @safe @nogc {}
-  void setError(Exception e) nothrow @safe @nogc {}
+  void setError(Throwable e) nothrow @safe @nogc {}
   static if (is(T == void))
     void setValue() @safe { throw new Exception("ThrowingNullReceiver"); }
   else

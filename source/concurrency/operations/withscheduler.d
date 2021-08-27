@@ -26,7 +26,7 @@ private struct WithSchedulerReceiver(Receiver, Value, Scheduler) {
   void setDone() @safe nothrow {
     receiver.setDone();
   }
-  void setError(Exception e) @safe nothrow {
+  void setError(Throwable e) @safe nothrow {
     receiver.setError(e);
   }
   auto getScheduler() @safe nothrow {

@@ -7,7 +7,7 @@ import core.time : Duration;
 // A Sender represents something that completes with either:
 // 1. a value (which can be void)
 // 2. completion, in response to cancellation
-// 3. an Exception
+// 3. an Throwable
 //
 // Many things can be represented as a Sender.
 // Threads, Fibers, coroutines, etc. In general, any async operation.
@@ -51,7 +51,7 @@ void checkSender(T)() @safe {
     else
       void setValue(T.Value) {}
     void setDone() nothrow {}
-    void setError(Exception e) nothrow {}
+    void setError(Throwable e) nothrow {}
     StopToken getStopToken() nothrow { return StopToken.init; }
     SchedulerObjectBase getScheduler() nothrow { return null; }
   }
@@ -118,7 +118,7 @@ struct JustFromSender(Fun) {
   static struct Op(Receiver) {
     Receiver receiver;
     Fun fun;
-    void start() @safe nothrow {
+    void start() @trusted nothrow {
       import std.traits : hasFunctionAttributes;
       static if (hasFunctionAttributes!(Fun, "nothrow")) {
         set();
@@ -181,7 +181,7 @@ interface SenderObjectBase(T) {
       void setDone() nothrow {
         receiver.setDone();
       }
-      void setError(Exception e) nothrow {
+      void setError(Throwable e) nothrow {
         receiver.setError(e);
       }
       StopToken getStopToken() nothrow {
@@ -263,26 +263,6 @@ struct ThrowingSender {
   }
 }
 
-/// This tests whether a Sender, by itself, makes any calls to the
-/// setError function.
-/// If a Sender is connected to a Receiver that has a non-nothrow
-/// setValue function, a Sender can still throw, but only Exceptions
-/// throw from that Receiver's setValue function.
-template canSenderThrow(Sender) {
-  static assert (models!(Sender, isSender));
-  struct NoErrorReceiver {
-    void setDone() nothrow @safe @nogc {}
-    static if (is(Sender.Value == void))
-      void setValue() nothrow @safe @nogc {}
-    else
-      void setValue(Sender.Value t) nothrow @safe @nogc {}
-  }
-  enum canSenderThrow = !__traits(compiles, Sender.init.connect(NoErrorReceiver()).start());
-}
-
-static assert( canSenderThrow!ThrowingSender);
-static assert(!canSenderThrow!(ValueSender!int));
-
 /// A sender that always calls setDone
 struct DoneSender {
   static assert (models!(typeof(this), isSender));
@@ -321,10 +301,10 @@ struct VoidSender {
 struct ErrorSender {
   static assert (models!(typeof(this), isSender));
   alias Value = void;
-  Exception exception;
+  Throwable exception;
   static struct ErrorOp(Receiver) {
     Receiver receiver;
-    Exception exception;
+    Throwable exception;
     void start() nothrow @trusted scope {
       receiver.setError(exception);
     }
@@ -403,7 +383,7 @@ struct PromiseSenderOp(T, Receiver) {
             cb.dispose();
             receiver.setError(e);
           }
-        }, (Exception e){
+        }, (Throwable e){
           receiver.setError(e);
         }, (Sender.Done d){
           receiver.setDone();
@@ -427,7 +407,7 @@ class PromiseSender(T) {
   } else
     alias ValueRep = Value;
   static struct Done{}
-  alias InternalValue = Algebraic!(Exception, ValueRep, Done);
+  alias InternalValue = Algebraic!(Throwable, ValueRep, Done);
   alias DG = void delegate(InternalValue) nothrow @safe shared;
   private {
     shared SList!DG dgs;
@@ -478,7 +458,7 @@ class PromiseSender(T) {
   void cancel() @safe shared {
     pushImpl(Done());
   }
-  void error(Exception e) @safe shared {
+  void error(Throwable e) @safe shared {
     pushImpl(e);
   }
   void fulfill(T t) @safe shared {

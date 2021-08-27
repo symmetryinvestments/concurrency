@@ -170,8 +170,8 @@ auto intervalStream(Duration duration, bool emitAtStart = false) {
     void setDone() @safe nothrow {
       op.receiver.setDone();
     }
-    void setError(Exception e) @safe nothrow {
-      op.receiver.setError(e);
+    void setError(Throwable t) @safe nothrow {
+      op.receiver.setError(t);
     }
     auto getStopToken() @safe {
       return op.receiver.getStopToken();

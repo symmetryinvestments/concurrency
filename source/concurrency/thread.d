@@ -300,12 +300,14 @@ struct ThreadSender {
     }
     void run() @trusted {
       import concurrency.receiver : setValueOrError;
+      import concurrency.error : clone;
+
       try {
-        receiver.setValueOrError();
+        receiver.setValue();
+      } catch (Exception e) {
+        receiver.setError(e);
       } catch (Throwable t) {
-        import std.stdio;
-        stderr.writeln(t);
-        assert(0);
+        receiver.setError(t.clone());
       }
     }
   }
@@ -373,12 +375,18 @@ private struct StdTaskPoolScheduler(Scheduler) {
 private struct TaskPoolSender {
   import std.parallelism : Task, TaskPool, scopedTask, task;
   import std.traits : ReturnType;
+  import concurrency.error : clone;
   alias Value = void;
   TaskPool pool;
   static struct Op(Receiver) {
-    static void setValue(Receiver receiver) @safe nothrow {
-      import concurrency.receiver : setValueOrError;
-      receiver.setValueOrError();
+    static void setValue(Receiver receiver) @trusted nothrow {
+      try {
+        receiver.setValue();
+      } catch (Exception e) {
+        receiver.setError(e);
+      } catch (Throwable t) {
+        receiver.setError(t.clone);
+      }
     }
     TaskPool pool;
     alias TaskType = typeof(task!setValue(Receiver.init));

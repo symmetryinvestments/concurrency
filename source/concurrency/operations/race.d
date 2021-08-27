@@ -88,7 +88,7 @@ private class State(Value) : StopSource {
   shared SharedBitField!Flags bitfield;
   static if (!is(Value == void))
     Value value;
-  Exception exception;
+  Throwable exception;
   bool noDropouts;
   this(bool noDropouts) {
     this.noDropouts = noDropouts;
@@ -162,7 +162,7 @@ private struct RaceReceiver(Receiver, InnerValue, Value) {
         process(newState);
     }
   }
-  void setError(Exception exception) @safe nothrow {
+  void setError(Throwable exception) @safe nothrow {
     with (state.bitfield.lock(Flags.doneOrError_produced, Counter.tick)) {
       bool last = isLast(newState);
       if (!isDoneOrErrorProduced(oldState)) {
