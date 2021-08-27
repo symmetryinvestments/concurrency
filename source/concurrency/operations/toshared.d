@@ -38,7 +38,7 @@ class SharedSender(Sender, Scheduler, ResetLogic resetLogic) if (models!(Sender,
   alias Value = Sender.Value;
   static if (!is(Value == void))
     alias ValueRep = Value;
-  alias InternalValue = Algebraic!(Exception, ValueRep, Done);
+  alias InternalValue = Algebraic!(Throwable, ValueRep, Done);
   alias DG = void delegate(InternalValue) nothrow @safe shared;
   static struct SharedSenderOp(Receiver) {
     SharedSender parent;
@@ -74,7 +74,7 @@ class SharedSender(Sender, Scheduler, ResetLogic resetLogic) if (models!(Sender,
               cb.dispose();
               receiver.setError(e);
             }
-          }, (Exception e){
+          }, (Throwable e){
             receiver.setError(e);
           }, (Done d){
             receiver.setDone();
@@ -114,7 +114,7 @@ class SharedSender(Sender, Scheduler, ResetLogic resetLogic) if (models!(Sender,
       state.value = InternalValue(Done());
       process();
     }
-    void setError(Exception e) @safe nothrow {
+    void setError(Throwable e) @safe nothrow {
       state.value = InternalValue(e);
       process();
     }
@@ -160,6 +160,7 @@ class SharedSender(Sender, Scheduler, ResetLogic resetLogic) if (models!(Sender,
           } else {
             auto localState = state;
             release(); // release early
+            // TODO: what happens if the sender completed after release, but before pushBack?
             localState.dgs.pushBack(dg);
           }
         }

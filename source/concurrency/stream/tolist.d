@@ -55,8 +55,8 @@ struct ToListReceiver(State) {
   void setDone() @safe nothrow {
     state.receiver.setDone();
   }
-  void setError(Exception e) nothrow @safe {
-    state.receiver.setError(e);
+  void setError(Throwable t) nothrow @safe {
+    state.receiver.setError(t);
   }
   auto getStopToken() nothrow @safe {
     return state.receiver.getStopToken();

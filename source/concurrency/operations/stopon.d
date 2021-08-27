@@ -28,7 +28,7 @@ private struct StopOnReceiver(Receiver, Value) {
   void setDone() @safe nothrow {
     receiver.setDone();
   }
-  void setError(Exception e) @safe nothrow {
+  void setError(Throwable e) @safe nothrow {
     receiver.setError(e);
   }
   auto getStopToken() nothrow @trusted {

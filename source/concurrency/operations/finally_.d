@@ -31,7 +31,7 @@ private struct FinallyReceiver(Value, Result, Receiver) {
   void setDone() @safe nothrow {
     receiver.setDone();
   }
-  void setError(Exception e) @safe nothrow {
+  void setError(Throwable e) @safe nothrow {
     receiver.setValue(getResult());
   }
   mixin ForwardExtensionPoints!receiver;

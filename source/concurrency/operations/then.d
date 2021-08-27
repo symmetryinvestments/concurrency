@@ -46,7 +46,7 @@ private struct ThenReceiver(Receiver, Value, Fun) {
   void setDone() @safe nothrow {
     receiver.setDone();
   }
-  void setError(Exception e) @safe nothrow {
+  void setError(Throwable e) @safe nothrow {
     receiver.setError(e);
   }
   mixin ForwardExtensionPoints!receiver;

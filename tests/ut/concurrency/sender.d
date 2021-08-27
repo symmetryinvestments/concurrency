@@ -59,7 +59,7 @@ import core.atomic : atomicOp;
 
 @("syncWait.thread.then.exception")
 @safe unittest {
-  bool delegate() @safe shared dg = () shared { throw new Exception("Exceptions are rethrown"); };
+  bool delegate() @safe shared dg = () shared { throw new Exception("Exceptions are forwarded"); };
   ThreadSender()
     .then(dg)
     .syncWait()

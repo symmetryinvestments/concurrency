@@ -10,14 +10,13 @@ bool isMainThread() @trusted {
   return Thread.getThis().isMainThread();
 }
 
-package struct SyncWaitReceiver2(Value, bool isNoThrow) {
+package struct SyncWaitReceiver2(Value) {
   static struct State {
     LocalThreadWorker worker;
     bool canceled;
     static if (!is(Value == void))
       Value result;
-    static if (!isNoThrow)
-      Exception exception;
+    Throwable throwable;
     StopSource stopSource;
 
     this(StopSource stopSource) {
@@ -35,11 +34,10 @@ package struct SyncWaitReceiver2(Value, bool isNoThrow) {
     state.worker.stop();
   }
 
-  static if (!isNoThrow)
-    void setError(Exception e) nothrow @safe {
-      state.exception = e;
-      state.worker.stop();
-    }
+  void setError(Throwable e) nothrow @safe {
+    state.throwable = e;
+    state.worker.stop();
+  }
   static if (is(Value == void))
     void setValue() nothrow @safe {
       state.worker.stop();
@@ -74,9 +72,7 @@ auto sync_wait_impl(Sender)(auto scope ref Sender sender, StopSource stopSource 
   import core.sys.posix.signal : SIGTERM, SIGINT;
 
   alias Value = Sender.Value;
-  enum NoThrow = !canSenderThrow!(Sender);
-
-  alias Receiver = SyncWaitReceiver2!(Value, NoThrow);
+  alias Receiver = SyncWaitReceiver2!(Value);
 
   auto state = Receiver.State(stopSource is null ? new StopSource() : stopSource);
   Receiver receiver = (()@trusted => Receiver(&state))();
@@ -100,9 +96,8 @@ auto sync_wait_impl(Sender)(auto scope ref Sender sender, StopSource stopSource 
     signalHandler.teardown();
 
   /// if exception, rethrow
-  static if (!NoThrow)
-    if (state.exception !is null)
-      throw state.exception;
+  if (state.throwable !is null)
+    throw state.throwable;
 
   /// if no value, return true if not canceled
   static if (is(Value == void))
@@ -200,9 +195,7 @@ Result!(Sender.Value) syncWaitImpl(Sender)(auto scope ref Sender sender, StopSou
   import core.sys.posix.signal : SIGTERM, SIGINT;
 
   alias Value = Sender.Value;
-  enum NoThrow = !canSenderThrow!(Sender);
-
-  alias Receiver = SyncWaitReceiver2!(Value, NoThrow);
+  alias Receiver = SyncWaitReceiver2!(Value);
 
   auto state = Receiver.State(stopSource is null ? new StopSource() : stopSource);
   // Receiver receiver = (()@trusted => Receiver(&state))();
@@ -229,10 +222,14 @@ Result!(Sender.Value) syncWaitImpl(Sender)(auto scope ref Sender sender, StopSou
   if (state.canceled)
     return Result!Value(Cancelled());
 
-  static if (!NoThrow)
-    if (state.exception !is null)
-      return Result!Value(state.exception);
+  if (auto t = cast(Error)state.throwable)
+    throw t;
 
+  if (state.throwable !is null) {
+    if (auto e = cast(Exception)state.throwable)
+      return Result!Value(e);
+    assert(false, "Can only rethrow Exceptions");
+  }
   static if (is(Value == void))
     return Result!Value();
   else

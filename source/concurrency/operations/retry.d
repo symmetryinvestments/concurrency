@@ -10,7 +10,7 @@ import std.traits;
 struct Times {
   int max = 5;
   int n = 0;
-  bool failure(Exception e) @safe nothrow {
+  bool failure(Throwable e) @safe nothrow {
     n++;
     return n >= max;
   }
@@ -39,7 +39,7 @@ private struct RetryReceiver(Receiver, Sender, Logic) {
   void setDone() @safe nothrow {
     receiver.setDone();
   }
-  void setError(Exception e) @safe nothrow {
+  void setError(Throwable e) @safe nothrow {
     if (logic.failure(e))
       receiver.setError(e);
     else {

@@ -28,7 +28,7 @@ private struct ViaAReceiver(ValueB, ValueA, Receiver) {
   void setDone() @safe nothrow {
     receiver.setDone();
   }
-  void setError(Exception e) @safe nothrow {
+  void setError(Throwable e) @safe nothrow {
     receiver.setError(e);
   }
   mixin ForwardExtensionPoints!receiver;
@@ -55,7 +55,7 @@ private struct ViaBReceiver(SenderA, ValueB, Receiver) {
   void setDone() @safe nothrow {
     receiver.setDone();
   }
-  void setError(Exception e) @safe nothrow {
+  void setError(Throwable e) @safe nothrow {
     receiver.setError(e);
   }
   mixin ForwardExtensionPoints!receiver;

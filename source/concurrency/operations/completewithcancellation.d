@@ -18,7 +18,7 @@ private struct CompleteWithCancellationReceiver(Receiver) {
   void setDone() nothrow @safe {
     receiver.setDone();
   }
-  void setError(Exception e) nothrow @safe {
+  void setError(Throwable e) nothrow @safe {
     receiver.setError(e);
   }
   mixin ForwardExtensionPoints!receiver;

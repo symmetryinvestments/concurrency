@@ -64,7 +64,7 @@ template ThrottleStreamOp(Stream, ThrottleEmitLogic emitLogic, ThrottleTimerLogi
     StopSource stopSource;
     StopSource timerStopSource;
     StopCallback cb;
-    Exception exception;
+    Throwable throwable;
     alias Op = OpType!(Properties.Sender, SenderReceiver!(typeof(this), Properties.Value));
     alias TimerOp = OpType!(SchedulerAfterSender, InnerReceiver);
     Op op;
@@ -104,7 +104,7 @@ template ThrottleStreamOp(Stream, ThrottleEmitLogic emitLogic, ThrottleTimerLogi
         } catch (Exception e) {
           with (flags.lock(ThrottleFlags.doneOrError_produced)) {
             if ((oldState & ThrottleFlags.doneOrError_produced) == 0) {
-              exception = e;
+              throwable = e;
             }
             release();
             process(newState);
@@ -138,7 +138,7 @@ template ThrottleStreamOp(Stream, ThrottleEmitLogic emitLogic, ThrottleTimerLogi
         } catch (Exception e) {
           with (flags.lock(ThrottleFlags.doneOrError_produced)) {
             if ((oldState & ThrottleFlags.doneOrError_produced) == 0) {
-              exception = e;
+              throwable = e;
             }
             release();
             process(newState);
@@ -147,10 +147,10 @@ template ThrottleStreamOp(Stream, ThrottleEmitLogic emitLogic, ThrottleTimerLogi
         }
       }
     }
-    private void setError(Exception e) {
+    private void setError(Throwable e) {
       with (flags.lock(ThrottleFlags.doneOrError_produced, ThrottleFlags.counter)) {
         if ((oldState & ThrottleFlags.doneOrError_produced) == 0) {
-          exception = e;
+          throwable = e;
         }
         release();
         process(newState);
@@ -209,8 +209,8 @@ template ThrottleStreamOp(Stream, ThrottleEmitLogic emitLogic, ThrottleTimerLogi
         else
           receiver.setValueOrError(value);
       } else if ((newState & ThrottleFlags.doneOrError_produced) > 0) {
-        if (exception)
-          receiver.setError(exception);
+        if (throwable)
+          receiver.setError(throwable);
         else
           receiver.setDone();
       }
@@ -252,7 +252,7 @@ struct TimerReceiver(Op, ElementType, ThrottleEmitLogic emitLogic, ThrottleTimer
       state.process(newState);
     }
   }
-  void setError(Exception e) nothrow @safe {
+  void setError(Throwable e) nothrow @safe {
     // TODO: would be nice if we can merge in next lock...
     if ((state.flags.load!(MemoryOrder.acq) & ThrottleFlags.timerRearming) > 0)
       return;
@@ -287,7 +287,7 @@ struct SenderReceiver(Op, Value) {
       state.process(newState);
     }
   }
-  void setError(Exception e) nothrow @safe {
+  void setError(Throwable e) nothrow @safe {
     state.setError(e);
   }
   auto getStopToken() {

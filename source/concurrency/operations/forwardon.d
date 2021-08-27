@@ -28,7 +28,7 @@ private struct ForwardOnReceiver(Receiver, Value, Scheduler) {
   void setDone() @safe nothrow {
     DoneSender().via(scheduler.schedule()).connectHeap(receiver).start();
   }
-  void setError(Exception e) @safe nothrow {
+  void setError(Throwable e) @safe nothrow {
     ErrorSender(e).via(scheduler.schedule()).connectHeap(receiver).start();
   }
   mixin ForwardExtensionPoints!receiver;

@@ -31,7 +31,7 @@ class Nursery : StopSource {
     Mutex mutex;
     shared size_t busy = 0;
     shared size_t counter = 0;
-    Exception exception; // first exception from sender, if any
+    Throwable throwable; // first throwable from sender, if any
     ReceiverObject receiver;
     StopCallback stopCallback;
     Nursery assumeThreadSafe() @trusted shared nothrow {
@@ -53,9 +53,9 @@ class Nursery : StopSource {
     return (cast()receiver).getScheduler();
   }
 
-  private void setError(Exception e, size_t id) nothrow @safe shared {
+  private void setError(Throwable e, size_t id) nothrow @safe shared {
     import core.atomic : cas;
-    with(assumeThreadSafe) cas(&exception, cast(Exception)null, e); // store exception if not already
+    with(assumeThreadSafe) cas(&throwable, cast(Throwable)null, e); // store throwable if not already
     done(id);
     stop();
   }
@@ -71,9 +71,9 @@ class Nursery : StopSource {
         operations = operations.remove(idx);
       bool isDone = atomicOp!"-="(busy,1) == 0;
       auto localReceiver = receiver;
-      auto localException = exception;
+      auto localThrowable = throwable;
       if (isDone) {
-        exception = null;
+        throwable = null;
         receiver = null;
         stopCallback.dispose();
         stopCallback = null;
@@ -81,8 +81,8 @@ class Nursery : StopSource {
       mutex.unlock_nothrow();
 
       if (isDone && localReceiver !is null) {
-        if (localException !is null) {
-          localReceiver.setError(localException);
+        if (localThrowable !is null) {
+          localReceiver.setError(localThrowable);
         } else if (isStopRequested()) {
           localReceiver.setDone();
         } else {
@@ -135,7 +135,7 @@ class Nursery : StopSource {
       this(Receiver receiver) { this.receiver = receiver; }
       void setValue() @safe { receiver.setValue(); }
       void setDone() nothrow @safe { receiver.setDone(); }
-      void setError(Exception e) nothrow @safe { receiver.setError(e); }
+      void setError(Throwable e) nothrow @safe { receiver.setError(e); }
       SchedulerObjectBase getScheduler() nothrow @safe {
         import concurrency.scheduler : toSchedulerObject;
         return receiver.getScheduler().toSchedulerObject();
@@ -180,7 +180,7 @@ class Nursery : StopSource {
 private interface ReceiverObject {
   void setValue() @safe;
   void setDone() nothrow @safe;
-  void setError(Exception e) nothrow @safe;
+  void setError(Throwable e) nothrow @safe;
   SchedulerObjectBase getScheduler() nothrow @safe;
 }
 
@@ -212,7 +212,7 @@ private struct NurseryReceiver(Value) {
     nursery.done(id);
   }
 
-  void setError(Exception e) nothrow @safe {
+  void setError(Throwable e) nothrow @safe {
     nursery.setError(e, id);
   }
 

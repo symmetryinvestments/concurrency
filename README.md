@@ -9,7 +9,7 @@ A Sender is a lazy Task (in the general sense of the word). It needs to be conne
 
 It can be used to model many asynchronous operations: Futures, Fiber, Coroutines, Threads, etc. It enforces structured concurrency because a Sender cannot start without it being awaited on.
 
- `setValue` is the only one allowed to throw exceptions, and if it does, `setError` is called with the Exception. `setDone` is called when the operation has been cancelled.
+ `setValue` is the only one allowed to throw exceptions, and if it does, `setError` is called with the Throwable. `setDone` is called when the operation has been cancelled.
 
 See http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p0443r14.html for the C++ proposal for introducing Senders/Receivers.
 
