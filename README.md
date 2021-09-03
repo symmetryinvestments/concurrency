@@ -44,7 +44,9 @@ struct ValueSender(T) {
     }
   }
   Op!Receiver connect(Receiver)(Receiver receiver) {
-    return Op!(Receiver)(receiver, value);
+    // ensure NVRO
+    auto op = Op!(Receiver)(receiver, value);
+    return op;
   }
 }
 ```
