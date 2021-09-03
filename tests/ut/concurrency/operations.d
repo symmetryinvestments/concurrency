@@ -117,6 +117,16 @@ unittest {
   OutOfBandValueSender!int(46).then((int i) shared => i*3).syncWait.value.shouldEqual(138);
 }
 
+@("then.tuple")
+@safe unittest {
+  just(1,2,3).then((Tuple!(int,int,int) t) shared => t[0]).syncWait.value.shouldEqual(1);
+}
+
+@("then.tuple.expand")
+@safe unittest {
+  just(1,2,3).then((int a,int b,int c) shared => a+b).syncWait.value.shouldEqual(3);
+}
+
 @("finally")
 unittest {
   ValueSender!int(1).finally_(() => 4).syncWait.value.should == 4;
@@ -222,6 +232,11 @@ unittest {
 unittest {
   auto oob = OutOfBandValueSender!int(45);
   oob.withStopSource(new StopSource()).syncWait.value.should == 45;
+}
+
+@("withStopSource.tuple")
+unittest {
+  just(14, 53).withStopToken((StopToken s, Tuple!(int, int) t) => t[0]*t[1]).syncWait.value.should == 742;
 }
 
 @("value.withstoptoken.via.thread")

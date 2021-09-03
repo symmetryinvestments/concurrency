@@ -27,7 +27,7 @@ private struct ThenReceiver(Receiver, Value, Fun) {
     }
   } else {
     import std.typecons : isTuple;
-    enum isExpandable = isTuple!Value;
+    enum isExpandable = isTuple!Value && __traits(compiles, {fun(Value.init.expand);});
     void setValue(Value value) @safe {
       static if (is(ReturnType!Fun == void)) {
         static if (isExpandable)
