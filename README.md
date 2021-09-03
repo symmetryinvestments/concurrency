@@ -61,7 +61,7 @@ Most Senders should call `receiver.getStopToken` to retrieve a stoptoken by whic
 
 Senders enjoy the following operations.
 
-- `sync_wait`. It takes a Sender and blocks the current execution context until the Sender is completed. It then returns or throws anything the Sender has send, if any. (note: attributes are inferred when possible, so that e.g. if the Sender doesn't call `setError`, `sync_wait` itself is nothrow).
+- `syncWait`. It takes a Sender and blocks the current execution context until the Sender is completed. It then returns or throws anything the Sender has send, if any. (note: attributes are inferred when possible, so that e.g. if the Sender doesn't call `setError`, `syncWait` itself is nothrow).
 
 - `then`. Chains a callable to be invoked when the Sender is completed with a value.
 
@@ -131,7 +131,7 @@ Most of the time you will need to write your own Stream however. The following h
 
 Schedulers create Senders that run on specific execution contexts. A Sender can query a Receiver with `.getScheduler()` to get a Scheduler and from there can schedule additional tasks to be ran immediately or after a certain `Duration`.
 
-`sync_wait` automatically inserts a `LocalThreadScheduler` with a timingwheels implementation to fulfull the Scheduler contract. This means that by default any Sender can schedule timers that run on the thread that awaits the whole chain.
+`syncWait` automatically inserts a `LocalThreadScheduler` with a timingwheels implementation to fulfull the Scheduler contract. This means that by default any Sender can schedule timers that run on the thread that awaits the whole chain.
 
 For testing purposes there is a `ManualTimeScheduler` which can be used to advance the timingwheels manually.
 
