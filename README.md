@@ -113,6 +113,7 @@ With the following operations:
 
 - `take`. Emits at most the first n values.
 - `transform`. Applies a tranformation function to each value.
+- `filter`. Filters out all values where predicate is false.
 - `scan`. Applies an accumulator function with seed to each value.
 - `sample`. Forwards the latest value of the base Stream every time the trigger Stream emits a value. If the base stream hasn't produced a (new) value the trigger is ignored.
 - `via`. Starts the Stream on the context of another Sender.

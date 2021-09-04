@@ -514,3 +514,13 @@ import concurrency.thread : ThreadSender;
   auto s2 = [2,3,4].arrayStream.toList;
   whenAll(s1,s2).syncWait.value.should == tuple([1,2,3],[2,3,4]);
 }
+
+@("filter")
+unittest {
+  import concurrency.stream.filter;
+  [1,2,3,4].arrayStream
+    .filter((int i) => i % 2 == 0)
+    .toList
+    .syncWait
+    .value.should == [2,4];
+}
