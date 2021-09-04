@@ -13,5 +13,6 @@ int main(string[] args)
                         "ut.concurrency.slist",
                         "ut.concurrency.scheduler",
                         "ut.concurrency.thread",
+                        "ut.concurrency.utils",
                         );
 }

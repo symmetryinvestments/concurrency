@@ -7,9 +7,8 @@ import concurrency.stoptoken;
 import concepts;
 
 auto then(Sender, Fun)(Sender sender, Fun fun) {
-  import std.traits : hasFunctionAttributes, isFunction, isFunctionPointer;
-  static assert (isFunction!Fun || isFunctionPointer!Fun || hasFunctionAttributes!(Fun, "shared"), "Function must be shared");
-
+  import concurrency.utils;
+  static assert (isThreadSafeFunction!Fun);
   return ThenSender!(Sender, Fun)(sender, fun);
 }
 

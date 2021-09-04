@@ -78,3 +78,5 @@ static if (__traits(compiles, () { import core.atomic : casWeak; }) && __traits(
        return cas(here, ifThis, writeThis);
    }
  }
+
+enum isThreadSafeFunction(alias Fun) = !hasFunctionAttributes!(Fun, "@system") && (isFunction!Fun || isFunctionPointer!Fun || hasFunctionAttributes!(Fun, "shared"));

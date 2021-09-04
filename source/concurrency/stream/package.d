@@ -362,6 +362,8 @@ auto take(Stream)(Stream stream, size_t n) if (models!(Stream, isStream)) {
 }
 
 auto transform(Stream, Fun)(Stream stream, Fun fun) if (models!(Stream, isStream)) {
+  import concurrency.utils : isThreadSafeFunction;
+  static assert(isThreadSafeFunction!Fun);
   import std.traits : ReturnType;
   alias Properties = StreamProperties!Stream;
   alias InnerElementType = ReturnType!Fun;
@@ -426,6 +428,8 @@ auto fromStreamOp(StreamElementType, SenderValue, alias Op, Args...)(Args args) 
 
 /// Applies an accumulator to each value from the source
 auto scan(Stream, ScanFn, Seed)(Stream stream, scope ScanFn scanFn, Seed seed) if (models!(Stream, isStream)) {
+  import concurrency.utils : isThreadSafeFunction;
+  static assert(isThreadSafeFunction!ScanFn);
   import std.traits : ReturnType;
   alias Properties = StreamProperties!Stream;
   alias DG = CollectDelegate!(Seed);
