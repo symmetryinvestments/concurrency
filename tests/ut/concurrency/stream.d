@@ -517,7 +517,6 @@ import concurrency.thread : ThreadSender;
 
 @("filter")
 unittest {
-  import concurrency.stream.filter;
   [1,2,3,4].arrayStream
     .filter((int i) => i % 2 == 0)
     .toList

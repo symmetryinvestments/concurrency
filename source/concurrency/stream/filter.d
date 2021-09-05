@@ -1,8 +1,13 @@
 module concurrency.stream.filter;
 
-import concurrency.stream;
+import concurrency.stream.stream;
 import concurrency.sender : OpType;
 import concepts;
+
+auto filter(Stream, Fun)(Stream stream, Fun fun) if (models!(Stream, isStream)) {
+  alias Properties = StreamProperties!Stream;
+  return fromStreamOp!(Properties.ElementType, Properties.Value, FilterStreamOp!(Stream, Fun))(stream, fun);
+}
 
 template FilterStreamOp(Stream, Fun) {
   import concurrency.utils : isThreadSafeFunction;
@@ -36,9 +41,3 @@ template FilterStreamOp(Stream, Fun) {
     }
   }
 }
-
-auto filter(Stream, Fun)(Stream stream, Fun fun) if (models!(Stream, isStream)) {
-  alias Properties = StreamProperties!Stream;
-  return fromStreamOp!(Properties.ElementType, Properties.Value, FilterStreamOp!(Stream, Fun))(stream, fun);
-}
-
