@@ -299,8 +299,8 @@ shared static this() {
   resetScheduler();
 }
 
-@models!(ThreadSender, isSender)
 struct ThreadSender {
+  static assert (models!(typeof(this), isSender));
   alias Value = void;
   static struct Op(Receiver) {
     private Receiver receiver;
