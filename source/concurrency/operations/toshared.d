@@ -183,11 +183,12 @@ class SharedSender(Sender, Scheduler) if (models!(Sender, isSender)) {
   }
   private void process() {
     with(counter.lock(Flags.completed)) {
+      auto localState = state;
       release(oldState & (~0x3)); // release early and remove all ticks
-      InternalValue v = state.value.get;
-      if (state.isStopRequested)
+      InternalValue v = localState.value.get;
+      if (localState.isStopRequested)
         v = Done();
-      foreach(dg; state.dgs[])
+      foreach(dg; localState.dgs[])
         dg(v);
     }
   }
