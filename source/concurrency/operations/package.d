@@ -15,3 +15,4 @@ public import concurrency.operations.raceall;
 public import concurrency.operations.withscheduler;
 public import concurrency.operations.on;
 public import concurrency.operations.forwardon;
+public import concurrency.operations.tosingleton;

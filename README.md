@@ -89,6 +89,8 @@ Senders enjoy the following operations.
 
 - `forwardOn`. Run the completion of a Sender on a specific Scheduler.
 
+- `toSingleton`. Only allows one instantiation of the underlying Sender, regardless of how many Receivers are connected. In contrast with `toShared` this starts the underlying Sender each time the receiver count goes from 0 to 1, whereas `toShared` keeps the last termination cached.
+
 ## Streams
 
 A Stream has a `.collect` function that accepts a `shared` callable and returns a Sender. Once the Sender is connected and started the Stream will call the callable zero or more times before one of the three terminal functions of the Receiver is called.

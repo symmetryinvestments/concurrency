@@ -14,18 +14,23 @@ import mir.algebraic : Algebraic, Nullable, match;
 /// If an receiver is connected after the underlying Sender has already been completed, that receiver will have one of its termination functions called immediately.
 /// This operation is useful when you have multiple tasks that all depend on one shared task. It allows you to write the shared task as a regular Sender and simply apply a `.toShared`.
 auto toShared(Sender, Scheduler)(Sender sender, Scheduler scheduler) {
-  return new SharedSender!(Sender, Scheduler)(sender, scheduler);
+  return new SharedSender!(Sender, Scheduler, ResetLogic.keepLatest)(sender, scheduler);
 }
 
 auto toShared(Sender)(Sender sender) {
-  return new SharedSender!(Sender, NullScheduler)(sender, NullScheduler());
+  return new SharedSender!(Sender, NullScheduler, ResetLogic.keepLatest)(sender, NullScheduler());
 }
 
-private struct NullScheduler {}
+struct NullScheduler {}
 private struct Done{}
 private struct ValueRep{}
 
-class SharedSender(Sender, Scheduler) if (models!(Sender, isSender)) {
+enum ResetLogic {
+  keepLatest,
+  alwaysReset
+}
+
+class SharedSender(Sender, Scheduler, ResetLogic resetLogic) if (models!(Sender, isSender)) {
   import std.traits : ReturnType;
   import concurrency.slist;
   import concurrency.bitfield;
@@ -182,10 +187,15 @@ class SharedSender(Sender, Scheduler) if (models!(Sender, isSender)) {
     }
   }
   private void process() {
-    with(counter.lock(Flags.completed)) {
+    static if (resetLogic == ResetLogic.alwaysReset) {
+      size_t updateFlag = 0;
+    } else {
+      size_t updateFlag = Flags.completed;
+    }
+    with(counter.lock(updateFlag)) {
       auto localState = state;
-      release(oldState & (~0x3)); // release early and remove all ticks
       InternalValue v = localState.value.get;
+      release(oldState & (~0x3)); // release early and remove all ticks
       if (localState.isStopRequested)
         v = Done();
       foreach(dg; localState.dgs[])

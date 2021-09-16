@@ -318,3 +318,21 @@ unittest {
 DoneSender().forwardOn(pool.getScheduler).syncWait.isCancelled.should == true;
  just(42).forwardOn(pool.getScheduler).syncWait.value.should == 42;
 }
+
+@("toSingleton")
+@safe unittest {
+  import std.typecons : tuple;
+  import concurrency.scheduler : ManualTimeWorker;
+  import core.atomic : atomicOp;
+
+  shared int g;
+
+  auto worker = new shared ManualTimeWorker();
+
+  auto single = delay(2.msecs).then(() shared => g.atomicOp!"+="(1)).toSingleton(worker.getScheduler);
+
+  auto driver = justFrom(() shared => worker.advance(2.msecs));
+
+  whenAll(single, single, driver).syncWait.value.should == tuple(1,1);
+  whenAll(single, single, driver).syncWait.value.should == tuple(2,2);
+}
