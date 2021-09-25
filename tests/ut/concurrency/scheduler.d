@@ -24,8 +24,8 @@ import concurrency.scheduler;
 
   shared int g, h;
   auto worker = new shared ManualTimeWorker();
-  worker.addTimer(() shared { g.atomicOp!"+="(1); }, 10.msecs);
-  worker.addTimer(() shared { h.atomicOp!"+="(1); }, 5.msecs);
+  worker.addTimer((TimerTrigger trigger) shared { g.atomicOp!"+="(1); }, 10.msecs);
+  worker.addTimer((TimerTrigger trigger) shared { h.atomicOp!"+="(1); }, 5.msecs);
 
   worker.timeUntilNextEvent().should == 5.msecs;
   g.should == 0;
@@ -53,7 +53,7 @@ import concurrency.scheduler;
 
   shared int g;
   auto worker = new shared ManualTimeWorker();
-  auto timer = worker.addTimer(() shared { g.atomicOp!"+="(1); }, 10.msecs);
+  auto timer = worker.addTimer((TimerTrigger trigger) shared { g.atomicOp!"+="(1 + (trigger == TimerTrigger.cancel)); }, 10.msecs);
   worker.timeUntilNextEvent().should == 10.msecs;
   g.should == 0;
 
@@ -63,7 +63,7 @@ import concurrency.scheduler;
 
   worker.cancelTimer(timer);
   worker.timeUntilNextEvent().should == null;
-  g.should == 0;
+  g.should == 2;
 }
 
 @("ManualTimeWorker.error")

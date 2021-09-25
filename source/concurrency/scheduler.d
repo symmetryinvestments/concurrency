@@ -40,6 +40,19 @@ SchedulerObjectBase toSchedulerObject(S)(S scheduler) {
   return new SchedulerObject!(S)(scheduler);
 }
 
+enum TimerTrigger {
+  trigger,
+  cancel
+}
+
+alias TimerDelegate = void delegate(TimerTrigger) shared @safe;
+
+struct Timer {
+  TimerDelegate dg;
+  ulong id_;
+  ulong id() { return id_; }
+}
+
 auto localThreadScheduler() {
   import concurrency.thread : LocalThreadWorker;
   import std.concurrency : thisTid;
@@ -104,11 +117,18 @@ struct ScheduleAfterOp(Worker, Receiver) {
       }
       stopCb = receiver.getStopToken().onStop(cast(void delegate() nothrow @safe shared)&stop);
       try {
-        timer = worker.addTimer(() shared nothrow {
+        timer = worker.addTimer((TimerTrigger cause) shared nothrow {
             stopCb.dispose();
-            with(flags.update(Flags.terminated)) {
-              if ((oldState & Flags.terminated) == 0)
-                receiver.setValueOrError();
+            final switch (cause) {
+            case TimerTrigger.cancel:
+              receiver.setDone();
+              break;
+            case TimerTrigger.trigger:
+              with(flags.update(Flags.terminated)) {
+                if ((oldState & Flags.terminated) == 0)
+                  receiver.setValueOrError();
+              }
+              break;
             }
           }, dur);
       } catch (Exception e) {
@@ -120,7 +140,6 @@ struct ScheduleAfterOp(Worker, Receiver) {
     with(flags.update(Flags.terminated)) {
       if ((oldState & Flags.terminated) == 0) {
         try { worker.cancelTimer(timer); } catch (Exception e) {} // TODO: what to do here?
-        receiver.setDone();
       }
     }
   }
@@ -159,11 +178,6 @@ class ManualTimeWorker {
     size_t time = 1;
     shared ulong nextTimerId;
   }
-  static struct Timer {
-    VoidDelegate dg;
-    ulong id_;
-    ulong id() { return id_; }
-  }
   auto lock() @trusted shared {
     import concurrency.utils : SharedGuard;
     return SharedGuard!(ManualTimeWorker).acquire(this, cast()mutex);
@@ -175,7 +189,7 @@ class ManualTimeWorker {
   ManualTimeScheduler getScheduler() @safe shared {
     return ManualTimeScheduler(this);
   }
-  Timer addTimer(VoidDelegate dg, Duration dur) @trusted shared {
+  Timer addTimer(TimerDelegate dg, Duration dur) @trusted shared {
     import core.atomic : atomicOp;
     with(lock()) {
       auto real_now = time;
@@ -191,6 +205,7 @@ class ManualTimeWorker {
     with(lock()) {
       wheels.cancel(timer);
     }
+    timer.dg(TimerTrigger.cancel);
   }
   Nullable!Duration timeUntilNextEvent() @trusted shared {
     with(lock()) {
@@ -205,7 +220,7 @@ class ManualTimeWorker {
       if (incr > 0) {
         auto wr = wheels.advance(incr);
         foreach(t; wr.timers) {
-          t.dg();
+          t.dg(TimerTrigger.trigger);
         }
       }
     }

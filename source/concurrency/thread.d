@@ -57,19 +57,14 @@ class LocalThreadExecutor : Executor {
 package struct LocalThreadWorker {
   import core.time : Duration, msecs, hnsecs;
   import std.concurrency : Tid, thisTid, send, receive, receiveTimeout;
+  import concurrency.scheduler : Timer, TimerTrigger, TimerDelegate;
 
   static struct AddTimer {
     Timer timer;
     Duration dur;
   }
-  static struct Timer {
-    VoidDelegate dg;
-    ulong id_;
-    ulong id() { return id_; }
-  }
   static struct RemoveTimer {
     Timer timer;
-    shared Semaphore semaphore;
   }
 
   private {
@@ -103,8 +98,7 @@ package struct LocalThreadWorker {
     };
     auto removeTimerHandler = (RemoveTimer cmd) scope {
       wheels.cancel(cmd.timer);
-      if (cmd.semaphore !is null)
-        (cast()cmd.semaphore).notify;
+      cmd.timer.dg(TimerTrigger.cancel);
     };
     while (running) {
       VoidFunction vFunc = null;
@@ -131,7 +125,7 @@ package struct LocalThreadWorker {
         if (advance > 0) {
           auto wr = wheels.advance(advance);
           foreach(t; wr.timers) {
-            t.dg();
+            t.dg(TimerTrigger.trigger);
           }
         }
         continue;
@@ -159,7 +153,7 @@ package struct LocalThreadWorker {
     tid.send(dg);
   }
 
-  Timer addTimer(VoidDelegate dg, Duration dur) @trusted {
+  Timer addTimer(TimerDelegate dg, Duration dur) @trusted {
     import core.atomic : atomicOp;
     ulong id = nextTimerId.atomicOp!("+=")(1);
     Timer timer = Timer(dg, id);
@@ -168,13 +162,7 @@ package struct LocalThreadWorker {
   }
 
   void cancelTimer(Timer timer) @trusted {
-    Semaphore semaphore;
-    if (!isInContext) {
-      semaphore = localSemaphore();
-    }
-    tid.send(RemoveTimer(timer, cast(shared)semaphore));
-    if (semaphore !is null)
-      semaphore.wait();
+    tid.send(RemoveTimer(timer));
   }
 
   void stop() nothrow @trusted {
