@@ -354,3 +354,49 @@ DoneSender().forwardOn(pool.getScheduler).syncWait.isCancelled.should == true;
           ).syncWait(sourceOuter).assumeOk;
   d.should == false;
 }
+
+@("withChild")
+@safe unittest {
+  import core.atomic;
+
+  class State {
+    import core.sync.event : Event;
+    bool parentAfterChild;
+    Event childEvent, parentEvent;
+    this() shared @trusted {
+      (cast()childEvent).initialize(false, false);
+      (cast()parentEvent).initialize(false, false);
+    }
+    void signalChild() shared @trusted {
+      (cast()childEvent).set();
+    }
+    void waitChild() shared @trusted {
+      (cast()childEvent).wait();
+    }
+    void signalParent() shared @trusted {
+      (cast()parentEvent).set();
+    }
+    void waitParent() shared @trusted {
+      (cast()parentEvent).wait();
+    }
+  }
+  auto state = new shared State();
+  auto source = new shared StopSource;
+
+  import std.stdio;
+  auto child = just(state).withStopToken((StopToken token, shared State state) @trusted {
+      while(!token.isStopRequested) {}
+      state.signalParent();
+      state.waitChild();
+    }).via(ThreadSender());
+
+  auto parent = just(state).withStopToken((StopToken token, shared State state){
+      state.waitParent();
+      state.parentAfterChild.atomicStore(token.isStopRequested == false);
+      state.signalChild();
+    }).via(ThreadSender());
+
+  whenAll(parent.withChild(child).withStopSource(source), just(source).then((shared StopSource s) => s.stop())).syncWait.isCancelled;
+
+  state.parentAfterChild.atomicLoad.should == true;
+}

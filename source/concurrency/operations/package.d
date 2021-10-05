@@ -17,3 +17,4 @@ public import concurrency.operations.on;
 public import concurrency.operations.forwardon;
 public import concurrency.operations.tosingleton;
 public import concurrency.operations.stopon;
+public import concurrency.operations.withchild;
