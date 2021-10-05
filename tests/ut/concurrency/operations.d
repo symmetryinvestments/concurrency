@@ -336,3 +336,21 @@ DoneSender().forwardOn(pool.getScheduler).syncWait.isCancelled.should == true;
   whenAll(single, single, driver).syncWait.value.should == tuple(1,1);
   whenAll(single, single, driver).syncWait.value.should == tuple(2,2);
 }
+
+@("stopOn")
+@safe unittest {
+  auto sourceInner = new shared StopSource();
+  auto sourceOuter = new shared StopSource();
+
+  shared bool b;
+  whenAll(delay(5.msecs).then(() shared => b = true).stopOn(StopToken(sourceInner)),
+          just(() => sourceOuter.stop())
+          ).syncWait(sourceOuter).assumeOk;
+  b.should == true;
+
+  shared bool d;
+  whenAll(delay(5.msecs).then(() shared => b = true).stopOn(StopToken(sourceInner)),
+          just(() => sourceInner.stop())
+          ).syncWait(sourceOuter).assumeOk;
+  d.should == false;
+}

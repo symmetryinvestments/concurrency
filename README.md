@@ -91,6 +91,8 @@ Senders enjoy the following operations.
 
 - `toSingleton`. Only allows one instantiation of the underlying Sender, regardless of how many Receivers are connected. In contrast with `toShared` this starts the underlying Sender each time the receiver count goes from 0 to 1, whereas `toShared` keeps the last termination cached.
 
+- `stopOn`. Allows to explicitely set which `StopToken` to use. Normally `StopToken`'s are chained so that triggering stop will propagate through the whole task chain. `stopOn` allows you to have Senders that only listen to a specific `StopToken`.
+
 ## Streams
 
 A Stream has a `.collect` function that accepts a `shared` callable and returns a Sender. Once the Sender is connected and started the Stream will call the callable zero or more times before one of the three terminal functions of the Receiver is called.
