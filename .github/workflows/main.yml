@@ -34,6 +34,12 @@ jobs:
           ulimit -a
           dub -c=unittest-release
 
+      - name: Run asan tests linux
+        if: runner.os == 'Linux' && startsWith(matrix.dc, 'ldc')
+        run: |
+          sudo apt install -y llvm   # provides executable `llvm-symbolizer`
+          LSAN_OPTIONS=suppressions=lsan.supp dub -c=unittest-asan
+
       - name: Run tests windows
         if: runner.os != 'Linux'
         run: |

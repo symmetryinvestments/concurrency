@@ -253,7 +253,7 @@ public:
     if (cb.next_ !is null) {
       cb.next_.prev_ = &cb.next_;
     }
-    cb.prev_ = &head_;
+    () @trusted { cb.prev_ = &head_; } ();
     head_ = cb;
 
     if (incrementRefCountIfSuccessful) {
