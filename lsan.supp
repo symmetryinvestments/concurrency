@@ -1,0 +1,4 @@
+# https://github.com/google/sanitizers/wiki/AddressSanitizerLeakSanitizer#suppressions
+
+leak:_D4core6memory__T10pureMallocZQnFNaNbNiNemZPv
+leak:_D4core6memory__T10pureCallocZQnFNaNbNiNemmZPv
