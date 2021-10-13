@@ -228,6 +228,11 @@ import core.atomic : atomicOp;
   justFrom(() shared =>42).syncWait.value.should == 42;
 }
 
+@("justFrom.exception")
+@safe unittest {
+  justFrom(() shared { throw new Exception("failure"); }).syncWait.isError.should == true;
+}
+
 @("delay")
 @safe unittest {
   import core.time : msecs;
@@ -241,7 +246,7 @@ import core.atomic : atomicOp;
   auto prom = promise!int;
   auto cont = prom.then((int i) => i * 2);
   auto runner = justFrom(() shared => prom.fulfill(72));
-  
+
   whenAll(cont, runner).syncWait.value.should == 144;
 }
 
@@ -251,7 +256,7 @@ import core.atomic : atomicOp;
   auto prom = promise!int;
   auto cont = prom.then((int i) => i * 2);
   auto runner = justFrom(() shared => prom.fulfill(72));
-  
+
   whenAll(cont, cont, runner).syncWait.value.should == tuple(144, 144);
 }
 
@@ -263,7 +268,7 @@ import core.atomic : atomicOp;
 
   auto cont = prom.forwardOn(pool.getScheduler).then((int i) => i * 2);
   auto runner = justFrom(() shared => prom.fulfill(72)).via(ThreadSender());
-  
+
   whenAll(cont, cont, runner).syncWait.value.should == tuple(144, 144);
 }
 

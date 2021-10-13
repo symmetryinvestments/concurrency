@@ -134,9 +134,9 @@ struct JustFromSender(Fun) {
       import concurrency.receiver : setValueOrError;
       static if (is(Value == void)) {
         fun();
-        receiver.setValueOrError();
+        receiver.setValue();
       } else
-        receiver.setValueOrError(fun());
+        receiver.setValue(fun());
     }
   }
   Fun fun;
@@ -277,7 +277,7 @@ template canSenderThrow(Sender) {
     else
       void setValue(Sender.Value t) nothrow @safe @nogc {}
   }
-  enum canSenderThrow = !__traits(compiles, Sender.init.connect(NoErrorReceiver()));
+  enum canSenderThrow = !__traits(compiles, Sender.init.connect(NoErrorReceiver()).start());
 }
 
 static assert( canSenderThrow!ThrowingSender);
