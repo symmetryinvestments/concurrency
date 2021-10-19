@@ -95,3 +95,52 @@ template SchedulerType(Receiver) {
   import std.traits : ReturnType;
   alias SchedulerType = ReturnType!(Receiver.getScheduler);
 }
+
+/// Helper to construct a Stream, useful if the Stream you are modeling has a blocking loop
+template loopStream(E) {
+  alias DG = CollectDelegate!(E);
+  auto loopStream(T)(T t) {
+    static struct LoopStream {
+      static assert(models!(typeof(this), isStream));
+      alias ElementType = E;
+      static struct LoopOp(Receiver) {
+        T t;
+        DG dg;
+        Receiver receiver;
+        @disable this(ref return scope typeof(this) rhs);
+        @disable this(this);
+        this(T t, DG dg, Receiver receiver) {
+          this.t = t;
+          this.dg = dg;
+          this.receiver = receiver;
+        }
+        void start() @trusted nothrow scope {
+          try {
+            t.loop(dg, receiver.getStopToken);
+          } catch (Exception e) {
+            receiver.setError(e);
+          }
+          if (receiver.getStopToken().isStopRequested)
+            receiver.setDone();
+          else
+            receiver.setValueOrError();
+        }
+      }
+      static struct LoopSender {
+        alias Value = void;
+        T t;
+        DG dg;
+        auto connect(Receiver)(return Receiver receiver) @safe scope return {
+          // ensure NRVO
+          auto op = LoopOp!(Receiver)(t, dg, receiver);
+          return op;
+        }
+      }
+      T t;
+      auto collect(DG dg) @safe {
+        return LoopSender(t, dg);
+      }
+    }
+    return LoopStream(t);
+  }
+}
