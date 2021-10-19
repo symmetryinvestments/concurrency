@@ -159,8 +159,6 @@ class SharedSender(Sender, Scheduler, ResetLogic resetLogic) if (models!(Sender,
             localState.op.start();
           } else {
             auto localState = state;
-            release(); // release early
-            // TODO: what happens if the sender completed after release, but before pushBack?
             localState.dgs.pushBack(dg);
           }
         }
