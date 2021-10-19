@@ -576,3 +576,8 @@ unittest {
     .syncWait
     .value.should == [2,4];
 }
+
+@("cycle")
+unittest {
+  "-/|\\".cycleStream().take(6).toList.syncWait.value.should == "-/|\\-/";
+}

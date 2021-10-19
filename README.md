@@ -114,6 +114,7 @@ Currently there are the following Streams:
 - `doneStream`. Upon start immediately emits cancellation.
 - `errorStream`. Upon start immediately emits an error.
 - `sharedStream`. Is used for broadcasting values to zero or more receivers. Receivers can be added and removed at any time.
+- `cycleStream`. Cycles through a ranges until cancelled.
 
 With the following operations:
 
