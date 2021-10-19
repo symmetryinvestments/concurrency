@@ -246,16 +246,69 @@ import concurrency.thread : ThreadSender;
 @("sample.faster")
 @safe unittest {
   import core.time;
+  import concurrency.operations : withScheduler, whenAll;
+  import concurrency.sender : justFrom;
 
   shared int p = 0;
+  import concurrency.scheduler : ManualTimeWorker;
 
-  7.msecs
+  auto worker = new shared ManualTimeWorker();
+
+  auto sampler = 7.msecs
     .intervalStream()
     .scan((int acc) => acc+1, 0)
     .sample(3.msecs.intervalStream())
     .take(3)
     .collect((int i) shared { p.atomicOp!"+="(i); })
-    .syncWait().isOk.should == true;
+    .withScheduler(worker.getScheduler);
+
+  auto driver = justFrom(() shared {
+      worker.advance(3.msecs);
+      p.atomicLoad.should == 0;
+      worker.timeUntilNextEvent().should == 3.msecs;
+
+      worker.advance(3.msecs);
+      p.atomicLoad.should == 0;
+      worker.timeUntilNextEvent().should == 1.msecs;
+
+      worker.advance(1.msecs);
+      p.atomicLoad.should == 0;
+      worker.timeUntilNextEvent().should == 2.msecs;
+
+      worker.advance(2.msecs);
+      p.atomicLoad.should == 1;
+      worker.timeUntilNextEvent().should == 3.msecs;
+
+      worker.advance(3.msecs);
+      p.atomicLoad.should == 1;
+      worker.timeUntilNextEvent().should == 2.msecs;
+
+      worker.advance(2.msecs);
+      p.atomicLoad.should == 1;
+      worker.timeUntilNextEvent().should == 1.msecs;
+
+      worker.advance(1.msecs);
+      p.atomicLoad.should == 3;
+      worker.timeUntilNextEvent().should == 3.msecs;
+
+      worker.advance(3.msecs);
+      p.atomicLoad.should == 3;
+      worker.timeUntilNextEvent().should == 3.msecs;
+
+      worker.advance(3.msecs);
+      // NOTE: normally `p` ought to be 6 since 3*7 msecs have already elapsed.
+      // but due to the way slots work in the timingwheels implementation
+      // timers that are added later are executed earlier.
+      // see https://github.com/symmetryinvestments/concurrency/issues/35
+      p.atomicLoad.should == 3;
+      worker.timeUntilNextEvent().should == 3.msecs;
+
+      worker.advance(3.msecs);
+      p.atomicLoad.should == 6;
+      worker.timeUntilNextEvent().should == null;
+    });
+
+  whenAll(sampler, driver).syncWait().assumeOk;
 
   p.should == 6;
 }
