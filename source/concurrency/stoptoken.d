@@ -22,13 +22,13 @@ class StopSource {
   }
 
   /// resets the internal state, only do this if you are sure nothing else is looking at this...
-  void reset() @system @nogc {
+  void reset(this t)() @system @nogc {
     this.state = stop_state();
   }
 }
 
 struct StopToken {
-  private StopSource source;
+  package(concurrency) StopSource source;
   this(StopSource source) nothrow @safe @nogc {
     this.source = source;
     isStopPossible = source !is null;
@@ -36,6 +36,7 @@ struct StopToken {
 
   this(shared StopSource source) nothrow @trusted @nogc {
     this.source = cast()source;
+    isStopPossible = source !is null;
   }
 
   bool isStopRequested() nothrow @safe @nogc {

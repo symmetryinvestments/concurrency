@@ -2,3 +2,5 @@
 
 leak:_D4core6memory__T10pureMallocZQnFNaNbNiNemZPv
 leak:_D4core6memory__T10pureCallocZQnFNaNbNiNemmZPv
+leak:_D2rt8monitor_13ensureMonitorFNbC6ObjectZPOSQBqQBq7Monitor
+leak:_D2rt5tlsgc4initFNbNiZPv
