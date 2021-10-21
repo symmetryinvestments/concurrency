@@ -23,10 +23,6 @@ package struct SyncWaitReceiver2(Value) {
       this.stopSource = stopSource;
       worker = LocalThreadWorker(getLocalThreadExecutor());
     }
-
-    void handleSignal(int signal) {
-      stopSource.stop();
-    }
   }
   State* state;
   void setDone() nothrow @safe {
@@ -53,60 +49,6 @@ package struct SyncWaitReceiver2(Value) {
   auto getScheduler() nothrow @safe {
     import concurrency.scheduler : SchedulerAdapter;
     return SchedulerAdapter!(LocalThreadWorker*)(&state.worker);
-  }
-}
-
-deprecated("Use syncWait instead")
-auto sync_wait(Sender, StopSource)(auto ref Sender sender, StopSource stopSource) {
-  return sync_wait_impl(sender, (()@trusted=>cast()stopSource)());
-}
-
-deprecated("Use syncWait instead")
-auto sync_wait(Sender)(auto scope ref Sender sender) {
-  return sync_wait_impl(sender);
-}
-
-auto sync_wait_impl(Sender)(auto scope ref Sender sender, StopSource stopSource = null) @safe {
-  static assert(models!(Sender, isSender));
-  import concurrency.signal;
-  import core.sys.posix.signal : SIGTERM, SIGINT;
-
-  alias Value = Sender.Value;
-  alias Receiver = SyncWaitReceiver2!(Value);
-
-  auto state = Receiver.State(stopSource is null ? new StopSource() : stopSource);
-  Receiver receiver = (()@trusted => Receiver(&state))();
-  SignalHandler signalHandler;
-
-  if (stopSource is null) {
-    /// TODO: not so sure about this
-    if (isMainThread) {
-      (()@trusted => signalHandler.setup(&state.handleSignal))();
-      signalHandler.on(SIGINT);
-      signalHandler.on(SIGTERM);
-    }
-  }
-
-  auto op = sender.connect(receiver);
-  op.start();
-
-  state.worker.start();
-
-  if (isMainThread)
-    signalHandler.teardown();
-
-  /// if exception, rethrow
-  if (state.throwable !is null)
-    throw state.throwable;
-
-  /// if no value, return true if not canceled
-  static if (is(Value == void))
-    return !state.canceled;
-  else {
-    if (state.canceled)
-      throw new Exception("Canceled");
-
-    return state.result;
   }
 }
 
@@ -179,16 +121,32 @@ template match(Handlers...) {
   }
 }
 
+void setTopLevelStopSource(shared StopSource stopSource) @trusted {
+  import std.exception : enforce;
+  enforce(parentStopSource is null);
+  parentStopSource = cast()stopSource;
+}
+
+package(concurrency) static StopSource parentStopSource;
+
 /// Start the Sender and waits until it completes, cancels, or has an error.
 auto syncWait(Sender, StopSource)(auto ref Sender sender, StopSource stopSource) {
   return syncWaitImpl(sender, (()@trusted=>cast()stopSource)());
 }
 
 auto syncWait(Sender)(auto scope ref Sender sender) {
-  return syncWaitImpl(sender);
+  import concurrency.signal : globalStopSource;
+  auto childStopSource = new shared StopSource();
+  StopToken parentStopToken = parentStopSource ? StopToken(parentStopSource) : StopToken(globalStopSource);
+
+  StopCallback cb = parentStopToken.onStop(() shared { childStopSource.stop(); });
+  auto result = syncWaitImpl(sender, (()@trusted=>cast()childStopSource)());
+  // detach stopSource
+  cb.dispose();
+  return result;
 }
 
-Result!(Sender.Value) syncWaitImpl(Sender)(auto scope ref Sender sender, StopSource stopSource = null) @safe {
+private Result!(Sender.Value) syncWaitImpl(Sender)(auto scope ref Sender sender, StopSource stopSource) @safe {
   import mir.algebraic : Algebraic, Nullable;
   static assert(models!(Sender, isSender));
   import concurrency.signal;
@@ -197,27 +155,18 @@ Result!(Sender.Value) syncWaitImpl(Sender)(auto scope ref Sender sender, StopSou
   alias Value = Sender.Value;
   alias Receiver = SyncWaitReceiver2!(Value);
 
-  auto state = Receiver.State(stopSource is null ? new StopSource() : stopSource);
-  // Receiver receiver = (()@trusted => Receiver(&state))();
+  /// TODO: not fiber safe
+  auto old = parentStopSource;
+  parentStopSource = stopSource;
+
+  auto state = Receiver.State(stopSource);
   Receiver receiver = (()@trusted => Receiver(&state))();
-  SignalHandler signalHandler;
-
-  if (stopSource is null) {
-    /// TODO: not so sure about this
-    if (isMainThread) {
-      (()@trusted => signalHandler.setup(&state.handleSignal))();
-      signalHandler.on(SIGINT);
-      signalHandler.on(SIGTERM);
-    }
-  }
-
   auto op = sender.connect(receiver);
   op.start();
 
   state.worker.start();
 
-  if (isMainThread)
-    signalHandler.teardown();
+  parentStopSource = old;
 
   if (state.canceled)
     return Result!Value(Cancelled());

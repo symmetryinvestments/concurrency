@@ -301,6 +301,9 @@ struct ThreadSender {
     void run() @trusted {
       import concurrency.receiver : setValueOrError;
       import concurrency.error : clone;
+      import concurrency : parentStopSource;
+
+      parentStopSource = receiver.getStopToken().source;
 
       try {
         receiver.setValue();
@@ -309,6 +312,8 @@ struct ThreadSender {
       } catch (Throwable t) {
         receiver.setError(t.clone());
       }
+
+      parentStopSource = null;
     }
   }
   auto connect(Receiver)(return Receiver receiver) @safe scope return {
@@ -380,6 +385,8 @@ private struct TaskPoolSender {
   TaskPool pool;
   static struct Op(Receiver) {
     static void setValue(Receiver receiver) @trusted nothrow {
+      import concurrency : parentStopSource;
+      parentStopSource = receiver.getStopToken().source;
       try {
         receiver.setValue();
       } catch (Exception e) {
@@ -387,6 +394,7 @@ private struct TaskPoolSender {
       } catch (Throwable t) {
         receiver.setError(t.clone);
       }
+      parentStopSource = null;
     }
     TaskPool pool;
     alias TaskType = typeof(task!setValue(Receiver.init));
