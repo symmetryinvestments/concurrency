@@ -134,9 +134,17 @@ struct JustFromSender(Fun) {
       import concurrency.receiver : setValueOrError;
       static if (is(Value == void)) {
         fun();
-        receiver.setValue();
-      } else
-        receiver.setValue(fun());
+        if (receiver.getStopToken.isStopRequested)
+          receiver.setDone();
+        else
+          receiver.setValue();
+      } else {
+        auto r = fun();
+        if (receiver.getStopToken.isStopRequested)
+          receiver.setDone();
+        else
+          receiver.setValue(r);
+      }
     }
   }
   Fun fun;
