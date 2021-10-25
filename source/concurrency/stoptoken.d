@@ -61,6 +61,11 @@ StopCallback onStop(StopToken)(StopToken stopToken, void delegate() nothrow @saf
   return cb;
 }
 
+StopCallback onStop(StopToken)(StopToken stopToken, void function() nothrow @safe callback) nothrow @trusted {
+  import std.functional : toDelegate;
+  return stopToken.onStop(cast(void delegate() nothrow @safe shared)callback.toDelegate);
+}
+
 class StopCallback {
   void dispose() nothrow @trusted @nogc {
     import core.atomic : cas;
