@@ -52,6 +52,36 @@ package struct SyncWaitReceiver2(Value) {
   }
 }
 
+deprecated("Use syncWait instead")
+auto sync_wait(Sender, StopSource)(auto ref Sender sender, StopSource stopSource) {
+  alias Value = Sender.Value;
+  auto result = syncWait(sender, (()@trusted=>cast()stopSource)());
+  static if (is(Value == void)) {
+    return result.match!((Cancelled c) => false,
+                         (Exception e) { throw e; },
+                         (typeof(null)) => true);
+  } else {
+    return result.match!((Cancelled c) { throw new Exception("Cancelled"); },
+                         (Exception e) { throw e; },
+                         (ref t) => t);
+  }
+}
+
+deprecated("Use syncWait instead")
+auto sync_wait(Sender)(auto scope ref Sender sender) {
+  alias Value = Sender.Value;
+  auto result = syncWait(sender);
+  static if (is(Value == void)) {
+    return result.match!((Cancelled c) => false,
+                         (Exception e) { throw e; },
+                         (typeof(null)) => true);
+  } else {
+    return result.match!((Cancelled c) { throw new Exception("Cancelled"); },
+                         (Exception e) { throw e; },
+                         (ref t) => t);
+  }
+}
+
 struct Cancelled {}
 static immutable cancelledException = new Exception("Cancelled");
 
