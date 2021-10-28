@@ -141,24 +141,9 @@ class Nursery : StopSource {
         return receiver.getScheduler().toSchedulerObject();
       }
     }
-    static struct Op {
-      shared Nursery nursery;
-      StopCallback cb;
-      ReceiverObject receiver;
-      @disable this(ref return scope typeof(this) rhs);
-      @disable this(this);
-      this(shared Nursery n, StopCallback cb, ReceiverObject r) {
-        nursery = n;
-        this.cb = cb;
-        receiver = r;
-      }
-      void start() nothrow scope @trusted {
-        nursery.setReceiver(receiver, cb);
-      }
-    }
     auto stopToken = receiver.getStopToken();
     auto cb = (()@trusted => stopToken.onStop(() shared nothrow @trusted => cast(void)this.stop()))();
-    return Op(this, cb, new ReceiverImpl(receiver));
+    return NurseryOp(this, cb, new ReceiverImpl(receiver));
   }
 
   private void setReceiver(ReceiverObject r, StopCallback cb) nothrow @safe shared {
@@ -222,5 +207,21 @@ private struct NurseryReceiver(Value) {
 
   auto getScheduler() @safe {
     return nursery.getScheduler();
+  }
+}
+
+private struct NurseryOp {
+  shared Nursery nursery;
+  StopCallback cb;
+  ReceiverObject receiver;
+  @disable this(ref return scope typeof(this) rhs);
+  @disable this(this);
+  this(return shared Nursery n, StopCallback cb, ReceiverObject r) @safe scope return {
+    nursery = n;
+    this.cb = cb;
+    receiver = r;
+  }
+  void start() nothrow scope @trusted {
+    nursery.setReceiver(receiver, cb);
   }
 }
