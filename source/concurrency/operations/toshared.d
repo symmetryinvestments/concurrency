@@ -22,9 +22,6 @@ auto toShared(Sender)(Sender sender) {
 }
 
 struct NullScheduler {}
-private struct Done{}
-private struct ValueRep{}
-
 enum ResetLogic {
   keepLatest,
   alwaysReset
@@ -32,152 +29,53 @@ enum ResetLogic {
 
 class SharedSender(Sender, Scheduler, ResetLogic resetLogic) if (models!(Sender, isSender)) {
   import std.traits : ReturnType;
-  import concurrency.slist;
-  import concurrency.bitfield;
   static assert(models!(typeof(this), isSender));
-  alias Value = Sender.Value;
-  static if (!is(Value == void))
-    alias ValueRep = Value;
-  alias InternalValue = Algebraic!(Throwable, ValueRep, Done);
-  alias DG = void delegate(InternalValue) nothrow @safe shared;
-  static struct SharedSenderOp(Receiver) {
-    SharedSender parent;
-    Receiver receiver;
-    StopCallback cb;
-    void start() nothrow @trusted scope {
-      parent.add(&(cast(shared)this).onValue);
-      cb = receiver.getStopToken.onStop(&(cast(shared)this).onStop);
-    }
-    void onStop() nothrow @trusted shared {
-      with(unshared) {
-        /// If this is the last one connected, remove will return false,
-        /// stop the underlying sender and we will receive the setDone via
-        /// the onValue.
-        /// This is to ensure we always await the underlying sender for
-        /// completion.
-        if (parent.remove(&(cast(shared)this).onValue))
-          receiver.setDone();
-      }
-    }
-    void onValue(InternalValue value) nothrow @safe shared {
-      with(unshared) {
-        value.match!((ValueRep v){
-            try {
-              static if (is(Value == void))
-                receiver.setValue();
-              else
-                receiver.setValue(v);
-            } catch (Exception e) {
-              /// TODO: dispose needs to be called in all cases, except
-              /// this onValue can sometimes be called immediately,
-              /// leaving no room to set cb.dispose...
-              cb.dispose();
-              receiver.setError(e);
-            }
-          }, (Throwable e){
-            receiver.setError(e);
-          }, (Done d){
-            receiver.setDone();
-          });
-      }
-    }
-    private auto ref unshared() @trusted nothrow shared {
-      return cast()this;
-    }
-  }
-  static class SharedSenderState : StopSource {
-    import std.traits : ReturnType;
-    alias Op = OpType!(Sender, SharedSenderReceiver);
-    SharedSender parent;
-    shared SList!DG dgs;
-    Nullable!InternalValue value;
-    Op op;
-    this(SharedSender parent) {
-      this.dgs = new shared SList!DG;
-      this.parent = parent;
-    }
-  }
-  static struct SharedSenderReceiver {
-    SharedSenderState state;
-    Scheduler scheduler;
-    static if (is(Sender.Value == void))
-      void setValue() @safe {
-        state.value = InternalValue(ValueRep());
-        process();
-      }
-    else
-      void setValue(ValueRep v) @safe {
-        state.value = InternalValue(v);
-        process();
-      }
-    void setDone() @safe nothrow {
-      state.value = InternalValue(Done());
-      process();
-    }
-    void setError(Throwable e) @safe nothrow {
-      state.value = InternalValue(e);
-      process();
-    }
-    private void process() @trusted {
-      state.parent.process();
-    }
-    StopToken getStopToken() @safe nothrow {
-      return StopToken(state);
-    }
-    Scheduler getScheduler() @safe nothrow scope {
-      return scheduler;
-    }
-  }
+  alias Props = Properties!(Sender);
+  alias Value = Props.Value;
+  alias InternalValue = Props.InternalValue;
   private {
     Sender sender;
     Scheduler scheduler;
-    SharedSenderState state;
-    enum Flags {
-      locked = 0x1,
-      completed = 0x2,
-      tick = 0x4
-    }
-    SharedBitField!Flags counter;
-    void add(DG dg) @safe nothrow {
-      with(counter.lock(0, Flags.tick)) {
+    SharedSenderState!(Sender) state;
+    void add(Props.DG dg) @safe nothrow {
+      with(state.counter.lock(0, Flags.tick)) {
         if (was(Flags.completed)) {
-          InternalValue value = state.value.get;
+          InternalValue value = state.inst.value.get;
           release(Flags.tick); // release early
           dg(value);
         } else {
           if ((oldState >> 2) == 0) {
-            auto localState = new SharedSenderState(this);
-            this.state = localState;
+            auto localState = new SharedSenderInstStateImpl!(Sender, Scheduler, resetLogic)();
+            this.state.inst = localState;
             release(); // release early
             localState.dgs.pushBack(dg);
             try {
-              localState.op = sender.connect(SharedSenderReceiver(localState, scheduler));
+              localState.op = sender.connect(SharedSenderReceiver!(Sender, Scheduler, resetLogic)(&state, scheduler));
             } catch (Exception e) {
-              state.value = InternalValue(e);
-              process();
+              state.process!(resetLogic)(InternalValue(e));
             }
             localState.op.start();
           } else {
-            auto localState = state;
+            auto localState = state.inst;
             localState.dgs.pushBack(dg);
           }
         }
       }
     }
     /// returns false if it is the last
-    bool remove(DG dg) @safe nothrow {
-      with (counter.lock(0, 0, Flags.tick)) {
+    bool remove(Props.DG dg) @safe nothrow {
+      with (state.counter.lock(0, 0, Flags.tick)) {
         if (was(Flags.completed)) {
           release(0-Flags.tick); // release early
           return true;
         }
         if ((newState >> 2) == 0) {
-          auto localStopSource = state;
+          auto localStopSource = state.inst;
           release(); // release early
           localStopSource.stop();
           return false;
         } else {
-          auto localReceiver = state;
+          auto localReceiver = state.inst;
           release(); // release early
           localReceiver.dgs.remove(dg);
           return true;
@@ -185,28 +83,12 @@ class SharedSender(Sender, Scheduler, ResetLogic resetLogic) if (models!(Sender,
       }
     }
   }
-  private void process() {
-    static if (resetLogic == ResetLogic.alwaysReset) {
-      size_t updateFlag = 0;
-    } else {
-      size_t updateFlag = Flags.completed;
-    }
-    with(counter.lock(updateFlag)) {
-      auto localState = state;
-      InternalValue v = localState.value.get;
-      release(oldState & (~0x3)); // release early and remove all ticks
-      if (localState.isStopRequested)
-        v = Done();
-      foreach(dg; localState.dgs[])
-        dg(v);
-    }
-  }
   bool isCompleted() @trusted {
     import core.atomic : MemoryOrder;
-    return (counter.load!(MemoryOrder.acq) & Flags.completed) > 0;
+    return (state.counter.load!(MemoryOrder.acq) & Flags.completed) > 0;
   }
   void reset() @trusted {
-    with (counter.lock()) {
+    with (state.counter.lock()) {
       if (was(Flags.completed))
         release(Flags.completed);
     }
@@ -217,7 +99,150 @@ class SharedSender(Sender, Scheduler, ResetLogic resetLogic) if (models!(Sender,
   }
   auto connect(Receiver)(return Receiver receiver) @safe scope return {
     // ensure NRVO
-    auto op = SharedSenderOp!Receiver(this, receiver);
+    auto op = SharedSenderOp!(Sender, Scheduler, resetLogic, Receiver)(this, receiver);
     return op;
   }
+}
+
+private enum Flags {
+  locked = 0x1,
+  completed = 0x2,
+  tick = 0x4
+}
+
+private struct Done{}
+
+private struct ValueRep{}
+
+private template Properties(Sender) {
+  alias Value = Sender.Value;
+  static if (!is(Value == void))
+    alias ValueRep = Value;
+  else
+    alias ValueRep = .ValueRep;
+  alias InternalValue = Algebraic!(Throwable, ValueRep, Done);
+  alias DG = void delegate(InternalValue) nothrow @safe shared;
+}
+
+private struct SharedSenderOp(Sender, Scheduler, ResetLogic resetLogic, Receiver) {
+  alias Props = Properties!(Sender);
+  SharedSender!(Sender, Scheduler, resetLogic) parent;
+  Receiver receiver;
+  StopCallback cb;
+  void start() nothrow @trusted scope {
+    parent.add(&(cast(shared)this).onValue);
+    cb = receiver.getStopToken.onStop(&(cast(shared)this).onStop);
+  }
+  void onStop() nothrow @trusted shared {
+    with(unshared) {
+      /// If this is the last one connected, remove will return false,
+      /// stop the underlying sender and we will receive the setDone via
+      /// the onValue.
+      /// This is to ensure we always await the underlying sender for
+      /// completion.
+      if (parent.remove(&(cast(shared)this).onValue))
+        receiver.setDone();
+    }
+  }
+  void onValue(Props.InternalValue value) nothrow @safe shared {
+    with(unshared) {
+      value.match!((Props.ValueRep v){
+          try {
+            static if (is(Props.Value == void))
+              receiver.setValue();
+            else
+              receiver.setValue(v);
+          } catch (Exception e) {
+            /// TODO: dispose needs to be called in all cases, except
+            /// this onValue can sometimes be called immediately,
+            /// leaving no room to set cb.dispose...
+            cb.dispose();
+            receiver.setError(e);
+          }
+        }, (Throwable e){
+          receiver.setError(e);
+        }, (Done d){
+          receiver.setDone();
+        });
+    }
+  }
+  private auto ref unshared() @trusted nothrow shared {
+    return cast()this;
+  }
+}
+
+private struct SharedSenderReceiver(Sender, Scheduler, ResetLogic resetLogic) {
+  alias InternalValue = Properties!(Sender).InternalValue;
+  alias ValueRep = Properties!(Sender).ValueRep;
+  SharedSenderState!(Sender)* state;
+  Scheduler scheduler;
+  static if (is(Sender.Value == void))
+    void setValue() @safe {
+      process(InternalValue(ValueRep()));
+    }
+  else
+    void setValue(ValueRep v) @safe {
+      process(InternalValue(v));
+    }
+  void setDone() @safe nothrow {
+    process(InternalValue(Done()));
+  }
+  void setError(Throwable e) @safe nothrow {
+    process(InternalValue(e));
+  }
+  private void process(InternalValue v) @safe {
+    state.process!(resetLogic)(v);
+  }
+  StopToken getStopToken() @trusted nothrow {
+    return StopToken(state.inst);
+  }
+  Scheduler getScheduler() @safe nothrow scope {
+    return scheduler;
+  }
+}
+
+private struct SharedSenderState(Sender) {
+  import concurrency.bitfield;
+
+  alias Props = Properties!(Sender);
+
+  SharedSenderInstState!(Sender) inst;
+  SharedBitField!Flags counter;
+}
+
+private template process(ResetLogic resetLogic) {
+  void process(State, InternalValue)(State state, InternalValue value) @safe {
+    state.inst.value = value;
+    static if (resetLogic == ResetLogic.alwaysReset) {
+      size_t updateFlag = 0;
+    } else {
+      size_t updateFlag = Flags.completed;
+    }
+    with(state.counter.lock(updateFlag)) {
+      auto localState = state.inst;
+      InternalValue v = localState.value.get;
+      release(oldState & (~0x3)); // release early and remove all ticks
+      if (localState.isStopRequested)
+        v = Done();
+      foreach(dg; localState.dgs[])
+        dg(v);
+    }
+  }
+}
+
+private class SharedSenderInstState(Sender) : StopSource {
+  import concurrency.slist;
+  import std.traits : ReturnType;
+  alias Props = Properties!(Sender);
+  shared SList!(Props.DG) dgs;
+  Nullable!(Props.InternalValue) value;
+  this() {
+    this.dgs = new shared SList!(Props.DG);
+  }
+}
+
+/// NOTE: this is a super class to break a dependency cycle of SharedSenderReceiver on itself (which it technically doesn't have but is probably too complex for the compiler)
+private class SharedSenderInstStateImpl(Sender, Scheduler, ResetLogic resetLogic) : SharedSenderInstState!(Sender) {
+  alias Op = OpType!(Sender, SharedSenderReceiver!(Sender, Scheduler, resetLogic));
+  Op op;
 }

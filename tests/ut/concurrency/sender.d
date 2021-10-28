@@ -234,6 +234,15 @@ import core.atomic : atomicOp;
   DelaySender(1.msecs).toShared(localThreadScheduler).syncWait().isOk.should == true;
 }
 
+@("toShared.nursery")
+@safe unittest {
+  /// just see if we can instantiate
+  import concurrency.nursery;
+  import concurrency.scheduler;
+  auto n = new shared Nursery();
+  auto s = n.toShared(localThreadScheduler());
+}
+
 @("nvro")
 @safe unittest {
   static struct Op(Receiver) {
