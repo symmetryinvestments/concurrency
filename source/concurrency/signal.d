@@ -28,6 +28,10 @@ bool setGlobalStopSource(shared StopSource stopSource) @safe {
 void setupCtrlCHandler(shared StopSource stopSource) @trusted {
   import core.sys.posix.signal;
   import core.atomic;
+
+  if (stopSource is null)
+    return;
+
   auto old = atomicExchange(&SignalHandler.signalStopSource, stopSource);
   if (old !is null)
     return;
@@ -60,10 +64,12 @@ private static shared StopSource globalSource;
 
 struct SignalHandler {
   import core.atomic : atomicStore, atomicLoad, MemoryOrder;
+  import core.thread : Thread;
   static shared int lastSignal; // last signal received
+  enum int ABORT = -1;
   version (Windows) {
     import core.sync.event : Event;
-    static shared Event event; // used to notify the dedicated thread to shutdown
+    private static shared Event event; // used to notify the dedicated thread to shutdown
     static void notify(int num) nothrow @nogc @trusted {
       lastSignal.atomicStore!(MemoryOrder.rel)(num);
       (cast()event).set();
@@ -77,7 +83,7 @@ struct SignalHandler {
     }
   } else version (linux) {
     import core.sys.posix.unistd : write, read;
-    static shared int event; // eventfd to notify dedicated thread
+    private static shared int event; // eventfd to notify dedicated thread
     static void notify(int num) nothrow @nogc {
       lastSignal.atomicStore!(MemoryOrder.rel)(num);
       ulong b = 1;
@@ -94,7 +100,7 @@ struct SignalHandler {
     }
   } else version (Posix) {
     import core.sys.posix.unistd : write, read, pipe;
-    static shared int[2] selfPipe; // self pipe to notify dedicated thread
+    private static shared int[2] selfPipe; // self pipe to notify dedicated thread
     static void notify(int num) nothrow @nogc {
       lastSignal.atomicStore!(MemoryOrder.rel)(num);
       ulong b = 1;
@@ -111,18 +117,33 @@ struct SignalHandler {
         throw new ErrnoException("Failed to create self-pipe");
     }
   }
-  static shared StopSource signalStopSource;
+  private static void shutdown() {
+    if (atomicLoad!(MemoryOrder.acq)(signalStopSource) !is null)
+      SignalHandler.notify(ABORT);
+  }
+  private static shared StopSource signalStopSource;
+  private static shared Thread handlerThread;
   static void launchHandlerThread() {
-    import core.thread;
+    if (handlerThread.atomicLoad !is null)
+      return;
+
     auto thread = new Thread((){
         for(;;) {
-          SignalHandler.await();
+          if (SignalHandler.await() == ABORT) {
+            return;
+          }
           signalStopSource.stop();
         }
       });
+    // This has to be a daemon thread otherwise the runtime will wait on it before calling the shared module destructor that stops it.
     thread.isDaemon = true;
     thread.start();
   }
+}
+
+/// This is required to properly shutdown in the presence of sanitizers
+shared static ~this() {
+  SignalHandler.shutdown();
 }
 
 version (Windows) {

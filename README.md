@@ -151,23 +151,35 @@ For testing purposes there is a `ManualTimeScheduler` which can be used to advan
 
 A place where Senders can be awaited in. Senders placed in the Nursery are started only when the Nursery is started.
 
-In many ways it is like the `when_all`, except as an object. That allows it to be passed around and for work to be registered into it dynamically.
+In many ways it is like the `whenAll`, except as an object. That allows it to be passed around and for work to be registered into it dynamically.
 
-## StopToken
+## Cancellation
 
-StopTokens are thread-safe objects used to request cancellation. They can be polled or subscribed to.
-
-A receiver may have a `getStopToken` that returns one. If not a default `getStopToken` is available that returns a `NeverStopToken`.
-
-A Sender should retrieve a StopToken via `getStopToken` on the connecting Receiver and try to abort as quick as possible when it gets triggered.
-
-The simplest way is to poll the stoptoken regularly. There is a `isStopRequested` method that will return `true` if the Sender should abort. After cleanup the Sender must call `setDone`.
-
-> NOTE: In some cases when a stop is requested, the Sender is already busy setting a value or an exception. Receivers should not assume that because the stoptoken is triggered only `setDone` will be called, it is perfectly valid to call one of the other two as well.
-
-You might need a push notification that a stop has been requested. There is a free function called `onStop` that takes a StopToken and a delegate. The delegate will be called - in an undefined execution context - to signify that a stop is requested. The `onStop` function returns a `StopCallback` that needs its `dispose` to be called before the Sender has terminated. Not calling `dispose` will lead to memory leaks in long-running Senders (e.g. the Nursery).
+Cancellation is a very important aspect of asynchronous work. So much so that it is baked-in into the Receiver's API. It is a cooperative mechanism however, and it requires each Sender to respond to requests. In response to a stop request a Sender should call the `setDone` function, so that any downstream work is cancelled as well. However, in case of a race, it is perfectly fine to terminate with any of the other termination functions.
 
 See http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p2175r0.html for a thorough explanation for why we need stop tokens in particular and cancellation in general.
+
+Cancellation requests happen through the use of a `StopSource` and a `StopToken`. Each Sender should request a `StopToken` from its Receiver by calling `getStopToken`. Senders should respond to cancellation through polling the StopToken's `isStopRequested` method or calling the `onStop` method to attach a callback. Note that the callback might be called immediately in case a stop has already been requested.
+
+By default the `syncWait` call will create a `StopSource` and a `StopToken`. The `StopSource` will be connected to any enclosing `syncWait` operation or otherwise to the `globalStopSource`. You can supply a `StopSource` to the `syncWait` function explicitely, but note that it won't be connected to any enclosing StopSource, for which you are responsible yourself.
+
+## Signals and termination
+
+By default the library sets up a signal handler on the first use of `syncWait`. It spins up a dedicated thread to listen for both `SIGINT` and `SIGTERM`. Either signal causes the `globalStopSource`'s `stop` method to be called on that dedicated thread.
+
+All calls to `syncWait` that do not supply a `StopSource` explicitely will create a `StopSource` which will be connected to the `globalStopSource`, or, in the case of nested `syncWaits`, to the parent `StopSource`.
+
+This ensures that by default both `SIGINT` and `SIGTERM` will cancel all work.
+
+This behavior can be overridden by calling `setGlobalStopSource` before any call to `syncWait`. If you do so you are responsible for setting up signal handlers yourself. See the functions in [signal.d](./source/concurrency/signal.d), specifically `setupCtrlCHandler`.
+
+### Additional methods of termination
+
+In certain scenarios you want to have additional ways to terminate outstanding work.
+
+Simply calling `globalStopSource().stop()` will cause any work to be cancelled. It will use the current thread to run all stop callbacks.
+
+If you want the termination to happen asynchronously, for instance because the current thread is not async-safe, you can call `SignalHandler.notify(SIGINT)`. Note that this does rely on `SignalHandler.launchHandlerThread` to be called at one point. This happens by default unless you call `setGlobalStopSource` and it returns `true`. In that case you need to call `SignalHandler.launchHandlerThread` yourself too. See the functions in [signal.d](./source/concurrency/signal.d).
 
 ## DSemver
 
