@@ -51,14 +51,23 @@ struct NeverStopToken {
   enum isStopPossible = false;
 }
 
-StopCallback onStop(StopToken)(StopToken stopToken, void delegate() nothrow @safe shared callback) nothrow @safe {
-  import std.traits : hasMember;
+StopCallback onStop(StopSource stopSource, void delegate() nothrow @safe shared callback) nothrow @safe {
   auto cb = new StopCallback(callback);
-  if (stopToken.isStopPossible) {
-    if (stopToken.source.state.try_add_callback(cb, true))
-      cb.source = stopToken.source;
-  }
+  if (stopSource.state.try_add_callback(cb, true))
+    cb.source = stopSource;
   return cb;
+}
+
+StopCallback onStop(StopSource stopSource, void function() nothrow @safe callback) nothrow @trusted {
+  import std.functional : toDelegate;
+  return stopSource.onStop(cast(void delegate() nothrow @safe shared)callback.toDelegate);
+}
+
+StopCallback onStop(StopToken)(StopToken stopToken, void delegate() nothrow @safe shared callback) nothrow @safe {
+  if (stopToken.isStopPossible) {
+    return stopToken.source.onStop(callback);
+  }
+  return new StopCallback(callback);
 }
 
 StopCallback onStop(StopToken)(StopToken stopToken, void function() nothrow @safe callback) nothrow @trusted {
