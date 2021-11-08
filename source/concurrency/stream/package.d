@@ -154,8 +154,10 @@ auto intervalStream(Duration duration, bool emitAtStart = false) {
         if (emitAtStart) {
           emitAtStart = false;
           dg();
-          if (receiver.getStopToken.isStopRequested)
+          if (receiver.getStopToken.isStopRequested) {
+            receiver.setDone();
             return;
+          }
         }
         load();
       } catch (Exception e) {
