@@ -63,7 +63,7 @@ void setupCtrlCHandler(shared StopSource stopSource) @trusted {
 private static shared StopSource globalSource;
 
 struct SignalHandler {
-  import core.atomic : atomicStore, atomicLoad, MemoryOrder;
+  import core.atomic : atomicStore, atomicLoad, MemoryOrder, atomicExchange;
   import core.thread : Thread;
   static shared int lastSignal; // last signal received
   enum int ABORT = -1;
@@ -137,13 +137,21 @@ struct SignalHandler {
       });
     // This has to be a daemon thread otherwise the runtime will wait on it before calling the shared module destructor that stops it.
     thread.isDaemon = true;
+
+    if (atomicExchange(&handlerThread, cast(shared)thread) !is null)
+      return; // someone beat us to it
+
     thread.start();
   }
 }
 
 /// This is required to properly shutdown in the presence of sanitizers
 shared static ~this() {
+  import core.atomic : atomicExchange;
+  import core.thread : Thread;
   SignalHandler.shutdown();
+  if (auto thread = atomicExchange(&SignalHandler.handlerThread, null))
+    (cast()thread).join();
 }
 
 version (Windows) {
