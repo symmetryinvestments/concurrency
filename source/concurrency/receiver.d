@@ -12,7 +12,7 @@ void checkReceiver(T)() {
   else
     t.setValue(Params[0].init);
   (() nothrow => t.setDone())();
-  (() nothrow => t.setError(new Exception("test")))();
+  (() nothrow => t.setError(new Throwable("test")))();
 }
 
 enum isReceiver(T) = is(typeof(checkReceiver!T));
