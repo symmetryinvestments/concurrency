@@ -7,6 +7,7 @@ import concurrency.stoptoken;
 import concepts;
 import std.traits;
 
+deprecated("don't use it, the semantics aren't correct")
 auto finally_(Sender, Result)(Sender sender, Result result) {
     import std.traits : isCallable;
     return FinallySender!(Sender, Result)(sender, result);
