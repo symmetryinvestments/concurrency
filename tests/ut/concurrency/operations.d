@@ -400,3 +400,27 @@ DoneSender().forwardOn(pool.getScheduler).syncWait.isCancelled.should == true;
 
   state.parentAfterChild.atomicLoad.should == true;
 }
+
+@("onTermination.value")
+@safe unittest {
+  import core.atomic : atomicOp;
+  shared int g = 0;
+  just(42).onTermination(() @safe shared => g.atomicOp!"+="(1)).syncWait.assumeOk;
+  g.should == 1;
+}
+
+@("onTermination.done")
+@safe unittest {
+  import core.atomic : atomicOp;
+  shared int g = 0;
+  DoneSender().onTermination(() @safe shared => g.atomicOp!"+="(1)).syncWait.isCancelled.should == true;
+  g.should == 1;
+}
+
+@("onTermination.error")
+@safe unittest {
+  import core.atomic : atomicOp;
+  shared int g = 0;
+  ThrowingSender().onTermination(() @safe shared => g.atomicOp!"+="(1)).syncWait.isError.should == true;
+  g.should == 1;
+}

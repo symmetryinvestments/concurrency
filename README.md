@@ -95,6 +95,8 @@ Senders enjoy the following operations.
 
 - `withChild`. Creates an ordering of stop triggers between the parent and the child. When the resulting Sender's `StopToken` is triggered, the parent's is only triggered after the child has completed. This creates certainty of child operations having ran cleanup code before the parent is triggered.
 
+- `onTermination`. Invokes the supplied callable on any termination of the underlying `Sender`.
+
 ## Streams
 
 A Stream has a `.collect` function that accepts a `shared` callable and returns a Sender. Once the Sender is connected and started the Stream will call the callable zero or more times before one of the three terminal functions of the Receiver is called.
