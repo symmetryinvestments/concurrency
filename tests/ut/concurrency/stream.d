@@ -573,3 +573,55 @@ unittest {
 unittest {
   "-/|\\".cycleStream().take(6).toList.syncWait.value.should == "-/|\\-/";
 }
+
+@("flatmap.concat.just")
+@safe unittest {
+  import concurrency.sender : just;
+
+  [1,2,3].arrayStream
+    .flatMapConcat((int i) => just(i))
+    .toList
+    .syncWait
+    .value
+    .should == [1,2,3];
+}
+
+@("flatmap.concat.thread")
+@safe unittest {
+  import concurrency.sender : just;
+  import concurrency.operations : via;
+
+  [1,2,3].arrayStream
+    .flatMapConcat((int i) => just(i).via(ThreadSender()))
+    .toList
+    .syncWait
+    .value
+    .should == [1,2,3];
+}
+
+@("flatmap.concat.error")
+@safe unittest {
+  import concurrency.sender : just, ErrorSender;
+  import concurrency.operations : via;
+
+  [1,2,3].arrayStream
+    .flatMapConcat((int i) => ErrorSender())
+    .collect(()shared{})
+    .syncWait
+    .assumeOk
+    .shouldThrow();
+}
+
+@("flatmap.concat.thread.on.thread")
+@safe unittest {
+  import concurrency.sender : just;
+  import concurrency.operations : via;
+
+  [1,2,3].arrayStream
+    .flatMapConcat((int i) => just(i).via(ThreadSender()))
+    .toList
+    .via(ThreadSender())
+    .syncWait
+    .value
+    .should == [1,2,3];
+}
