@@ -8,6 +8,20 @@ import concurrency.nursery;
 import concurrency.stoptoken;
 import unit_threaded;
 
+@("run.stopped")
+@safe unittest {
+  auto nursery = new shared Nursery();
+  nursery.stop();
+  nursery.syncWait().isCancelled.should == true;
+}
+
+@("run.empty")
+@safe unittest {
+  auto nursery = new shared Nursery();
+  auto stop = justFrom(() shared => nursery.stop());
+  whenAll(nursery, stop).syncWait().isCancelled.should == true;
+}
+
 @("run.value")
 @safe unittest {
   auto nursery = new shared Nursery();
@@ -158,10 +172,4 @@ unittest {
   nursery.run(stopper);
 
   nursery.syncWait.isCancelled.should == true;
-}
-
-@("nothrow")
-@safe unittest {
-  auto nursery = new shared Nursery();
-  (() nothrow => nursery.run(ValueSender!int(21)))();
 }
