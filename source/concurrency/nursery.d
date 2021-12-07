@@ -29,7 +29,7 @@ class Nursery : StopSource {
       size_t id;
     }
     Mutex mutex;
-    shared size_t busy = 0;
+    shared size_t busy = 1; // we start at 1 to denote the Nursery is open for tasks
     shared size_t counter = 0;
     Throwable throwable; // first throwable from sender, if any
     ReceiverObject receiver;
@@ -43,6 +43,19 @@ class Nursery : StopSource {
     import concurrency.utils : resetScheduler;
     resetScheduler();
     with(assumeThreadSafe) mutex = new Mutex();
+  }
+
+  override bool stop() nothrow @trusted {
+    auto result = super.stop();
+
+    if (result)
+      (cast(shared)this).done(-1);
+
+    return result;
+  }
+
+  override bool stop() nothrow @trusted shared {
+    return (cast(Nursery)this).stop();
   }
 
   StopToken getStopToken() nothrow @trusted shared {
@@ -69,13 +82,14 @@ class Nursery : StopSource {
       auto idx = operations.countUntil!(o => o.id == id);
       if (idx != -1)
         operations = operations.remove(idx);
-      bool isDone = atomicOp!"-="(busy,1) == 0;
+      bool isDone = atomicOp!"-="(busy,1) == 0 || operations.length == 0;
       auto localReceiver = receiver;
       auto localThrowable = throwable;
       if (isDone) {
         throwable = null;
         receiver = null;
-        stopCallback.dispose();
+        if (stopCallback)
+          stopCallback.dispose();
         stopCallback = null;
       }
       mutex.unlock_nothrow();
@@ -105,17 +119,21 @@ class Nursery : StopSource {
     import concepts;
     static assert (models!(Sender, isSender));
     import std.typecons : Nullable;
-    import core.atomic : atomicOp;
+    import core.atomic : atomicOp, atomicLoad;
     import concurrency.sender : connectHeap;
 
     static if (is(Sender == class) || is(Sender == interface))
       if (sender is null)
         return;
 
+    if (busy.atomicLoad() == 0)
+      throw new Exception("This nursery is already stopped, it cannot accept more work.");
+
     size_t id = atomicOp!"+="(counter, 1);
     auto op = sender.connectHeap(NurseryReceiver!(Sender.Value)(this, id));
 
     mutex.lock_nothrow();
+
     operations ~= cast(shared) Node(op, id);
     atomicOp!"+="(busy, 1);
     bool hasStarted = this.receiver !is null;
@@ -222,6 +240,10 @@ private struct NurseryOp {
     receiver = r;
   }
   void start() nothrow scope @trusted {
-    nursery.setReceiver(receiver, cb);
+    import core.atomic : atomicLoad;
+    if (nursery.busy.atomicLoad == 0)
+      receiver.setDone();
+    else
+      nursery.setReceiver(receiver, cb);
   }
 }
