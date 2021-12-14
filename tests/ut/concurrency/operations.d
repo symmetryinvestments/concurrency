@@ -424,3 +424,35 @@ DoneSender().forwardOn(pool.getScheduler).syncWait.isCancelled.should == true;
   ThrowingSender().onTermination(() @safe shared => g.atomicOp!"+="(1)).syncWait.isError.should == true;
   g.should == 1;
 }
+
+@("onError.value")
+@safe unittest {
+  import core.atomic : atomicOp;
+  shared int g = 0;
+  just(42).onError((Exception e) @safe shared => g.atomicOp!"+="(1)).syncWait.assumeOk;
+  g.should == 0;
+}
+
+@("onError.done")
+@safe unittest {
+  import core.atomic : atomicOp;
+  shared int g = 0;
+  DoneSender().onError((Exception e) @safe shared => g.atomicOp!"+="(1)).syncWait.isCancelled.should == true;
+  g.should == 0;
+}
+
+@("onError.error")
+@safe unittest {
+  import core.atomic : atomicOp;
+  shared int g = 0;
+  ThrowingSender().onError((Exception e) @safe shared => g.atomicOp!"+="(1)).syncWait.isError.should == true;
+  g.should == 1;
+}
+
+@("onError.throw")
+@safe unittest {
+  import core.exception : AssertError;
+  auto err = ThrowingSender().onError((Exception e) @safe shared { throw new Exception("in onError"); }).syncWait.error;
+  err.msg.should == "in onError";
+  err.next.msg.should == "ThrowingSender";
+}
