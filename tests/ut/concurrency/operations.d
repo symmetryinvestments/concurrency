@@ -456,3 +456,52 @@ DoneSender().forwardOn(pool.getScheduler).syncWait.isCancelled.should == true;
   err.msg.should == "in onError";
   err.next.msg.should == "ThrowingSender";
 }
+
+@("stopWhen.source.value")
+@safe unittest {
+  auto waiting = ThreadSender().withStopToken((StopToken token) @trusted {
+      while (!token.isStopRequested) { Thread.yield(); }
+      return 43;
+    });
+  auto trigger = delay(100.msecs);
+  waiting.stopWhen(trigger).syncWait().value.should == 43;
+}
+
+@("stopWhen.source.error")
+@safe unittest {
+  auto waiting = ThreadSender().withStopToken((StopToken token) @trusted {
+      while (!token.isStopRequested) { Thread.yield(); }
+      throw new Exception("Upside down");
+    });
+  auto trigger = delay(100.msecs);
+  waiting.stopWhen(trigger).syncWait().assumeOk.shouldThrowWithMessage("Upside down");
+}
+
+@("stopWhen.source.cancelled")
+@safe unittest {
+  auto waiting = ThreadSender().withStopToken((StopToken token) @trusted {
+      while (!token.isStopRequested) { Thread.yield(); }
+    }).completeWithCancellation;
+  auto trigger = delay(100.msecs);
+  waiting.stopWhen(trigger).syncWait().isCancelled.should == true;
+}
+
+@("stopWhen.trigger.error")
+@safe unittest {
+  auto waiting = ThreadSender().withStopToken((StopToken token) @trusted {
+      while (!token.isStopRequested) { Thread.yield(); }
+      throw new Exception("This occurres later, so the other one gets propagated");
+    });
+  auto trigger = ThrowingSender();
+  waiting.stopWhen(trigger).syncWait().assumeOk.shouldThrowWithMessage("ThrowingSender");
+}
+
+@("stopWhen.trigger.cancelled.value")
+@safe unittest {
+  auto waiting = ThreadSender().withStopToken((StopToken token) @trusted {
+      while (!token.isStopRequested) { Thread.yield(); }
+      return 42;
+    });
+  auto trigger = delay(100.msecs).completeWithCancellation;
+  waiting.stopWhen(trigger).syncWait().isCancelled.should == true;
+}
