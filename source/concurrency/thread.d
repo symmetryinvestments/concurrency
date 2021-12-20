@@ -25,17 +25,10 @@ class LocalThreadExecutor : Executor {
   }
 
   void execute(VoidDelegate dg) @trusted {
-    version (unittest) {
-      // NOTE: We must call the delegate on the current thread instead of going to the main one
-      // the reason is that there is no nursery running on the main one because we are running unit tests
-      // when SIL becomes multithreaded we can revisit this
+    if (isInContext)
       dg();
-    } else {
-      if (isInContext)
-        dg();
-      else
-        (cast() tid).send(dg);
-    }
+    else
+      (cast() tid).send(dg);
   }
 
   void execute(VoidFunction fn) @trusted {
