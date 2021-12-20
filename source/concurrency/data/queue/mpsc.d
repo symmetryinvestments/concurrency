@@ -1,4 +1,4 @@
-module concurrency.queue.mpsc;
+module concurrency.data.queue.mpsc;
 
 struct MPSCQueueProducer(Node) {
   private MPSCQueue!(Node) q;

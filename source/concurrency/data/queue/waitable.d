@@ -1,6 +1,6 @@
-module concurrency.queue.waitable;
+module concurrency.data.queue.waitable;
 
-class Waitable(Q) {
+class WaitableQueue(Q) {
   import core.sync.semaphore : Semaphore;
   import core.time : Duration;
   import mir.algebraic : Nullable;
@@ -45,13 +45,13 @@ class Waitable(Q) {
   }
 
   static if (__traits(compiles, q.producer)) {
-    shared(WaitableProducer!Q) producer() @trusted nothrow @nogc {
-      return shared WaitableProducer!Q(cast(shared)q, cast(shared)sema);
+    shared(WaitableQueueProducer!Q) producer() @trusted nothrow @nogc {
+      return shared WaitableQueueProducer!Q(cast(shared)q, cast(shared)sema);
     }
   }
 }
 
-struct WaitableProducer(Q) {
+struct WaitableQueueProducer(Q) {
   import core.sync.semaphore : Semaphore;
 
   private shared Q q;
