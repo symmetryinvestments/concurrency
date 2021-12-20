@@ -95,6 +95,8 @@ Senders enjoy the following operations.
 
 - `onTermination`. Invokes the supplied callable on any termination of the underlying `Sender`.
 
+- `stopWhen`. Cancels the source when the trigger completes normally. If the either source or trigger completes with cancellation or with an error, the first one is propagates after both are completed.
+
 ## Streams
 
 A Stream has a `.collect` function that accepts a `shared` callable and returns a Sender. Once the Sender is connected and started the Stream will call the callable zero or more times before one of the three terminal functions of the Receiver is called.
