@@ -14,5 +14,6 @@ int main(string[] args)
                         "ut.concurrency.scheduler",
                         "ut.concurrency.thread",
                         "ut.concurrency.utils",
+                        "ut.concurrency.mpsc"
                         );
 }
