@@ -54,9 +54,8 @@ struct Timer {
 }
 
 auto localThreadScheduler() {
-  import concurrency.thread : LocalThreadWorker;
-  import std.concurrency : thisTid;
-  return SchedulerAdapter!LocalThreadWorker(LocalThreadWorker(thisTid()));
+  import concurrency.thread : LocalThreadWorker, getLocalThreadExecutor;
+  return SchedulerAdapter!LocalThreadWorker(LocalThreadWorker(getLocalThreadExecutor));
 }
 
 struct SchedulerAdapter(Worker) {
