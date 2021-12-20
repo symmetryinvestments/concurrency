@@ -6,6 +6,7 @@ import concurrency.sender;
 import concurrency.stoptoken;
 import concepts;
 
+/// runs a side-effect whenever the underlying sender errors
 auto onError(Sender, SideEffect)(Sender sender, SideEffect effect) {
   import concurrency.utils : isThreadSafeFunction;
   alias T = Exception;
