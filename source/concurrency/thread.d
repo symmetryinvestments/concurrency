@@ -70,10 +70,6 @@ package struct LocalThreadWorker {
     this.tid = e.tid;
   }
 
-  this(Tid tid) @safe {
-    this.tid = tid;
-  }
-
   void start() @trusted {
     assert(isInContext); // start can only be called on the thread
     import concurrency.timingwheels;
