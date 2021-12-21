@@ -15,5 +15,6 @@ int main(string[] args)
                         "ut.concurrency.thread",
                         "ut.concurrency.utils",
                         "ut.concurrency.mpsc",
+                        "ut.concurrency.waitable",
                         );
 }
