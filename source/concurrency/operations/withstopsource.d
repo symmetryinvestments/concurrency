@@ -47,11 +47,10 @@ private struct SSReceiver(Receiver, Value) {
     import core.atomic;
     if (this.combinedSource is null) {
       auto local = new StopSource();
-      auto sharedStopSource = cast(shared)local;
-      StopSource emptyStopSource = null;
-      if (cas(&this.combinedSource, emptyStopSource, local)) {
-        cbs[0] = receiver.getStopToken().onStop(() shared => cast(void)sharedStopSource.stop());
-        cbs[1] = StopToken(stopSource).onStop(() shared => cast(void)sharedStopSource.stop());
+      if (cas(&this.combinedSource, cast(StopSource)null, local)) {
+        auto stop = cast(void delegate() shared nothrow @safe)&local.stop;
+        cbs[0] = receiver.getStopToken().onStop(stop);
+        cbs[1] = StopToken(stopSource).onStop(stop);
         if (atomicLoad(this.combinedSource) is null) {
           cbs[0].dispose();
           cbs[1].dispose();
