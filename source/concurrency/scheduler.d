@@ -116,23 +116,24 @@ struct ScheduleAfterOp(Worker, Receiver) {
       }
       stopCb = receiver.getStopToken().onStop(cast(void delegate() nothrow @safe shared)&stop);
       try {
-        timer = worker.addTimer((TimerTrigger cause) shared nothrow {
-            stopCb.dispose();
-            final switch (cause) {
-            case TimerTrigger.cancel:
-              receiver.setDone();
-              break;
-            case TimerTrigger.trigger:
-              with(flags.update(Flags.terminated)) {
-                if ((oldState & Flags.terminated) == 0)
-                  receiver.setValueOrError();
-              }
-              break;
-            }
-          }, dur);
+        timer = worker.addTimer(cast(void delegate(TimerTrigger) @safe shared)&trigger, dur);
       } catch (Exception e) {
         receiver.setError(e);
       }
+    }
+  }
+  private void trigger(TimerTrigger cause) @trusted nothrow {
+    stopCb.dispose();
+    final switch (cause) {
+    case TimerTrigger.cancel:
+      receiver.setDone();
+      break;
+    case TimerTrigger.trigger:
+      with(flags.update(Flags.terminated)) {
+        if ((oldState & Flags.terminated) == 0)
+          receiver.setValueOrError();
+      }
+      break;
     }
   }
   private void stop() @trusted nothrow {
