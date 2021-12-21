@@ -5,6 +5,11 @@ import concurrency.scheduler;
 import concurrency.sender;
 import concepts;
 import core.sync.semaphore : Semaphore;
+import mir.algebraic;
+import concurrency.scheduler : Timer;
+import core.time : Duration;
+import concurrency.data.queue.waitable;
+import concurrency.data.queue.mpsc;
 
 LocalThreadExecutor getLocalThreadExecutor() @safe {
   static LocalThreadExecutor localThreadExecutor;
@@ -13,61 +18,74 @@ LocalThreadExecutor getLocalThreadExecutor() @safe {
   return localThreadExecutor;
 }
 
+struct AddTimer {
+  Timer timer;
+  Duration dur;
+}
+
+struct RemoveTimer {
+  Timer timer;
+}
+
+alias WorkItem = Variant!(typeof(null), VoidDelegate, VoidFunction, AddTimer, RemoveTimer); // null signifies end
+
+struct WorkNode {
+  WorkItem payload;
+  WorkNode* next;
+}
+
+alias WorkQueue = WaitableQueue!(MPSCQueue!WorkNode);
+
 class LocalThreadExecutor : Executor {
   import core.atomic : atomicOp, atomicStore, atomicLoad, cas;
-  import std.concurrency : Tid, thisTid, send, receive;
+  import core.thread : ThreadID;
+  import std.process : thisThreadID;
+  static struct Node {
+    VoidDelegate dg;
+    Node* next;
+  }
   private {
-    Tid tid;
+    ThreadID threadId;
+    WorkQueue queue;
   }
 
   this() @safe {
-    tid = thisTid;
+    // todo: probably use thisThreadID
+    threadId = thisThreadID;
+    queue = new WorkQueue;
   }
 
   void execute(VoidDelegate dg) @trusted {
     if (isInContext)
       dg();
     else
-      (cast() tid).send(dg);
+      queue.push(new WorkNode(WorkItem(dg)));
   }
 
   void execute(VoidFunction fn) @trusted {
-    version (unittest) {
+    if (isInContext)
       fn();
-    } else {
-      if (isInContext)
-        fn();
-      else
-        (cast() tid).send(fn);
-    }
+    else
+      queue.push(new WorkNode(WorkItem(fn)));
   }
 
   bool isInContext() @trusted {
-    return thisTid == cast()tid;
+    return thisThreadID == threadId;
   }
 }
 
 package struct LocalThreadWorker {
   import core.time : Duration, msecs, hnsecs;
-  import std.concurrency : Tid, thisTid, send, receive, receiveTimeout;
   import concurrency.scheduler : Timer, TimerTrigger, TimerDelegate;
 
-  static struct AddTimer {
-    Timer timer;
-    Duration dur;
-  }
-  static struct RemoveTimer {
-    Timer timer;
-  }
-
   private {
-    Tid tid;
     shared int counter;
     shared ulong nextTimerId;
+    LocalThreadExecutor executor;
   }
 
   this(LocalThreadExecutor e) @safe {
-    this.tid = e.tid;
+    executor = e;
   }
 
   void start() @trusted {
@@ -78,36 +96,37 @@ package struct LocalThreadWorker {
     auto ticks = 1.msecs; // represents the granularity
     wheels.init();
     bool running = true;
-    auto addTimerHandler = (AddTimer cmd) scope {
-      auto real_now = Clock.currStdTime;
-      auto tw_now = wheels.currStdTime(ticks);
-      auto delay = (real_now - tw_now).hnsecs;
-      auto at = (cmd.dur + delay)/ticks;
-      wheels.schedule(cmd.timer, at);
-    };
-    auto removeTimerHandler = (RemoveTimer cmd) scope {
-      wheels.cancel(cmd.timer);
-      cmd.timer.dg(TimerTrigger.cancel);
-    };
     while (running) {
-      VoidFunction vFunc = null;
-      VoidDelegate vDel = null;
       import std.meta : AliasSeq;
-      alias handlers = AliasSeq!((VoidFunction fn) => vFunc = fn,
-                                 (VoidDelegate dg) => vDel = dg,
-                                 addTimerHandler,
-                                 removeTimerHandler,
-                                 (bool _){running = false;}
+      alias handlers = AliasSeq!((typeof(null)){running = false;},
+                                 (RemoveTimer cmd) {
+                                   wheels.cancel(cmd.timer);
+                                   cmd.timer.dg(TimerTrigger.cancel);
+                                 },
+                                 (AddTimer cmd) {
+                                   auto real_now = Clock.currStdTime;
+                                   auto tw_now = wheels.currStdTime(ticks);
+                                   auto delay = (real_now - tw_now).hnsecs;
+                                   auto at = (cmd.dur + delay)/ticks;
+                                   wheels.schedule(cmd.timer, at);
+                                 },
+                                 (VoidFunction fn) => fn(),
+                                 (VoidDelegate dg) => dg()
                                  );
       auto nextTrigger = wheels.timeUntilNextEvent(ticks, Clock.currStdTime);
       bool handleIt = false;
       if (nextTrigger.isNull()) {
-        receive(handlers);
-        goto handleIt;
+        auto work = executor.queue.pop();
+        if (work is null)
+          continue;
+        work.payload.match!(handlers);
       } else {
         if (nextTrigger.get > 0.msecs) {
-          if (receiveTimeout(nextTrigger.get, handlers)) {
-            goto handleIt;
+          auto work = executor.queue.pop(nextTrigger.get);
+          if (work !is null) {
+
+            work.payload.match!(handlers);
+            continue;
           }
         }
         int advance = wheels.ticksToCatchUp(ticks, Clock.currStdTime);
@@ -117,53 +136,44 @@ package struct LocalThreadWorker {
             t.dg(TimerTrigger.trigger);
           }
         }
-        continue;
-      }
-    handleIt:
-      if (vFunc !is null) {
-        vFunc();
-      }
-      if (vDel !is null) {
-        vDel();
       }
     }
     version (unittest) {
-      import std.variant : Variant;
-      import core.time : seconds;
-      while(receiveTimeout(seconds(-1),(Variant v){
-            import std.stdio;
-            writeln("Got unwanted message ", v);
-            assert(0);
-          })) {}
+      if (!executor.queue.empty) {
+        auto work = executor.queue.pop();
+        import std.stdio;
+        writeln("Got unwanted message ", work);
+        assert(0);
+      }
     }
   }
 
   void schedule(VoidDelegate dg) {
-    tid.send(dg);
+    executor.queue.push(new WorkNode(WorkItem(dg)));
   }
 
   Timer addTimer(TimerDelegate dg, Duration dur) @trusted {
     import core.atomic : atomicOp;
     ulong id = nextTimerId.atomicOp!("+=")(1);
     Timer timer = Timer(dg, id);
-    tid.send(AddTimer(timer, dur));
+    executor.queue.push(new WorkNode(WorkItem(AddTimer(timer, dur))));
     return timer;
   }
 
   void cancelTimer(Timer timer) @trusted {
-    tid.send(RemoveTimer(timer));
+    executor.queue.push(new WorkNode(WorkItem(RemoveTimer(timer))));
   }
 
   void stop() nothrow @trusted {
     try {
-      (cast()tid).send(false);
+      executor.queue.push(new WorkNode(WorkItem(null)));
     } catch (Exception e) {
       assert(false, e.msg);
     }
   }
 
   bool isInContext() @trusted {
-    return thisTid == cast()tid;
+    return executor.isInContext;
   }
 }
 
@@ -236,7 +246,6 @@ class ThreadExecutor : Executor {
 
 auto executeAndWait(Executor, Work, Args...)(Executor executor, Work work, Args args) {
   import core.sync.semaphore;
-  import std.concurrency;
   import std.traits;
 
   if (executor.isInContext)
