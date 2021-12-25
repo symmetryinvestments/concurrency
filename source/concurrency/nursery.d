@@ -150,13 +150,16 @@ class Nursery : StopSource {
   auto connect(Receiver)(Receiver receiver) shared scope @safe {
     final class ReceiverImpl : ReceiverObject {
       Receiver receiver;
+      SchedulerObjectBase scheduler;
       this(Receiver receiver) { this.receiver = receiver; }
       void setValue() @safe { receiver.setValue(); }
       void setDone() nothrow @safe { receiver.setDone(); }
       void setError(Throwable e) nothrow @safe { receiver.setError(e); }
       SchedulerObjectBase getScheduler() nothrow @safe {
         import concurrency.scheduler : toSchedulerObject;
-        return receiver.getScheduler().toSchedulerObject();
+        if (scheduler is null)
+          scheduler = receiver.getScheduler().toSchedulerObject();
+        return scheduler;
       }
     }
     auto stopToken = receiver.getStopToken();
