@@ -80,7 +80,7 @@ package struct LocalThreadWorker {
 
   private {
     shared int counter;
-    shared ulong nextTimerId;
+    static shared ulong nextTimerId;
     LocalThreadExecutor executor;
   }
 
