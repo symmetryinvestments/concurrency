@@ -329,7 +329,6 @@ struct TimingWheels(T)
                     auto le = levels[l].slots[s].head;
                     dl_unlink(le, &levels[l].slots[s].head);
                     () @trusted {
-                        GC.removeRange(le);
                         dispose(allocator, le);
                     }();
                 }
@@ -339,7 +338,6 @@ struct TimingWheels(T)
             assert(freeListLen>0);
             auto n = freeList.next;
             () @trusted {
-                GC.removeRange(freeList);
                 dispose(allocator, freeList);
             }();
             freeListLen--;
@@ -358,9 +356,6 @@ struct TimingWheels(T)
             return result;
         }
         result = make!(ListElement!T)(allocator);
-        () @trusted {
-            GC.addRange(result, (*result).sizeof);
-        }();
         return result;
     }
     private void returnToFreeList(ListElement!T* le)
@@ -369,7 +364,6 @@ struct TimingWheels(T)
         {
             // this can be safely disposed as we do not leak ListElements outide this module
             () @trusted {
-                GC.removeRange(le);
                 dispose(allocator, le);
             }();
         }
