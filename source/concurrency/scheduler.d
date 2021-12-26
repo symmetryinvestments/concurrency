@@ -172,8 +172,10 @@ class ManualTimeWorker {
   import concurrency.executor : VoidDelegate;
   import core.sync.mutex : Mutex;
   import core.time : msecs, hnsecs;
+  import std.array : Appender;
   private {
     TimingWheels!Timer wheels;
+    Appender!(Timer[]) expiredTimers;
     Mutex mutex;
     size_t time = 1;
     shared ulong nextTimerId;
@@ -213,15 +215,18 @@ class ManualTimeWorker {
     }
   }
   void advance(Duration dur) @trusted shared {
+    import std.range : retro;
     import core.time : msecs;
     with(lock()) {
       time += dur.total!"hnsecs";
       int incr = wheels.ticksToCatchUp(1.msecs, time);
       if (incr > 0) {
-        auto wr = wheels.advance(incr);
-        foreach(t; wr.timers) {
+        wheels.advance(incr, expiredTimers);
+        // NOTE timingwheels keeps the timers in reverse order, so we iterate in reverse
+        foreach(t; expiredTimers.data.retro) {
           t.dg(TimerTrigger.trigger);
         }
+        expiredTimers.shrinkTo(0);
       }
     }
   }

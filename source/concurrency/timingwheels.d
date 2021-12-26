@@ -511,29 +511,9 @@ struct TimingWheels(T)
     ///   ticks = how many ticks to advance. Must be in range 0 <= 256
     /// Returns: list of expired timers
     ///
-    auto advance(this W)(ulong ticks)
+    import std.array : Appender;
+    void advance(this W)(ulong ticks, ref Appender!(T[]) app)
     {
-        struct ExpiredTimers
-        {
-            HashMap!(TimerIdType, T)    _map;
-            auto timers()
-            {
-                return _map.byValue;
-            }
-            auto length()
-            {
-                return _map.length();
-            }
-            bool contains(TimerIdType id)
-            {
-                return _map.contains(id);
-            }
-            void remove(TimerIdType id)
-            {
-                _map.remove(id);
-            }
-        }
-        alias AdvanceResult = automem.RefCounted!(ExpiredTimers, Mallocator);
         if (ticks > l2t(0))
         {
             throw new AdvanceWheelError("You can't advance that much");
@@ -543,7 +523,6 @@ struct TimingWheels(T)
             throw new AdvanceWheelError("ticks must be > 0");
         }
         debug(timingwheels) safe_tracef("advancing %d ticks", ticks);
-        auto      result = AdvanceResult(ExpiredTimers());
         auto      level  = &levels[0];
 
         while(ticks)
@@ -557,10 +536,8 @@ struct TimingWheels(T)
             {
                 auto le = slot.head;
                 auto timer = le.timer;
-                auto timer_id = timer.id();
-                assert(!result._map.contains(timer_id), "Something wrong: we try to return same timer twice");
                 debug(timingwheels) safe_tracef("return timer: %s, scheduled at %s", timer, le.scheduled_at);
-                result._map[timer_id] = timer;
+                app.put(timer);
                 dl_unlink(le, &slot.head);
                 returnToFreeList(le);
                 ptrs.remove(timer.id());
@@ -570,7 +547,6 @@ struct TimingWheels(T)
                 advance_level(1);
             }
         }
-        return result;
     }
     auto totalTimers() pure @safe @nogc
     {

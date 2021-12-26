@@ -296,14 +296,6 @@ import concurrency.thread : ThreadSender;
       worker.timeUntilNextEvent().should == 3.msecs;
 
       worker.advance(3.msecs);
-      // NOTE: normally `p` ought to be 6 since 3*7 msecs have already elapsed.
-      // but due to the way slots work in the timingwheels implementation
-      // timers that are added later are executed earlier.
-      // see https://github.com/symmetryinvestments/concurrency/issues/35
-      p.atomicLoad.should == 3;
-      worker.timeUntilNextEvent().should == 3.msecs;
-
-      worker.advance(3.msecs);
       p.atomicLoad.should == 6;
       worker.timeUntilNextEvent().should == null;
     });
