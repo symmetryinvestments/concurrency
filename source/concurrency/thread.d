@@ -92,6 +92,8 @@ package struct LocalThreadWorker {
     assert(isInContext); // start can only be called on the thread
     import concurrency.timingwheels;
     import std.datetime.systime : Clock;
+    import std.array : Appender;
+    Appender!(Timer[]) expiredTimers;
     TimingWheels!Timer wheels;
     auto ticks = 1.msecs; // represents the granularity
     wheels.init();
@@ -131,10 +133,13 @@ package struct LocalThreadWorker {
         }
         int advance = wheels.ticksToCatchUp(ticks, Clock.currStdTime);
         if (advance > 0) {
-          auto wr = wheels.advance(advance);
-          foreach(t; wr.timers) {
+          import std.range : retro;
+          wheels.advance(advance, expiredTimers);
+          // NOTE timingwheels keeps the timers in reverse order, so we iterate in reverse
+          foreach(t; expiredTimers.data.retro) {
             t.dg(TimerTrigger.trigger);
           }
+          expiredTimers.shrinkTo(0);
         }
       }
     }
