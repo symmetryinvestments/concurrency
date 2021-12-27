@@ -7,7 +7,7 @@ struct MPSCQueueProducer(Node) {
   }
 }
 
-class MPSCQueue(Node) {
+final class MPSCQueue(Node) {
   alias ElementType = Node*;
   private Node* head, tail;
   private Node stub;
