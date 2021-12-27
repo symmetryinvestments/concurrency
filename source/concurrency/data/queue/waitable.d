@@ -1,6 +1,6 @@
 module concurrency.data.queue.waitable;
 
-class WaitableQueue(Q) {
+final class WaitableQueue(Q) {
   import core.sync.semaphore : Semaphore;
   import core.time : Duration;
   import mir.algebraic : Nullable;
