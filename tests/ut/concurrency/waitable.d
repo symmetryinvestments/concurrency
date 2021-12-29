@@ -52,7 +52,7 @@ auto intSummer(Q)(Q q) {
   import core.time : msecs;
 
   auto q = new WaitableQueue!(MPSCQueue!Node)();
-  q.intSummer.stopWhen(intProducer(q, 10)).syncWait.value.should == 55;
+  q.intSummer.stopWhen(intProducer(q, 50000)).syncWait.value.should == 1250025000;
   q.empty.should == true;
 }
 
