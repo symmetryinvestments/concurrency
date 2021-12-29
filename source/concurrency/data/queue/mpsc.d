@@ -52,14 +52,14 @@ final class MPSCQueue(Node) {
         this.tail = next;
         return end;
       }
-      Node* start = this.head.atomicLoad!(MemoryOrder.raw);
-      if (end !is start)
-        return null;
-      push(&stub);
-      next = end.next.atomicLoad!(MemoryOrder.raw);
-      if (next) {
-        this.tail = next;
-        return end;
+      Node* start = this.head.atomicLoad!(MemoryOrder.acq);
+      if (end is start) {
+        push(&stub);
+        next = end.next.atomicLoad!(MemoryOrder.raw);
+        if (next) {
+          this.tail = next;
+          return end;
+        }
       }
     }
   }
