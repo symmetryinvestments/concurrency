@@ -85,12 +85,12 @@ import core.atomic : atomicOp;
 
 @("value.void")
 @safe unittest {
-  ValueSender!void().syncWait().isOk.should == true;
+  ValueSender!void().syncWait().assumeOk;
 }
 
 @("syncWait.thread")
 @safe unittest {
-  ThreadSender().syncWait.isOk.should == true;
+  ThreadSender().syncWait.assumeOk;
 }
 
 @("syncWait.thread.then.value")
@@ -228,10 +228,10 @@ import core.atomic : atomicOp;
 @safe unittest {
   import core.time : msecs;
   // by default toShared doesn't support scheduling
-  static assert(!__traits(compiles, { DelaySender(1.msecs).toShared().syncWait().isOk.should == true; }));
+  static assert(!__traits(compiles, { DelaySender(1.msecs).toShared().syncWait().assumeOk; }));
   // have to pass scheduler explicitly
   import concurrency.scheduler : localThreadScheduler;
-  DelaySender(1.msecs).toShared(localThreadScheduler).syncWait().isOk.should == true;
+  DelaySender(1.msecs).toShared(localThreadScheduler).syncWait().assumeOk;
 }
 
 @("toShared.nursery")
@@ -266,11 +266,11 @@ import core.atomic : atomicOp;
       return op;
     }
   }
-  NRVOSender().syncWait().isOk.should == true;
-  NRVOSender().via(ThreadSender()).syncWait().isOk.should == true;
-  whenAll(NRVOSender(),VoidSender()).syncWait.isOk.should == true;
-  whenAll(VoidSender(),NRVOSender()).syncWait.isOk.should == true;
-  race(NRVOSender(),NRVOSender()).syncWait.isOk.should == true;
+  NRVOSender().syncWait().assumeOk;
+  NRVOSender().via(ThreadSender()).syncWait().assumeOk;
+  whenAll(NRVOSender(),VoidSender()).syncWait.assumeOk;
+  whenAll(VoidSender(),NRVOSender()).syncWait.assumeOk;
+  race(NRVOSender(),NRVOSender()).syncWait.assumeOk;
 }
 
 @("justFrom")

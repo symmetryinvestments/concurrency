@@ -26,7 +26,7 @@ import unit_threaded;
 @safe unittest {
   auto nursery = new shared Nursery();
   nursery.run(ValueSender!(int)(5));
-  nursery.syncWait.isOk.should == true;
+  nursery.syncWait.assumeOk;
   nursery.getStopToken().isStopRequested().shouldBeFalse();
 }
 
@@ -44,7 +44,7 @@ import unit_threaded;
   shared(int) global;
   nursery.run(ValueSender!(int)(5).then((int c) shared => global = c));
   global.shouldEqual(0);
-  nursery.syncWait.isOk.should == true;
+  nursery.syncWait.assumeOk;
   global.shouldEqual(5);
 }
 
@@ -58,7 +58,7 @@ import unit_threaded;
             }));
       }));
   global.shouldEqual(0);
-  nursery.syncWait.isOk.should == true;
+  nursery.syncWait.assumeOk;
   global.shouldEqual(5);
   nursery.getStopToken().isStopRequested().shouldBeFalse();
 }
@@ -104,7 +104,7 @@ import unit_threaded;
   nursery1.run(nursery2);
   nursery2.run(ValueSender!(int)(99).then((int c) shared => global = c));
   global.shouldEqual(0);
-  nursery1.syncWait.isOk.should == true;
+  nursery1.syncWait.assumeOk;
   global.shouldEqual(99);
   nursery1.getStopToken().isStopRequested().shouldBeFalse();
   nursery2.getStopToken().isStopRequested().shouldBeFalse();
@@ -149,7 +149,7 @@ unittest {
   nursery.run(thread1);
   nursery.run(stopper);
 
-  nursery.syncWait.isOk.should == true;
+  nursery.syncWait.assumeOk;
 }
 
 @("withStopSource.2")
