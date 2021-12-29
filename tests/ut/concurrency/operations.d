@@ -144,7 +144,7 @@ unittest {
   whenAll(ValueSender!int(1), ValueSender!int(2), ValueSender!int(3)).syncWait.value.should == tuple(1,2,3);
   whenAll(VoidSender(), ValueSender!int(2)).syncWait.value.should == 2;
   whenAll(ValueSender!int(1), VoidSender()).syncWait.value.should == 1;
-  whenAll(VoidSender(), VoidSender()).syncWait.isOk.should == true;
+  whenAll(VoidSender(), VoidSender()).syncWait.assumeOk;
   whenAll(ValueSender!int(1), ThrowingSender()).syncWait.assumeOk.shouldThrowWithMessage("ThrowingSender");
   whenAll(ThrowingSender(), ValueSender!int(1)).syncWait.assumeOk.shouldThrowWithMessage("ThrowingSender");
   whenAll(ValueSender!int(1), DoneSender()).syncWait.isCancelled.should == true;
@@ -204,7 +204,7 @@ unittest {
       return op;
     }
   }
-  Sender().retry(Times(5)).syncWait.isOk.should == true;
+  Sender().retry(Times(5)).syncWait.assumeOk;
   n.should == 4;
   n = 0;
 
@@ -273,7 +273,7 @@ unittest {
     });
   auto timer = DelaySender(10.msecs).withScheduler(worker.getScheduler);
 
-  whenAll(timer, driver).syncWait().isOk.should == true;
+  whenAll(timer, driver).syncWait().assumeOk;
 }
 
 @("on.ManualTimeWorker.cancel")
@@ -313,7 +313,7 @@ unittest {
 @safe unittest {
   auto pool = stdTaskPool(2);
 
-  VoidSender().forwardOn(pool.getScheduler).syncWait.isOk.should == true;
+  VoidSender().forwardOn(pool.getScheduler).syncWait.assumeOk;
   ErrorSender(new Exception("bad news")).forwardOn(pool.getScheduler).syncWait.isError.should == true;
 DoneSender().forwardOn(pool.getScheduler).syncWait.isCancelled.should == true;
  just(42).forwardOn(pool.getScheduler).syncWait.value.should == 42;

@@ -12,7 +12,7 @@ import concurrency.thread : ThreadSender;
 @("arrayStream")
 @safe unittest {
   shared int p = 0;
-  [1,2,3].arrayStream().collect((int t) shared { p.atomicOp!"+="(t); }).syncWait().isOk.should == true;
+  [1,2,3].arrayStream().collect((int t) shared { p.atomicOp!"+="(t); }).syncWait().assumeOk;
   p.should == 6;
 }
 
@@ -39,7 +39,7 @@ import concurrency.thread : ThreadSender;
       worker.timeUntilNextEvent().should == null;
     });
 
-  whenAll(interval, driver).syncWait().isOk.should == true;
+  whenAll(interval, driver).syncWait().assumeOk;
 }
 
 
@@ -61,7 +61,7 @@ import concurrency.thread : ThreadSender;
 @("infiniteStream.take")
 @safe unittest {
   shared int g = 0;
-  infiniteStream(4).take(5).collect((int n) shared { g.atomicOp!"+="(n); }).syncWait().isOk.should == true;
+  infiniteStream(4).take(5).collect((int n) shared { g.atomicOp!"+="(n); }).syncWait().assumeOk;
   g.should == 20;
 }
 
@@ -69,7 +69,7 @@ import concurrency.thread : ThreadSender;
 @safe unittest {
   import concurrency.stoptoken;
   shared int g = 0;
-  iotaStream(0, 5).collect((int n) shared { g.atomicOp!"+="(n); }).syncWait().isOk.should == true;
+  iotaStream(0, 5).collect((int n) shared { g.atomicOp!"+="(n); }).syncWait().assumeOk;
   g.should == 10;
 }
 
@@ -83,7 +83,7 @@ import concurrency.thread : ThreadSender;
     }
   }
   shared int g = 0;
-  Loop(0,4).loopStream!size_t.collect((size_t n) shared { g.atomicOp!"+="(n); }).syncWait().isOk.should == true;
+  Loop(0,4).loopStream!size_t.collect((size_t n) shared { g.atomicOp!"+="(n); }).syncWait().assumeOk;
   g.should == 6;
 }
 
@@ -96,7 +96,7 @@ import concurrency.thread : ThreadSender;
   }
   shared int p;
 
-  getStream().collect((int i) @safe shared { p.atomicOp!"+="(i); }).syncWait().isOk.should == true;
+  getStream().collect((int i) @safe shared { p.atomicOp!"+="(i); }).syncWait().assumeOk;
 
   p.should == 6;
 }
@@ -109,7 +109,7 @@ import concurrency.thread : ThreadSender;
   }
   shared int p;
 
-  getStream().take(2).collect((int i) shared { p.atomicOp!"+="(i); }).syncWait().isOk.should == true;
+  getStream().take(2).collect((int i) shared { p.atomicOp!"+="(i); }).syncWait().assumeOk;
 
   p.should == 3;
 }
@@ -119,7 +119,7 @@ import concurrency.thread : ThreadSender;
   import core.time : msecs;
   shared bool p = false;
 
-  1.msecs.intervalStream().toStreamObject().take(1).collect(() shared { p = true; }).syncWait().isOk.should == true;
+  1.msecs.intervalStream().toStreamObject().take(1).collect(() shared { p = true; }).syncWait().assumeOk;
 
   p.should == true;
 }
@@ -127,21 +127,21 @@ import concurrency.thread : ThreadSender;
 @("transform.int.double")
 @safe unittest {
   shared int p = 0;
-  [1,2,3].arrayStream().transform((int i) => i * 3).collect((int t) shared { p.atomicOp!"+="(t); }).syncWait().isOk.should == true;
+  [1,2,3].arrayStream().transform((int i) => i * 3).collect((int t) shared { p.atomicOp!"+="(t); }).syncWait().assumeOk;
   p.should == 18;
 }
 
 @("transform.int.bool")
 @safe unittest {
   shared int p = 0;
-  [1,2,3].arrayStream().transform((int i) => i % 2 == 0).collect((bool t) shared { if (t) p.atomicOp!"+="(1); }).syncWait().isOk.should == true;
+  [1,2,3].arrayStream().transform((int i) => i % 2 == 0).collect((bool t) shared { if (t) p.atomicOp!"+="(1); }).syncWait().assumeOk;
   p.should == 1;
 }
 
 @("scan")
 @safe unittest {
   shared int p = 0;
-  [1,2,3].arrayStream().scan((int acc, int i) => acc += i, 0).collect((int t) shared { p.atomicOp!"+="(t); }).syncWait().isOk.should == true;
+  [1,2,3].arrayStream().scan((int acc, int i) => acc += i, 0).collect((int t) shared { p.atomicOp!"+="(t); }).syncWait().assumeOk;
   p.should == 10;
 }
 
@@ -149,7 +149,7 @@ import concurrency.thread : ThreadSender;
 @safe unittest {
   import core.time;
   shared int p = 0;
-  5.msecs.intervalStream.scan((int acc) => acc += 1, 0).take(3).collect((int t) shared { p.atomicOp!"+="(t); }).syncWait().isOk.should == true;
+  5.msecs.intervalStream.scan((int acc) => acc += 1, 0).take(3).collect((int t) shared { p.atomicOp!"+="(t); }).syncWait().assumeOk;
   p.should == 6;
 }
 
@@ -157,7 +157,7 @@ import concurrency.thread : ThreadSender;
 @safe unittest {
   shared int p = 0;
 
-  [1,2,3].arrayStream.take(2).collect((int i) shared { p.atomicOp!"+="(i); }).syncWait.isOk.should == true;
+  [1,2,3].arrayStream.take(2).collect((int i) shared { p.atomicOp!"+="(i); }).syncWait.assumeOk;
   p.should == 3;
 }
 
@@ -165,7 +165,7 @@ import concurrency.thread : ThreadSender;
 @safe unittest {
   shared int p = 0;
 
-  [1,2,3].arrayStream.take(4).collect((int i) shared { p.atomicOp!"+="(i); }).syncWait.isOk.should == true;
+  [1,2,3].arrayStream.take(4).collect((int i) shared { p.atomicOp!"+="(i); }).syncWait.assumeOk;
   p.should == 6;
 }
 
@@ -182,11 +182,11 @@ import concurrency.thread : ThreadSender;
 @("sample.trigger.stop")
 @safe unittest {
   import core.time;
-  auto sampler = 7.msecs.intervalStream()
+  7.msecs.intervalStream()
     .scan((int acc) => acc+1, 0)
     .sample(10.msecs.intervalStream().take(3))
     .collect((int i) shared {})
-    .syncWait().isOk.should == true;
+    .syncWait().assumeOk;
 }
 
 @("sample.slower")
@@ -238,7 +238,7 @@ import concurrency.thread : ThreadSender;
       worker.timeUntilNextEvent().should == null;
     });
 
-  whenAll(sampler, driver).syncWait().isOk.should == true;
+  whenAll(sampler, driver).syncWait().assumeOk;
 
   p.should == 7;
 }
@@ -319,7 +319,7 @@ import concurrency.thread : ThreadSender;
     });
   auto collector = source.collect((int t) shared { p.atomicOp!"+="(t); });
 
-  race(collector, emitter).syncWait().isOk.should == true;
+  race(collector, emitter).syncWait().assumeOk;
 
   p.atomicLoad.should == 18;
 }
@@ -336,7 +336,7 @@ import concurrency.thread : ThreadSender;
     .throttleLast(3.msecs)
     .take(6)
     .collect((int i) shared { p.atomicOp!"+="(i); })
-    .syncWait().isOk.should == true;
+    .syncWait().assumeOk;
 
   p.atomicLoad.shouldBeGreaterThan(40);
 }
@@ -350,7 +350,7 @@ import concurrency.thread : ThreadSender;
   [1,2,3].arrayStream()
     .throttleLast(30.msecs)
     .collect((int i) shared { p.atomicOp!"+="(i); })
-    .syncWait().isOk.should == true;
+    .syncWait().assumeOk;
 
   p.atomicLoad.should == 3;
 }
@@ -379,7 +379,7 @@ import concurrency.thread : ThreadSender;
     .throttleLast(3.msecs)
     .take(6)
     .collect((int i) shared { p.atomicOp!"+="(i); })
-    .syncWait().isOk.should == true;
+    .syncWait().assumeOk;
 
   p.atomicLoad.shouldBeGreaterThan(40);
 }
@@ -394,7 +394,7 @@ import concurrency.thread : ThreadSender;
     .via(ThreadSender())
     .throttleLast(30.msecs)
     .collect((int i) shared { p.atomicOp!"+="(i); })
-    .syncWait().isOk.should == true;
+    .syncWait().assumeOk;
 
   p.atomicLoad.should == 3;
 }
@@ -446,7 +446,7 @@ import concurrency.thread : ThreadSender;
 
       worker.timeUntilNextEvent().should == null;
     });
-  whenAll(throttled, driver).syncWait().isOk.should == true;
+  whenAll(throttled, driver).syncWait().assumeOk;
 
   p.should == 5;
 }
@@ -497,7 +497,7 @@ import concurrency.thread : ThreadSender;
 
       worker.timeUntilNextEvent().should == null;
     });
-  whenAll(throttled, driver).syncWait().isOk.should == true;
+  whenAll(throttled, driver).syncWait().assumeOk;
 
   p.should == 5;
 }
@@ -512,14 +512,14 @@ import concurrency.thread : ThreadSender;
   [1,2,3,4,5,6,7].arrayStream
     .slide(3)
     .collect((int[] a) @safe shared { p.atomicOp!"+="(a.sum); })
-    .syncWait.isOk.should == true;
+    .syncWait.assumeOk;
 
   p.should == 60;
 
   [1,2].arrayStream
     .slide(3)
     .collect((int[] a) @safe shared { p.atomicOp!"+="(a.sum); })
-    .syncWait.isOk.should == true;
+    .syncWait.assumeOk;
 
   p.should == 60;
 }
@@ -534,14 +534,14 @@ import concurrency.thread : ThreadSender;
   [1,2,3,4,5,6,7].arrayStream
     .slide(3, 2)
     .collect((int[] a) @safe shared { p.atomicOp!"+="(a.sum); })
-    .syncWait.isOk.should == true;
+    .syncWait.assumeOk;
 
   p.should == 36;
 
   [1,2].arrayStream
     .slide(2, 2)
     .collect((int[] a) @safe shared { p.atomicOp!"+="(a.sum); })
-    .syncWait.isOk.should == true;
+    .syncWait.assumeOk;
 
   p.should == 39;
 }
