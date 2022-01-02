@@ -287,7 +287,7 @@ import core.atomic : atomicOp;
 @safe unittest {
   import core.time : msecs;
 
-  race(delay(2.msecs).then(() shared => 2),
+  race(delay(20.msecs).then(() shared => 2),
        delay(1.msecs).then(() shared => 1)).syncWait.value.should == 1;
 }
 
