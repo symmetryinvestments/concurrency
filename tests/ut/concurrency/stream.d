@@ -625,3 +625,44 @@ unittest {
     .value
     .should == [1,2,3];
 }
+
+@("flatmap.latest.just")
+@safe unittest {
+  import concurrency.sender : just;
+
+  [1,2,3].arrayStream
+    .flatMapLatest((int i) => just(i))
+    .toList
+    .syncWait
+    .value
+    .should == [1,2,3];
+}
+
+@("flatmap.latest.delay")
+@safe unittest {
+  import concurrency.sender : just, delay;
+  import concurrency.operations : via, onTermination;
+  import core.time;
+
+  import std.stdio;
+  [1,2,3].arrayStream
+    .flatMapLatest((int i) => just(i).via(delay(50.msecs)))
+    .toList
+    .via(ThreadSender())
+    .syncWait
+    .value
+    .should == [3];
+}
+
+@("flatmap.latest.error")
+@safe unittest {
+  import concurrency.sender : just, ErrorSender;
+  import concurrency.operations : via;
+
+  [1,2,3].arrayStream
+    .flatMapLatest((int i) => ErrorSender())
+    .collect(()shared{})
+    .syncWait
+    .assumeOk
+    .shouldThrow();
+}
