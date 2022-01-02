@@ -43,6 +43,9 @@ shared struct SharedBitField(Flags) {
     } while (!casWeak!(MemoryOrder.acq, MemoryOrder.acq)(&store, oldState, newState));
     return tuple!("oldState", "newState")(oldState, newState);
   }
+  auto add(size_t add) nothrow {
+    store.atomicOp!"+="(add);
+  }
   size_t load(MemoryOrder ms)() {
     return store.atomicLoad!ms;
   }

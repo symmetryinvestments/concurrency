@@ -133,6 +133,8 @@ With the following operations:
 - `debounce`. Limits a Stream by only emitting the last value after the Stream has not emitted for a duration.
 - `slide`. Slides a window over the stream and emits each full window as an array.
 - `toList`. Converts the Stream into a Sender that completes with an array that contains all the items emitted. Be careful to use this on finite streams only.
+- `flatMapConcat`. For each value runs the supplied function and starts the returned `Sender`. The inner `Sender` must be completed before another is started.
+- `flatMapLatest`. For each value runs the supplied function and starts the returned `Sender`. A `Sender` that is still running when the next value arrives is cancelled.
 
 Most of the time you will need to write your own Stream however. The following helpers can speed that up:
 

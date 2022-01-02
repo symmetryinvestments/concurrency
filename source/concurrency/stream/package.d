@@ -13,6 +13,7 @@ public import concurrency.stream.slide;
 public import concurrency.stream.throttling;
 public import concurrency.stream.cycle;
 public import concurrency.stream.flatmapconcat;
+public import concurrency.stream.flatmaplatest;
 import concurrency.sender : isSender, OpType;
 import concepts;
 import std.traits : hasFunctionAttributes;
