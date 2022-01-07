@@ -8,7 +8,7 @@ import concepts;
 import std.traits;
 import concurrency.utils : spin_yield, casWeak;
 
-WhenAllSender!(Senders) whenAll(Senders...)(Senders senders) if (Senders.length > 1) {
+WhenAllSender!(Senders) whenAll(Senders...)(Senders senders) {
   return WhenAllSender!(Senders)(senders);
 }
 
@@ -22,13 +22,13 @@ private enum Counter : size_t {
   tick = 0x8
 }
 
-template SenderValues(Senders...) {
+template GetSenderValues(Senders...) {
   import std.meta;
   alias SenderValue(T) = T.Value;
-  alias SenderValues = staticMap!(SenderValue, Senders);
+  alias GetSenderValues = staticMap!(SenderValue, Senders);
 }
 
-private template WhenAllResult(SenderValues...) {
+private template WhenAllResult(Senders...) if (Senders.length > 1) {
   import std.meta;
   import std.typecons;
   import mir.algebraic : Algebraic, Nullable;
@@ -44,6 +44,7 @@ private template WhenAllResult(SenderValues...) {
       alias Cummulative = AliasSeq!();
     }
   }
+  alias SenderValues = GetSenderValues!(Senders);
   alias ValueTypes = Filter!(NoVoid, SenderValues);
   static if (ValueTypes.length > 1)
     alias Values = Tuple!(Filter!(NoVoid, SenderValues));
@@ -74,12 +75,33 @@ private template WhenAllResult(SenderValues...) {
   }
 }
 
+alias ArrayElement(T : P[], P) = P;
+
+private template WhenAllResult(Senders...) if (Senders.length == 1) {
+  alias Element = ArrayElement!(Senders).Value;
+  static if (is(Element : void)) {
+    struct WhenAllResult {}
+  } else {
+    struct WhenAllResult {
+      Element[] values;
+      void setValue(Element)(Element elem, size_t index) {
+        values[index] = elem;
+      }
+    }
+  }
+}
+
 private struct WhenAllOp(Receiver, Senders...) {
   import std.meta : staticMap;
-  alias R = WhenAllResult!(SenderValues!Senders);
-  alias ElementReceiver(Sender) = WhenAllReceiver!(Receiver, Sender.Value, R);
-  alias ConnectResult(Sender) = OpType!(Sender, ElementReceiver!Sender);
-  alias Ops = staticMap!(ConnectResult, Senders);
+  alias R = WhenAllResult!(Senders);
+  static if (Senders.length > 1) {
+    alias ElementReceiver(Sender) = WhenAllReceiver!(Receiver, Sender.Value, R);
+    alias ConnectResult(Sender) = OpType!(Sender, ElementReceiver!Sender);
+    alias Ops = staticMap!(ConnectResult, Senders);
+  } else {
+    alias ElementReceiver = WhenAllReceiver!(Receiver, ArrayElement!(Senders).Value, R);
+    alias Ops = OpType!(ArrayElement!(Senders), ElementReceiver)[];
+  }
   Receiver receiver;
   WhenAllState!R state;
   Ops ops;
@@ -88,8 +110,17 @@ private struct WhenAllOp(Receiver, Senders...) {
   this(Receiver receiver, Senders senders) {
     this.receiver = receiver;
     state = new WhenAllState!R();
-    foreach(i, Sender; Senders) {
-      ops[i] = senders[i].connect(WhenAllReceiver!(Receiver, Sender.Value, R)(receiver, state, i, Senders.length));
+    static if (Senders.length > 1) {
+      foreach(i, Sender; Senders) {
+        ops[i] = senders[i].connect(WhenAllReceiver!(Receiver, Sender.Value, R)(receiver, state, i, Senders.length));
+      }
+    } else {
+      static if (!is(ArrayElement!(Senders).Value : void))
+        state.value.values.length = senders[0].length;
+      ops.length = senders[0].length;
+      foreach(i; 0..senders[0].length) {
+        ops[i] = senders[0][i].connect(WhenAllReceiver!(Receiver, ArrayElement!(Senders).Value, R)(receiver, state, i, senders[0].length));
+      }
     }
   }
   void start() @trusted nothrow scope {
@@ -99,16 +130,24 @@ private struct WhenAllOp(Receiver, Senders...) {
       return;
     }
     state.cb = receiver.getStopToken().onStop(cast(void delegate() nothrow @safe shared)&state.stop); // butt ugly cast, but it won't take the second overload
-    foreach(i, _; Senders) {
-      ops[i].start();
+    static if (Senders.length > 1) {
+      foreach(i, _; Senders) {
+        ops[i].start();
+      }
+    } else {
+      foreach(i; 0..ops.length) {
+        ops[i].start();
+      }
     }
   }
 }
 
 import std.meta : allSatisfy, ApplyRight;
 
-struct WhenAllSender(Senders...) if (allSatisfy!(ApplyRight!(models, isSender), Senders)) {
-  alias Result = WhenAllResult!(SenderValues!Senders);
+struct WhenAllSender(Senders...)
+     if ((Senders.length > 1 && allSatisfy!(ApplyRight!(models, isSender), Senders)) ||
+         (models!(ArrayElement!(Senders[0]), isSender))) {
+  alias Result = WhenAllResult!(Senders);
   static if (hasMember!(Result, "values"))
     alias Value = typeof(Result.values);
   else

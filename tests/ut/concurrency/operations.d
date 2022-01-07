@@ -148,7 +148,7 @@ unittest {
   DoneSender().finally_(3).syncWait.isCancelled.should == true;
 }
 
-@("whenAll")
+@("whenAll.basic")
 unittest {
   whenAll(ValueSender!int(1), ValueSender!int(2)).syncWait.value.should == tuple(1,2);
   whenAll(ValueSender!int(1), ValueSender!int(2), ValueSender!int(3)).syncWait.value.should == tuple(1,2,3);
@@ -189,6 +189,16 @@ unittest {
   auto source = new StopSource();
   auto stopper = just(source).then((StopSource source) shared => source.stop());
   whenAll(waiting, stopper).withStopSource(source).syncWait.isCancelled.should == true;
+}
+
+@("whenAll.array.just")
+unittest {
+  whenAll([just(4), just(5)]).syncWait.value.should == [4,5];
+}
+
+@("whenAll.array.void")
+unittest {
+  whenAll([VoidSender(), VoidSender()]).syncWait.assumeOk;
 }
 
 @("retry")
