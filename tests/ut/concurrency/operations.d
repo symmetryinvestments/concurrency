@@ -94,6 +94,16 @@ unittest {
   nursery.syncWait.isCancelled.should == true;
 }
 
+@("race.array.just")
+@safe unittest {
+  race([just(4), just(5)]).syncWait.value.should == 4;
+}
+
+@("race.array.void")
+@safe unittest {
+  race([VoidSender(), VoidSender()]).syncWait.assumeOk;
+}
+
 @("via")
 unittest {
   import std.typecons : tuple;

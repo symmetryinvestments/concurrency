@@ -15,7 +15,7 @@ RaceSender!(Senders) race(Senders...)(Senders senders) {
   return RaceSender!(Senders)(senders, false);
 }
 
-private template Result(Senders...) {
+private template Result(Senders...) if (Senders.length > 1) {
   import concurrency.utils : NoVoid;
   import mir.algebraic : Algebraic, Nullable;
   import std.meta : staticMap, Filter, NoDuplicates;
@@ -37,12 +37,24 @@ private template Result(Senders...) {
   }
 }
 
+alias ArrayElement(T : P[], P) = P;
+
+import std.traits;
+private template Result(Senders...) if (Senders.length == 1) {
+  alias Result = ArrayElement!(Senders).Value;
+}
+
 private struct RaceOp(Receiver, Senders...) {
   import std.meta : staticMap;
   alias R = Result!(Senders);
-  alias ElementReceiver(Sender) = RaceReceiver!(Receiver, Sender.Value, R);
-  alias ConnectResult(Sender) = OpType!(Sender, ElementReceiver!Sender);
-  alias Ops = staticMap!(ConnectResult, Senders);
+  static if (Senders.length > 1) {
+    alias ElementReceiver(Sender) = RaceReceiver!(Receiver, Sender.Value, R);
+    alias ConnectResult(Sender) = OpType!(Sender, ElementReceiver!Sender);
+    alias Ops = staticMap!(ConnectResult, Senders);
+  } else {
+    alias ElementReceiver = RaceReceiver!(Receiver, R, R);
+    alias Ops = OpType!(ArrayElement!(Senders[0]), ElementReceiver)[];
+  }
   Receiver receiver;
   State!R state;
   Ops ops;
@@ -51,8 +63,15 @@ private struct RaceOp(Receiver, Senders...) {
   this(Receiver receiver, return Senders senders, bool noDropouts) @trusted scope {
     this.receiver = receiver;
     state = new State!(R)(noDropouts);
-    foreach(i, Sender; Senders) {
-      ops[i] = senders[i].connect(ElementReceiver!(Sender)(receiver, state, Senders.length));
+    static if (Senders.length > 1) {
+      foreach(i, Sender; Senders) {
+        ops[i] = senders[i].connect(ElementReceiver!(Sender)(receiver, state, Senders.length));
+      }
+    } else {
+      ops.length = senders[0].length;
+      foreach(i; 0..senders[0].length) {
+        ops[i] = senders[0][i].connect(ElementReceiver(receiver, state, senders[0].length));
+      }
     }
   }
   void start() @trusted nothrow scope {
@@ -62,15 +81,23 @@ private struct RaceOp(Receiver, Senders...) {
       return;
     }
     state.cb = receiver.getStopToken().onStop(cast(void delegate() nothrow @safe shared)&state.stop); // butt ugly cast, but it won't take the second overload
-    foreach(i, _; Senders) {
-      ops[i].start();
+    static if (Senders.length > 1) {
+      foreach(i, _; Senders) {
+        ops[i].start();
+      }
+    } else {
+      foreach(i; 0..ops.length) {
+        ops[i].start();
+      }
     }
   }
 }
 
 import std.meta : allSatisfy, ApplyRight;
 
-struct RaceSender(Senders...) if (allSatisfy!(ApplyRight!(models, isSender), Senders)) {
+struct RaceSender(Senders...)
+     if ((Senders.length > 1 && allSatisfy!(ApplyRight!(models, isSender), Senders)) ||
+         (models!(ArrayElement!(Senders[0]), isSender))) {
   static assert(models!(typeof(this), isSender));
   alias Value = Result!(Senders);
   Senders senders;
