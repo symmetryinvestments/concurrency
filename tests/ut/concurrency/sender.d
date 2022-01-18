@@ -294,8 +294,8 @@ import core.atomic : atomicOp;
 @("promise.basic")
 @safe unittest {
   auto prom = promise!int;
-  auto cont = prom.then((int i) => i * 2);
-  auto runner = justFrom(() shared => prom.fulfill(72));
+  auto cont = prom.sender.then((int i) => i * 2);
+  auto runner = justFrom(() shared => cast(void)prom.fulfill(72));
 
   whenAll(cont, runner).syncWait.value.should == 144;
 }
@@ -304,8 +304,8 @@ import core.atomic : atomicOp;
 @safe unittest {
   import std.typecons : tuple;
   auto prom = promise!int;
-  auto cont = prom.then((int i) => i * 2);
-  auto runner = justFrom(() shared => prom.fulfill(72));
+  auto cont = prom.sender.then((int i) => i * 2);
+  auto runner = justFrom(() shared => cast(void)prom.fulfill(72));
 
   whenAll(cont, cont, runner).syncWait.value.should == tuple(144, 144);
 }
@@ -316,8 +316,8 @@ import core.atomic : atomicOp;
   auto prom = promise!int;
   auto pool = stdTaskPool(2);
 
-  auto cont = prom.forwardOn(pool.getScheduler).then((int i) => i * 2);
-  auto runner = justFrom(() shared => prom.fulfill(72)).via(ThreadSender());
+  auto cont = prom.sender.forwardOn(pool.getScheduler).then((int i) => i * 2);
+  auto runner = justFrom(() shared => cast(void)prom.fulfill(72)).via(ThreadSender());
 
   whenAll(cont, cont, runner).syncWait.value.should == tuple(144, 144);
 }

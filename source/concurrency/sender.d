@@ -360,7 +360,7 @@ auto delay(Duration dur) {
 
 struct PromiseSenderOp(T, Receiver) {
   import concurrency.stoptoken;
-  alias Sender = PromiseSender!T;
+  alias Sender = Promise!T;
   alias InternalValue = Sender.InternalValue;
   shared Sender parent;
   Receiver receiver;
@@ -403,12 +403,11 @@ struct PromiseSenderOp(T, Receiver) {
   }
 }
 
-class PromiseSender(T) {
+class Promise(T) {
   import std.traits : ReturnType;
   import concurrency.slist;
   import concurrency.bitfield;
   import mir.algebraic : Algebraic, match, Nullable;
-  static assert(models!(typeof(this), isSender));
   alias Value = T;
   static if (is(Value == void)) {
     static struct ValueRep{}
@@ -487,6 +486,20 @@ class PromiseSender(T) {
   this() {
     this.dgs = new shared SList!DG;
   }
+  auto sender() shared @safe nothrow {
+    return shared PromiseSender!T(this);
+  }
+}
+
+shared(Promise!T) promise(T)() {
+  return new shared Promise!T();
+}
+
+struct PromiseSender(T) {
+  alias Value = T;
+  static assert(models!(typeof(this), isSender));
+  private shared Promise!T promise;
+
   auto connect(Receiver)(return Receiver receiver) @trusted scope {
     // ensure NRVO
     auto op = (cast(shared)this).connect(receiver);
@@ -494,11 +507,7 @@ class PromiseSender(T) {
   }
   auto connect(Receiver)(return Receiver receiver) @safe shared scope return {
     // ensure NRVO
-    auto op = PromiseSenderOp!(T, Receiver)(this, receiver);
+    auto op = PromiseSenderOp!(T, Receiver)(promise, receiver);
     return op;
   }
-}
-
-shared(PromiseSender!T) promise(T)() {
-  return new shared PromiseSender!T();
 }
