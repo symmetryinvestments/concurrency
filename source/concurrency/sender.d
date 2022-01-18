@@ -380,7 +380,7 @@ struct PromiseSenderOp(T, Receiver) {
     with(unshared) {
       value.match!((Sender.ValueRep v){
           try {
-            static if (is(Value == void))
+            static if (is(Sender.Value == void))
               receiver.setValue();
             else
               receiver.setValue(v);
@@ -451,26 +451,34 @@ class PromiseSender(T) {
       return cast()this;
     }
   }
-  private void pushImpl(P)(P t) @safe shared {
+  private bool pushImpl(P)(P t) @safe shared nothrow {
     import std.exception : enforce;
     with (counter.lock(Flags.completed)) {
-      enforce(!was(Flags.completed), "Can only complete once");
+      if (was(Flags.completed))
+        return false;
       InternalValue val = InternalValue(t);
       (cast()value) = val;
       auto localDgs = dgs.release();
       release();
       foreach(dg; localDgs)
         dg(val);
+      return true;
     }
   }
-  void cancel() @safe shared {
-    pushImpl(Done());
+  bool cancel() @safe shared nothrow {
+    return pushImpl(Done());
   }
-  void error(Throwable e) @safe shared {
-    pushImpl(e);
+  bool error(Throwable e) @safe shared nothrow {
+    return pushImpl(e);
   }
-  void fulfill(T t) @safe shared {
-    pushImpl(t);
+  static if (is(Value == void)) {
+    bool fulfill() @safe shared nothrow {
+      return pushImpl(ValueRep());
+    }
+  } else {
+    bool fulfill(T t) @safe shared nothrow {
+      return pushImpl(t);
+    }
   }
   bool isCompleted() @trusted shared {
     import core.atomic : MemoryOrder;
