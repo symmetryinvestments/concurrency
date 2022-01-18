@@ -22,11 +22,12 @@ struct Guard(Flags) {
 }
 
 shared struct SharedBitField(Flags) {
-  static assert(__traits(compiles, Flags.locked), "Must has a non-zero 'locked' flag");
-  static assert(Flags.locked != 0, "Must has a non-zero 'locked' flag");
+  static assert(__traits(compiles, Flags.locked), "Must have a 'locked' flag");
   private shared size_t store;
-  Guard!Flags lock(size_t or = 0, size_t add = 0, size_t sub = 0) return scope @safe @nogc nothrow {
-    return Guard!Flags(&this, update(Flags.locked | or, add, sub).expand);
+  static if (Flags.locked > 0) {
+    Guard!Flags lock(size_t or = 0, size_t add = 0, size_t sub = 0) return scope @safe @nogc nothrow {
+        return Guard!Flags(&this, update(Flags.locked | or, add, sub).expand);
+      }
   }
   auto update(size_t or, size_t add = 0, size_t sub = 0) nothrow {
     import concurrency.utils : spin_yield, casWeak;
@@ -44,7 +45,10 @@ shared struct SharedBitField(Flags) {
     return tuple!("oldState", "newState")(oldState, newState);
   }
   auto add(size_t add) nothrow {
-    store.atomicOp!"+="(add);
+    return store.atomicOp!"+="(add);
+  }
+  auto sub(size_t sub) nothrow {
+    return store.atomicOp!"-="(sub);
   }
   size_t load(MemoryOrder ms)() {
     return store.atomicLoad!ms;
