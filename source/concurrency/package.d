@@ -63,7 +63,7 @@ auto sync_wait(Sender, StopSource)(auto ref Sender sender, StopSource stopSource
   } else {
     return result.match!((Cancelled c) { throw new Exception("Cancelled"); },
                          (Exception e) { throw e; },
-                         (ref t) => t);
+                         "a");
   }
 }
 
@@ -78,7 +78,7 @@ auto sync_wait(Sender)(auto scope ref Sender sender) {
   } else {
     return result.match!((Cancelled c) { throw new Exception("Cancelled"); },
                          (Exception e) { throw e; },
-                         (ref t) => t);
+                         "a");
   }
 }
 
@@ -147,7 +147,7 @@ template match(Handlers...) {
     static if (is(T == void))
       return r.result.match!(Handlers);
     else
-      return r.result.match!((Result!(T).Value!(T) v) => v.value, (ref t) => t).match!(Handlers);
+      return r.result.match!((Result!(T).Value!(T) v) => v.value, "a").match!(Handlers);
   }
 }
 
