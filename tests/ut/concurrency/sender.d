@@ -24,12 +24,12 @@ import core.atomic : atomicOp;
 
 @("syncWait.match")
 @safe unittest {
-  ValueSender!(int)(5).syncWait.match!((int i) => true, (ref t) => false).should == true;
+  ValueSender!(int)(5).syncWait.match!((int i) => true, "false").should == true;
 }
 
 @("syncWait.match.void")
 @safe unittest {
-  VoidSender().syncWait.match!((typeof(null)) => true, (ref t) => false).should == true;
+  VoidSender().syncWait.match!((typeof(null)) => true, "false").should == true;
 }
 
 @("syncWait.nested.basic")
