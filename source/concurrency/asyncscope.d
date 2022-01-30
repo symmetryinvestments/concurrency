@@ -53,6 +53,10 @@ public:
 
   ~this() @safe shared {
     import concurrency : syncWait;
+    import core.atomic : atomicLoad;
+    auto t = throwable.atomicLoad();
+    if (t !is null && (cast(shared(Exception))t) is null)
+      return;
     if (!completion.isCompleted)
       cleanup.syncWait();
   }
@@ -83,14 +87,23 @@ public:
     return stopSource.stop();
   }
 
-  bool spawn(Sender)(Sender s) shared @safe {
+  bool spawn(Sender)(Sender s) shared @trusted {
     import concurrency.sender : connectHeap;
     with (flag.update(0, Flag.tick)) {
       if ((oldState & Flag.stopped) == 1) {
         complete();
         return false;
       }
-      s.connectHeap(AsyncScopeReceiver(&this)).start();
+      try {
+        s.connectHeap(AsyncScopeReceiver(&this)).start();
+      } catch (Throwable t) {
+        // we are required to catch the throwable here, otherwise
+        // the destructor will wait infinitely for something that
+        // no longer runs
+        // by calling setError we ensure the internal state is correct
+        setError(t);
+        throw t;
+      }
       return true;
     }
   }

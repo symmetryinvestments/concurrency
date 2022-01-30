@@ -126,6 +126,42 @@ import unit_threaded;
   p.should == true;
 }
 
+@("spawn.assert.thread")
+@safe unittest {
+  import concurrency.thread : ThreadSender;
+  import concurrency.operations : then;
+  auto fail = ThreadSender().then(() shared {
+      assert(false, "bad things happen");
+    });
+  auto s = asyncScope();
+
+  s.spawn(fail).should == true;
+  s.cleanup.syncWait.shouldThrow!Throwable;
+}
+
+@("spawn.assert.inline")
+@trusted unittest {
+  import concurrency.thread : ThreadSender;
+  import concurrency.sender : justFrom;
+
+  auto fail = justFrom(() shared {
+      assert(0, "bad things happen 2");
+    });
+  auto s = asyncScope();
+
+  s.spawn(fail).shouldThrow!Throwable;
+  s.cleanup.syncWait.shouldThrow!Throwable;
+}
+
+@("cleanup.assert.then")
+@safe unittest {
+  import concurrency.thread : ThreadSender;
+  import concurrency.operations : then;
+  auto s = asyncScope();
+
+  s.cleanup.then(() shared { assert(false, "Ohh no!"); }).syncWait.shouldThrow!Throwable;
+}
+
 auto waitingTask() {
   import concurrency.thread : ThreadSender;
   import concurrency.operations : withStopToken;
