@@ -95,6 +95,9 @@ class StopCallback {
     }
     local.state.remove_callback(this);
   }
+  void dispose() shared nothrow @trusted @nogc {
+    (cast()this).dispose();
+  }
 
 private:
   this(void delegate() nothrow shared @safe callback) nothrow @safe @nogc {
