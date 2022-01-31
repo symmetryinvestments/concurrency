@@ -4,6 +4,7 @@ import concurrency.stoptoken;
 import concurrency.sender;
 import concurrency.thread;
 import concepts;
+import mir.algebraic: reflectErr, Variant, match, Algebraic, assumeOk;
 
 bool isMainThread() @trusted {
   import core.thread : Thread;
@@ -59,7 +60,7 @@ auto sync_wait(Sender, StopSource)(auto ref Sender sender, StopSource stopSource
   static if (is(Value == void)) {
     return result.match!((Cancelled c) => false,
                          (Exception e) { throw e; },
-                         (typeof(null)) => true);
+                         () => true); // void
   } else {
     return result.match!((Cancelled c) { throw new Exception("Cancelled"); },
                          (Exception e) { throw e; },
@@ -74,7 +75,7 @@ auto sync_wait(Sender)(auto scope ref Sender sender) {
   static if (is(Value == void)) {
     return result.match!((Cancelled c) => false,
                          (Exception e) { throw e; },
-                         (typeof(null)) => true);
+                         () => true); // void
   } else {
     return result.match!((Cancelled c) { throw new Exception("Cancelled"); },
                          (Exception e) { throw e; },
@@ -82,74 +83,16 @@ auto sync_wait(Sender)(auto scope ref Sender sender) {
   }
 }
 
-struct Cancelled {}
-static immutable cancelledException = new Exception("Cancelled");
+@reflectErr enum Cancelled { cancelled }
 
-struct Result(T) {
-  import mir.algebraic : Algebraic, Nullable;
-  static struct Value(T) {
-    static if (!is(T == void))
-      T value;
-  }
-  static if (is(T == void))
-    Nullable!(Cancelled, Exception) result;
-  else
-    Algebraic!(Value!T, Cancelled, Exception) result;
+alias Result(T) = Variant!(Cancelled, Exception, T);
 
-  static if (!is(T == void))
-    this(T v) {
-      result = Value!T(v);
-    }
-  this(Cancelled c) {
-    result = c;
-  }
-  this(Exception e) {
-    result = e;
-  }
-
-  bool isCancelled() {
+  bool isCancelled(Types...)(const Algebraic!Types result) {
     return result._is!Cancelled;
   }
-  bool isError() {
+  bool isError(Types...)(const Algebraic!Types result) {
     return result._is!Exception;
   }
-  bool isOk() {
-    static if (is(T == void))
-      return result.isNull;
-    else
-      return result._is!(Value!T);
-  }
-  static if (!is(T == void))
-    T value() {
-      if (isCancelled)
-        throw cancelledException;
-      if (isError)
-        throw error;
-      return result.get!(Value!T).value;
-    }
-  Exception error() {
-    return result.get!(Exception);
-  }
-  void assumeOk() {
-    import mir.algebraic : match;
-    static if (is(T == void))
-      result.match!((typeof(null)){},(Exception e){throw e;},(Cancelled c){throw cancelledException;});
-    else
-      result.match!((Exception e){throw e;},(Cancelled c){throw cancelledException;},(ref t){});
-  }
-}
-
-/// matches over the result of syncWait
-template match(Handlers...) {
-  // has to be separate because of dual-context limitation
-  auto match(T)(Result!T r) {
-    import mir.algebraic : match;
-    static if (is(T == void))
-      return r.result.match!(Handlers);
-    else
-      return r.result.match!((Result!(T).Value!(T) v) => v.value, "a").match!(Handlers);
-  }
-}
 
 void setTopLevelStopSource(shared StopSource stopSource) @trusted {
   import std.exception : enforce;

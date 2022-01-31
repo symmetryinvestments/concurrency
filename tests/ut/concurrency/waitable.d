@@ -4,6 +4,7 @@ import unit_threaded;
 import concurrency.data.queue.mpsc;
 import concurrency.data.queue.waitable;
 import concurrency : syncWait;
+import mir.algebraic : value = assumeOk;
 
 struct Node {
   int payload;

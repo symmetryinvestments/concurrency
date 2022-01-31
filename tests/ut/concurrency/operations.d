@@ -11,6 +11,7 @@ import unit_threaded;
 import core.time;
 import core.thread;
 import std.typecons;
+import mir.algebraic: value = assumeOk, assumeOk;
 
 /// Used to test that Senders keep the operational state alive until one receiver's terminal is called
 struct OutOfBandValueSender(T) {
@@ -416,7 +417,7 @@ DoneSender().forwardOn(pool.getScheduler).syncWait.isCancelled.should == true;
       state.signalChild();
     }).via(ThreadSender());
 
-  whenAll(parent.withChild(child).withStopSource(source), just(source).then((shared StopSource s) => s.stop())).syncWait.isCancelled;
+  whenAll(parent.withChild(child).withStopSource(source), just(source).then((shared StopSource s) => s.stop())).syncWait.isCancelled.should == true;
 
   state.parentAfterChild.atomicLoad.should == true;
 }
@@ -472,7 +473,7 @@ DoneSender().forwardOn(pool.getScheduler).syncWait.isCancelled.should == true;
 @("onError.throw")
 @safe unittest {
   import core.exception : AssertError;
-  auto err = ThrowingSender().onError((Exception e) @safe shared { throw new Exception("in onError"); }).syncWait.error;
+  auto err = ThrowingSender().onError((Exception e) @safe shared { throw new Exception("in onError"); }).syncWait.get!Exception;
   err.msg.should == "in onError";
   err.next.msg.should == "ThrowingSender";
 }

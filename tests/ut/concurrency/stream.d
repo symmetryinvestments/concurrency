@@ -6,6 +6,7 @@ import unit_threaded;
 import concurrency.stoptoken;
 import core.atomic;
 import concurrency.thread : ThreadSender;
+import mir.algebraic: value = assumeOk, assumeOk;
 
 // TODO: it would be good if we can get the Sender .collect returns to be scoped if the delegates are.
 

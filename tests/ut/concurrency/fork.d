@@ -8,6 +8,7 @@ import concurrency.thread;
 import concurrency.operations;
 import concurrency.receiver;
 import unit_threaded;
+import mir.algebraic: assumeOk;
 
 @("sync_wait.fork")
 @trusted unittest {
