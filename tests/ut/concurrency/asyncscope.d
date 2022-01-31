@@ -4,6 +4,7 @@ import concurrency.asyncscope;
 import concurrency : syncWait;
 import concurrency.sender : VoidSender, DoneSender, ThrowingSender;
 import concurrency.stoptoken : StopToken;
+import mir.algebraic: assumeOk;
 import unit_threaded;
 
 @("cleanup.empty")
