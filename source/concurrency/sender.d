@@ -360,24 +360,87 @@ auto delay(Duration dur) {
 
 struct PromiseSenderOp(T, Receiver) {
   import concurrency.stoptoken;
+  import concurrency.bitfield;
+  private enum Flags : size_t {
+    locked = 0x0,
+    setup = 0x1,
+    value = 0x2,
+    stop = 0x4
+  }
   alias Sender = Promise!T;
   alias InternalValue = Sender.InternalValue;
   shared Sender parent;
   Receiver receiver;
   StopCallback cb;
+  shared SharedBitField!Flags bitfield;
   void start() nothrow @trusted scope {
-    parent.add(&(cast(shared)this).onValue);
-    cb = receiver.getStopToken.onStop(&(cast(shared)this).onStop);
+    // if already completed we can optimize
+    if (parent.isCompleted) {
+      bitfield.add(Flags.setup);
+      parent.add(&(cast(shared)this).onValue);
+      return;
+    }
+    // Otherwise we have to be a bit careful here,
+    // both the onStop and the onValue we register
+    // can be called from possibly different contexts.
+    // We can't atomically connect both, so we have to
+    // devise a scheme to handle one or both being called
+    // before we are done here.
+
+    // we use a simple atomic bitfield that we set after setup
+    // is done. If `onValue` or `onStop` trigger before setup
+    // is complete, they update the bitfield and return early.
+    // After we setup both, we flip the setup bit and check
+    // if any of the callbacks triggered in the meantime,
+    // if they did we know we have to perform some cleanup
+    // if they didn't the callbacks themselves will handle it
+
+    bool triggeredInline = parent.add(&(cast(shared)this).onValue);
+    // if triggeredInline there is no point in setting up the stop callback
+    if (!triggeredInline)
+      cb = receiver.getStopToken.onStop(&(cast(shared)this).onStop);
+
+    with (bitfield.add(Flags.setup)) {
+      if (has(Flags.stop)) {
+        // it stopped before we finished setup
+        parent.remove(&(cast(shared)this).onValue);
+        receiver.setDone();
+      }
+      if (has(Flags.value)) {
+        // it fired before we finished setup
+        // just add it again, it will fire again
+        parent.add(&(cast(shared)this).onValue);
+      }
+    }
   }
   void onStop() nothrow @trusted shared {
+    // we toggle the stop bit and return early if setup bit isn't set
+    with (bitfield.add(Flags.stop))
+      if (!has(Flags.setup))
+        return;
     with(unshared) {
-      parent.remove(&(cast(shared)this).onValue);
-      receiver.setDone();
+      // If `parent.remove` returns true, onValue will never be called,
+      // so we can call setDone ourselves.
+      // If it returns false onStop and onValue are in a race, and we
+      // let onValue pass.
+      if (parent.remove(&(cast(shared)this).onValue))
+        receiver.setDone();
     }
   }
   void onValue(InternalValue value) nothrow @safe shared {
     import mir.algebraic : match;
+    // we toggle the stop bit and return early if setup bit isn't set
+    with (bitfield.add(Flags.value))
+      if (!has(Flags.setup))
+        return;
     with(unshared) {
+      // `cb.dispose` will ensure onStop will never be called
+      // after it returns. It will also block if it is currently
+      // being executed.
+      // This means that when it completes we are the only one
+      // calling the receiver's termination functions.
+      if (cb)
+        cb.dispose();
       value.match!((Sender.ValueRep v){
           try {
             static if (is(Sender.Value == void))
@@ -385,10 +448,6 @@ struct PromiseSenderOp(T, Receiver) {
             else
               receiver.setValue(v);
           } catch (Exception e) {
-            /// TODO: dispose needs to be called in all cases, except
-            /// this onValue can sometimes be called immediately,
-            /// leaving no room to set cb.dispose...
-            cb.dispose();
             receiver.setError(e);
           }
         }, (Throwable e){

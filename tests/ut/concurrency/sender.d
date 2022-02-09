@@ -323,6 +323,22 @@ import mir.algebraic: value = assumeOk, assumeOk, match;
   whenAll(cont, cont, runner).syncWait.value.should == tuple(144, 144);
 }
 
+@("promise.then.exception.inline")
+@safe unittest {
+  auto prom = promise!int;
+  auto cont = prom.sender.then((int i) { throw new Exception("nope"); });
+  prom.fulfill(33);
+  cont.syncWait().assumeOk.shouldThrowWithMessage("nope");
+}
+
+@("promise.then.exception.thread")
+@safe unittest {
+  auto prom = promise!int;
+  auto cont = prom.sender.then((int i) { throw new Exception("nope"); });
+  auto runner = justFrom(() shared => cast(void)prom.fulfill(72)).via(ThreadSender());
+  whenAll(cont, runner).syncWait().assumeOk.shouldThrowWithMessage("nope");
+}
+
 @("just.tuple")
 @safe unittest {
   import std.typecons : tuple;
