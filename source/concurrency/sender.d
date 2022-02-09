@@ -424,25 +424,29 @@ class Promise(T) {
       completed = 0x2
     }
     SharedBitField!Flags counter;
-    void add(DG dg) @safe nothrow shared {
+    bool add(DG dg) @safe nothrow shared {
       with(unshared) {
         with(counter.lock()) {
           if (was(Flags.completed)) {
             auto val = value.get;
             release(); // release early
             dg(val);
+            return true;
           } else {
             dgs.pushBack(dg);
+            return false;
           }
         }
       }
     }
-    void remove(DG dg) @safe nothrow shared {
+    bool remove(DG dg) @safe nothrow shared {
       with (counter.lock()) {
         if (was(Flags.completed)) {
           release(); // release early
+          return false;
         } else {
           dgs.remove(dg);
+          return true;
         }
       }
     }
@@ -479,7 +483,7 @@ class Promise(T) {
       return pushImpl(t);
     }
   }
-  bool isCompleted() @trusted shared {
+  bool isCompleted() @trusted shared nothrow {
     import core.atomic : MemoryOrder;
     return (counter.load!(MemoryOrder.acq) & Flags.completed) > 0;
   }
