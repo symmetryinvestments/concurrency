@@ -45,13 +45,20 @@ shared struct SharedBitField(Flags) {
     return tuple!("oldState", "newState")(oldState, newState);
   }
   auto add(size_t add) nothrow {
-    return store.atomicOp!"+="(add);
+    return Result!Flags(store.atomicOp!"+="(add));
   }
   auto sub(size_t sub) nothrow {
-    return store.atomicOp!"-="(sub);
+    return Result!Flags(store.atomicOp!"-="(sub));
   }
   size_t load(MemoryOrder ms)() {
     return store.atomicLoad!ms;
   }
 }
 
+struct Result(Flags) {
+  size_t state;
+  alias state this;
+  bool has(Flags flags) {
+    return (state & flags) == flags;
+  }
+}
