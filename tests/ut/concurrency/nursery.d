@@ -7,7 +7,6 @@ import concurrency.operations;
 import concurrency.nursery;
 import concurrency.stoptoken;
 import unit_threaded;
-import mir.algebraic: assumeOk;
 
 @("run.stopped")
 @safe unittest {

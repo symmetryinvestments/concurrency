@@ -7,7 +7,6 @@ import concurrency.operations;
 import concurrency.receiver;
 import unit_threaded;
 import core.atomic : atomicOp;
-import mir.algebraic: value = assumeOk, assumeOk, match;
 
 @("syncWait.value")
 @safe unittest {
@@ -30,7 +29,7 @@ import mir.algebraic: value = assumeOk, assumeOk, match;
 
 @("syncWait.match.void")
 @safe unittest {
-  VoidSender().syncWait.match!(() => true, "false").should == true;
+  VoidSender().syncWait.match!((typeof(null)) => true, "false").should == true;
 }
 
 @("syncWait.nested.basic")

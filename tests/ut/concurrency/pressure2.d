@@ -4,7 +4,6 @@ import concurrency;
 import concurrency.thread;
 import concurrency.operations;
 import unit_threaded;
-import mir.algebraic: value = assumeOk;
 
 @("100.threads")
 unittest {

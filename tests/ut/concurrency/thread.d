@@ -7,7 +7,6 @@ import concurrency.operations;
 import concurrency.receiver;
 import unit_threaded;
 import core.atomic : atomicOp;
-import mir.algebraic: value = assumeOk;
 
 @("stdTaskPool")
 @safe unittest {

@@ -7,7 +7,6 @@ import unit_threaded;
 import concurrency.stoptoken;
 import core.time : msecs;
 import concurrency.scheduler;
-import mir.algebraic: assumeOk;
 
 @("scheduleAfter")
 @safe unittest {

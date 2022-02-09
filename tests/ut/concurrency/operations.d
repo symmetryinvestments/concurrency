@@ -11,7 +11,6 @@ import unit_threaded;
 import core.time;
 import core.thread;
 import std.typecons;
-import mir.algebraic: value = assumeOk, assumeOk;
 
 /// Used to test that Senders keep the operational state alive until one receiver's terminal is called
 struct OutOfBandValueSender(T) {
