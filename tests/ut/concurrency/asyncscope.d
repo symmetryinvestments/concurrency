@@ -171,3 +171,14 @@ auto waitingTask() {
       while (!token.isStopRequested) { Thread.yield(); }
     });
 }
+
+@("withScheduler")
+@safe unittest {
+  import concurrency.sender : VoidSender;
+  import concurrency.operations : withScheduler;
+  import concurrency.scheduler : localThreadScheduler;
+  auto s = asyncScope();
+
+  s.spawn(VoidSender().withScheduler(localThreadScheduler));
+  s.cleanup.syncWait.assumeOk;
+}

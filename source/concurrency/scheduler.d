@@ -232,6 +232,25 @@ class ManualTimeWorker {
   }
 }
 
-T withBaseScheduler(T, P)(auto ref T t, auto ref P p) if (isScheduler!T && isScheduler!P) {
-  return t;
+T withBaseScheduler(T, P)(auto ref T t, auto ref P p) {
+  static if (isScheduler!T)
+    return t;
+  else static if (isScheduler!P)
+    return ProxyScheduler!(T, P)(t,p);
+  else
+    static assert(false, "Neither "~T.stringof~" nor "~P.stringof~" are full schedulers. Chain the sender with a .withScheduler and ensure the Scheduler passes the isScheduler check.");
+}
+
+private struct ProxyScheduler(T, P) {
+  import std.parallelism : TaskPool;
+  import core.time : Duration;
+  T front;
+  P back;
+  auto schedule() {
+    return front.schedule();
+  }
+  auto scheduleAfter(Duration run) {
+    import concurrency.operations : via;
+    return schedule().via(back.scheduleAfter(run));
+  }
 }
