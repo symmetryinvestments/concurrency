@@ -80,3 +80,35 @@ static if (__traits(compiles, () { import core.atomic : casWeak; }) && __traits(
  }
 
 enum isThreadSafeFunction(alias Fun) = !hasFunctionAttributes!(Fun, "@system") && (isFunction!Fun || isFunctionPointer!Fun || hasFunctionAttributes!(Fun, "shared"));
+
+// Loads a function from the main process.
+// When using dynamic libraries globals and TLS variables are duplicated.
+// We need a way to ensure globals used across dynamic libraries and the host
+// are all pointing to the same instance.
+// We do this by exporting accessors functions which a dynamic library can
+// call to get access to the global.
+auto dynamicLoad(alias fun)() nothrow @trusted {
+  alias Fn = typeof(&fun);
+  __gshared Fn fn;
+  if (fn !is null)
+    return fn;
+
+  version (Windows) {
+    import core.sys.windows.windows;
+    fn = cast(Fn) GetProcAddress(GetModuleHandle(null), fun.mangleof);
+  } else version (Posix) {
+    import core.sys.posix.dlfcn : dlopen, dlsym, dlerror, RTLD_LAZY;
+    auto parent = dlopen(null, RTLD_LAZY);
+    fn = cast(Fn) dlsym(parent, fun.mangleof);
+  } else static assert(false, "platform not supported");
+
+  // If dynamic loading fails we just pick the local function.
+  // This serves two purposes, 1) if users aren't using dynamic
+  // libraries and the application isn't compiled with the proper linker
+  // flags for exporting functions, it won't be found, and 2) it will
+  // reference the function so it won't be compiled away.
+  if(fn is null)
+    fn = &fun;
+
+  return fn;
+}
