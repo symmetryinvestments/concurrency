@@ -11,10 +11,25 @@ import core.time : Duration;
 import concurrency.data.queue.waitable;
 import concurrency.data.queue.mpsc;
 
-LocalThreadExecutor getLocalThreadExecutor() @safe {
+// we export the getLocalThreadExecutor function so that dynamic libraries
+// can load it to access the host's localThreadExecutor TLS instance.
+// Otherwise they would access their own local instance.
+// should not be called directly by usercode, call `silThreadExecutor` instead.
+export extern(C) LocalThreadExecutor concurrency_getLocalThreadExecutor() @safe {
   static LocalThreadExecutor localThreadExecutor;
-  if (localThreadExecutor is null)
+  if (localThreadExecutor is null) {
     localThreadExecutor = new LocalThreadExecutor();
+  }
+
+  return localThreadExecutor;
+}
+
+LocalThreadExecutor getLocalThreadExecutor() @trusted {
+  import concurrency.utils : dynamicLoad;
+  static LocalThreadExecutor localThreadExecutor;
+  if (localThreadExecutor is null) {
+    localThreadExecutor = dynamicLoad!concurrency_getLocalThreadExecutor()();
+  }
   return localThreadExecutor;
 }
 
