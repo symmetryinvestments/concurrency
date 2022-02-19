@@ -3,25 +3,35 @@ module concurrency.signal;
 import concurrency.stoptoken;
 
 shared(StopSource) globalStopSource() @trusted {
-  import core.atomic : atomicLoad;
-  static StopSource localSource; // can't be shared else it is global
-  if (localSource !is null)
-    return cast(shared)localSource;
+  import core.atomic : atomicLoad, cas;
 
   if (globalSource.atomicLoad is null) {
-    auto tmp = new shared StopSource();
-    if (setGlobalStopSource(tmp)) {
-      setupCtrlCHandler(tmp);
+    import concurrency.utils : dynamicLoad;
+    auto ptr = getGlobalStopSourcePointer();
+
+    if (auto source = (*ptr).atomicLoad) {
+      globalSource = source;
+      return globalSource;
     }
+
+    auto tmp = new shared StopSource();
+    if (ptr.cas(cast(shared StopSource)null, tmp)) {
+      setupCtrlCHandler(tmp);
+      globalSource = tmp;
+    } else
+      globalSource = (*ptr).atomicLoad;
   }
-  localSource = cast()globalSource;
-  return cast(shared)localSource;
+  return globalSource;
 }
 
 /// Returns true if first to set (otherwise it is ignored)
 bool setGlobalStopSource(shared StopSource stopSource) @safe {
-  import core.atomic : atomicExchange;
-  return atomicExchange(&globalSource, stopSource) is null;
+  import core.atomic : cas;
+  auto ptr = getGlobalStopSourcePointer();
+  if (!ptr.cas(cast(shared StopSource)null, stopSource))
+    return false;
+  globalSource = stopSource;
+  return true;
 }
 
 /// Sets the stopSource to be called when receiving an interrupt
@@ -62,6 +72,19 @@ void setupCtrlCHandler(shared StopSource stopSource) @trusted {
 
 private static shared StopSource globalSource;
 
+// we export this function so that dynamic libraries can load it to access
+// the host's globalStopSource pointer.
+// Otherwise they would access their own local instance.
+// should not be called directly by usercode, instead use `globalStopSource`.
+export extern(C) shared(StopSource*) concurrency_globalStopSourcePointer() @safe {
+  return &globalSource;
+}
+
+private shared(StopSource*) getGlobalStopSourcePointer() @safe {
+  import concurrency.utils : dynamicLoad;
+  return dynamicLoad!concurrency_globalStopSourcePointer()();
+}
+
 struct SignalHandler {
   import core.atomic : atomicStore, atomicLoad, MemoryOrder, atomicExchange;
   import core.thread : Thread;
@@ -74,11 +97,11 @@ struct SignalHandler {
       lastSignal.atomicStore!(MemoryOrder.rel)(num);
       (cast()event).set();
     }
-    static int await() nothrow @nogc @trusted {
+    private static int await() nothrow @nogc @trusted {
       (cast()event).wait();
       return lastSignal.atomicLoad!(MemoryOrder.acq)();
     }
-    static void setup() @trusted {
+    private static void setup() @trusted {
       (cast()event).initialize(false, false);
     }
   } else version (linux) {
@@ -89,12 +112,12 @@ struct SignalHandler {
       ulong b = 1;
       write(event, &b, typeof(b).sizeof);
     }
-    static int await() nothrow @nogc {
+    private static int await() nothrow @nogc {
       ulong b;
       while(read(event, &b, typeof(b).sizeof) != typeof(b).sizeof) {}
       return lastSignal.atomicLoad!(MemoryOrder.acq)();
     }
-    static void setup() {
+    private static void setup() {
       import core.sys.linux.sys.eventfd;
       event = eventfd(0, EFD_CLOEXEC);
     }
@@ -106,12 +129,12 @@ struct SignalHandler {
       ulong b = 1;
       write(selfPipe[1], &b, typeof(b).sizeof);
     }
-    static int await() nothrow @nogc {
+    private static int await() nothrow @nogc {
       ulong b;
       while(read(cast()selfPipe[0], &b, typeof(b).sizeof) != typeof(b).sizeof) {}
       return lastSignal.atomicLoad!(MemoryOrder.acq)();
     }
-    static void setup() {
+    private static void setup() {
       import std.exception : ErrnoException;
       if (pipe(cast(int[2])selfPipe) == -1)
         throw new ErrnoException("Failed to create self-pipe");
@@ -123,7 +146,7 @@ struct SignalHandler {
   }
   private static shared StopSource signalStopSource;
   private static shared Thread handlerThread;
-  static void launchHandlerThread() {
+  private static void launchHandlerThread() {
     if (handlerThread.atomicLoad !is null)
       return;
 
