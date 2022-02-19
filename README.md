@@ -187,6 +187,12 @@ Simply calling `globalStopSource().stop()` will cause any work to be cancelled. 
 
 If you want the termination to happen asynchronously, for instance because the current thread is not async-safe, you can call `SignalHandler.notify(SIGINT)`. Note that this does rely on `SignalHandler.launchHandlerThread` to be called at one point. This happens by default unless you call `setGlobalStopSource` and it returns `true`. In that case you need to call `SignalHandler.launchHandlerThread` yourself too. See the functions in [signal.d](./source/concurrency/signal.d).
 
+## Dynamic libraries
+
+The concurrency library is designed to work with dynamic libraries. It exports 2 functions that it uses to load important globals and thread-locals from the host process.
+
+The only requirement is that the linker you are using supports `--export-dynamic-symbol` (at least gold, lld do).
+
 ## DSemver
 
 This package uses [dsemver](https://github.com/symmetryinvestments/dsemver) to calculate the next semantic version.
