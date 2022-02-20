@@ -76,3 +76,9 @@ import core.atomic : atomicOp;
   auto slow = delay(100.msecs);
   whenAll(fail,slow).syncWait.assertThrown!(AssertError)("i must be 99");
 }
+
+@("dynamicLoadRaw.getThreadLocalExecutor")
+@safe unittest {
+  import concurrency.utils;
+  dynamicLoadRaw!concurrency_getLocalThreadExecutor.should.not == null;
+}
