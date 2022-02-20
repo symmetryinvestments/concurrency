@@ -24,6 +24,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-dub-
 
+      - name: Install binutils
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt install -y binutils-gold
+          sudo update-alternatives --install "/usr/bin/ld" "ld" "/usr/bin/ld.gold" 20
+          sudo update-alternatives --config ld
+          ld --version
+
       - name: Run tests linux
         if: runner.os == 'Linux'
         run: |
