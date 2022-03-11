@@ -3,9 +3,9 @@
 	"versions": {
 		"automem": "0.6.4",
 		"concepts": "0.0.8",
-		"ikod-containers": "0.0.20",
+		"ikod-containers": "0.0.21",
 		"mir-core": "1.1.101",
 		"test_allocator": "0.3.3",
-		"unit-threaded": "1.0.15"
+		"unit-threaded": "2.0.3"
 	}
 }

@@ -14,7 +14,7 @@ configuration "default" {
 	dflags "-dip1000" "-dip25"
 }
 configuration "unittest" {
-	dependency "unit-threaded" version=">=1.0.15"
+	dependency "unit-threaded" version="*"
 	targetType "executable"
 	mainSourceFile "tests/ut/ut_runner.d"
 	dflags "-dip1000" "-dip25"
@@ -22,7 +22,7 @@ configuration "unittest" {
 	importPaths "source" "tests/ut"
 }
 configuration "unittest-release" {
-	dependency "unit-threaded" version=">=1.0.15"
+	dependency "unit-threaded" version="*"
 	targetType "executable"
 	mainSourceFile "tests/ut/ut_runner.d"
 	dflags "-dip1000" "-dip25" "-g"
@@ -36,7 +36,7 @@ configuration "nodip" {
 }
 
 configuration "unittest-asan" {
-	dependency "unit-threaded" version=">=1.0.15"
+	dependency "unit-threaded" version="*"
 	targetType "executable"
 	mainSourceFile "tests/ut/ut_runner.d"
 	dflags "-dip1000" "-dip25" "-fsanitize=address"
