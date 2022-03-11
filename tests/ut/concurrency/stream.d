@@ -502,7 +502,7 @@ import concurrency.thread : ThreadSender;
   p.should == 5;
 }
 
-@("slide")
+@("slide.basic")
 @safe unittest {
   [1,2,3,4,5,6,7].arrayStream
     .slide(3)
@@ -535,6 +535,18 @@ import concurrency.thread : ThreadSender;
     .transform((int[] a) => a.dup)
     .toList
     .syncWait.value.should == [[1,2],[3,4],[5,6]];
+
+  [1,2,3,4,5,6,7].arrayStream
+    .slide(2, 3)
+    .transform((int[] a) => a.dup)
+    .toList
+    .syncWait.value.should == [[1,2],[4,5]];
+
+  [1,2,3,4,5,6,7,8,9,10].arrayStream
+    .slide(2, 4)
+    .transform((int[] a) => a.dup)
+    .toList
+    .syncWait.value.should == [[1,2],[5,6],[9,10]];
 }
 
 @("toList.arrayStream")
