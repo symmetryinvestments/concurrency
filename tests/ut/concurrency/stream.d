@@ -504,46 +504,37 @@ import concurrency.thread : ThreadSender;
 
 @("slide")
 @safe unittest {
-  import std.stdio;
-  import std.functional : toDelegate;
-  import std.algorithm : sum;
-  shared int p;
-
   [1,2,3,4,5,6,7].arrayStream
     .slide(3)
-    .collect((int[] a) @safe shared { p.atomicOp!"+="(a.sum); })
-    .syncWait.assumeOk;
-
-  p.should == 60;
+    .transform((int[] a) => a.dup)
+    .toList
+    .syncWait.value.should == [[1,2,3],[2,3,4],[3,4,5],[4,5,6],[5,6,7]];
 
   [1,2].arrayStream
     .slide(3)
-    .collect((int[] a) @safe shared { p.atomicOp!"+="(a.sum); })
-    .syncWait.assumeOk;
-
-  p.should == 60;
+    .toList
+    .syncWait.value.length.should == 0;
 }
 
 @("slide.step")
 @safe unittest {
-  import std.stdio;
-  import std.functional : toDelegate;
-  import std.algorithm : sum;
-  shared int p;
-
   [1,2,3,4,5,6,7].arrayStream
     .slide(3, 2)
-    .collect((int[] a) @safe shared { p.atomicOp!"+="(a.sum); })
-    .syncWait.assumeOk;
-
-  p.should == 36;
+    .transform((int[] a) => a.dup)
+    .toList
+    .syncWait.value.should == [[1,2,3],[3,4,5],[5,6,7]];
 
   [1,2].arrayStream
     .slide(2, 2)
-    .collect((int[] a) @safe shared { p.atomicOp!"+="(a.sum); })
-    .syncWait.assumeOk;
+    .transform((int[] a) => a.dup)
+    .toList
+    .syncWait.value.should == [[1,2]];
 
-  p.should == 39;
+  [1,2,3,4,5,6,7].arrayStream
+    .slide(2, 2)
+    .transform((int[] a) => a.dup)
+    .toList
+    .syncWait.value.should == [[1,2],[3,4],[5,6]];
 }
 
 @("toList.arrayStream")

@@ -43,11 +43,9 @@ template SlideStreamOp(Stream) {
           return;
       }
       dg(arr);
-      if (step != window) {
-        moveAll(arr[step .. $], arr[0..$-step]);
-        if (step > 1)
-          arr.length -= step;
-      }
+      moveAll(arr[step .. $], arr[0..$-step]);
+      if (step > 1)
+        arr.length -= step;
     }
     void start() nothrow @safe {
       op.start();
