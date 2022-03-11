@@ -67,6 +67,8 @@ struct SchedulerAdapter(Worker) {
     static struct ScheduleOp(Receiver) {
       Worker worker;
       Receiver receiver;
+      @disable this(ref return scope typeof(this) rhs);
+      @disable this(this);
       void start() @trusted nothrow {
         try {
           worker.schedule(cast(VoidDelegate)()=>receiver.setValueOrError());
@@ -108,6 +110,8 @@ struct ScheduleAfterOp(Worker, Receiver) {
   Timer timer;
   StopCallback stopCb;
   shared SharedBitField!Flags flags;
+  @disable this(ref return scope typeof(this) rhs);
+  @disable this(this);
   void start() @trusted nothrow {
     with(flags.lock()) {
       if (receiver.getStopToken().isStopRequested) {
