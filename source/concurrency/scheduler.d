@@ -258,3 +258,12 @@ private struct ProxyScheduler(T, P) {
     return schedule().via(back.scheduleAfter(run));
   }
 }
+
+struct ScheduleAfter {
+  Duration duration;
+  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+    // ensure NRVO
+    auto op = receiver.getScheduler.scheduleAfter(duration).connect(receiver);
+    return op;
+  }
+}
