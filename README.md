@@ -83,6 +83,8 @@ Senders enjoy the following operations.
 
 - `completeWithCancellation`. Wraps the Sender and redirects the setValue termination to complete with cancellation. The Sender is not allowed to produce a Value.
 
+- `completeWithError`. Wraps the Sender and redirects the all terminations to complete with error. If an `Throwable` is forwarded in the Sender it takes precedence over the error value if the latter is only an `Exception`.
+
 - `toShared`. Wraps a Sender in a SharedSender that forwards the same termination call to each connected Receiver.
 
 - `forwardOn`. Run the completion of a Sender on a specific Scheduler.

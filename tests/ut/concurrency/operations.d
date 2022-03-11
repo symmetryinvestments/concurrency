@@ -525,3 +525,23 @@ DoneSender().forwardOn(pool.getScheduler).syncWait.isCancelled.should == true;
   auto trigger = delay(100.msecs).completeWithCancellation;
   waiting.stopWhen(trigger).syncWait().isCancelled.should == true;
 }
+
+@("completewitherror.basic")
+@safe unittest {
+  ValueSender!void().completeWithError(new Exception("hello")).syncWait.assumeOk.shouldThrowWithMessage("hello");
+}
+
+@("completewitherror.exception.base")
+@safe unittest {
+  ErrorSender(new Exception("not you")).completeWithError(new Exception("overridden")).syncWait.assumeOk.shouldThrowWithMessage!Throwable("overridden");
+}
+
+@("completewitherror.throwable.base")
+@safe unittest {
+  ErrorSender(new Throwable("precedence")).completeWithError(new Exception("hello")).syncWait.assumeOk.shouldThrowWithMessage!Throwable("precedence");
+}
+
+@("completewitherror.error.base")
+@safe unittest {
+  ErrorSender(new Error("precedence")).completeWithError(new Exception("hello")).syncWait.assumeOk.shouldThrowWithMessage!Error("precedence");
+}

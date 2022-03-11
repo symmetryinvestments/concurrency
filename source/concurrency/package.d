@@ -182,13 +182,10 @@ private Result!(Sender.Value) syncWaitImpl(Sender)(auto scope ref Sender sender,
   if (state.canceled)
     return Result!Value(Cancelled());
 
-  if (auto t = cast(Error)state.throwable)
-    throw t;
-
   if (state.throwable !is null) {
     if (auto e = cast(Exception)state.throwable)
       return Result!Value(e);
-    assert(false, "Can only rethrow Exceptions");
+    throw state.throwable;
   }
   static if (is(Value == void))
     return Result!Value();

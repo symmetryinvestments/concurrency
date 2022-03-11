@@ -21,3 +21,4 @@ public import concurrency.operations.withchild;
 public import concurrency.operations.ontermination;
 public import concurrency.operations.onerror;
 public import concurrency.operations.stopwhen;
+public import concurrency.operations.completewitherror;
