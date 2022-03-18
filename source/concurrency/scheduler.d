@@ -1,6 +1,6 @@
 module concurrency.scheduler;
 
-import concurrency.sender : SenderObjectBase;
+import concurrency.sender : SenderObjectBase, isSender;
 import core.time : Duration;
 import concepts;
 import mir.algebraic : Nullable, nullable;
@@ -236,7 +236,7 @@ class ManualTimeWorker {
   }
 }
 
-T withBaseScheduler(T, P)(auto ref T t, auto ref P p) {
+auto withBaseScheduler(T, P)(auto ref T t, auto ref P p) {
   static if (isScheduler!T)
     return t;
   else static if (isScheduler!P)
@@ -260,10 +260,22 @@ private struct ProxyScheduler(T, P) {
 }
 
 struct ScheduleAfter {
+  static assert (models!(typeof(this), isSender));
+  alias Value = void;
   Duration duration;
   auto connect(Receiver)(return Receiver receiver) @safe scope return {
     // ensure NRVO
     auto op = receiver.getScheduler.scheduleAfter(duration).connect(receiver);
+    return op;
+  }
+}
+
+struct Schedule {
+  static assert (models!(typeof(this), isSender));
+  alias Value = void;
+  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+    // ensure NRVO
+    auto op = receiver.getScheduler.schedule().connect(receiver);
     return op;
   }
 }
