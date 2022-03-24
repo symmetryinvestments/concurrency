@@ -88,8 +88,14 @@ struct SchedulerAdapter(Worker) {
     }
     return ScheduleSender(worker);
   }
+  auto schedule() shared @trusted {
+    return (cast()this).schedule();
+  }
   auto scheduleAfter(Duration dur) {
     return ScheduleAfterSender!(Worker)(worker, dur);
+  }
+  auto scheduleAfter(Duration dur) shared @trusted {
+    return (cast()this).scheduleAfter(dur);
   }
 }
 
