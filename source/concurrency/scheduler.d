@@ -58,6 +58,8 @@ auto localThreadScheduler() {
   return SchedulerAdapter!LocalThreadWorker(LocalThreadWorker(getLocalThreadExecutor));
 }
 
+alias LocalThreadScheduler = typeof(localThreadScheduler());
+
 struct SchedulerAdapter(Worker) {
   import concurrency.receiver : setValueOrError;
   import concurrency.executor : VoidDelegate;
