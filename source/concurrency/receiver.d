@@ -43,7 +43,7 @@ interface ReceiverObjectBase(T) {
   void setDone() nothrow @safe;
   void setError(Throwable e) nothrow @safe;
   StopToken getStopToken() nothrow @safe;
-  SchedulerObjectBase getScheduler() nothrow @safe;
+  SchedulerObjectBase getScheduler() scope nothrow @safe;
 }
 
 struct NullReceiver(T) {

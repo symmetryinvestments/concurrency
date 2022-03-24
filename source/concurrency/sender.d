@@ -175,7 +175,7 @@ interface SenderObjectBase(T) {
   static assert (models!(typeof(this), isSender));
   alias Value = T;
   alias Op = OperationObject;
-  OperationObject connect(ReceiverObjectBase!(T) receiver) @safe;
+  OperationObject connect(return ReceiverObjectBase!(T) receiver) @safe scope;
   OperationObject connect(Receiver)(return Receiver receiver) @trusted scope {
     return connect(new class(receiver) ReceiverObjectBase!T {
       Receiver receiver;
@@ -200,7 +200,7 @@ interface SenderObjectBase(T) {
       StopToken getStopToken() nothrow {
         return stopTokenObject(receiver.getStopToken());
       }
-      SchedulerObjectBase getScheduler() nothrow @safe {
+      SchedulerObjectBase getScheduler() nothrow @safe scope {
         import concurrency.scheduler : toSchedulerObject;
         return receiver.getScheduler().toSchedulerObject;
       }
@@ -241,11 +241,11 @@ class SenderObjectImpl(Sender) : SenderObjectBase!(Sender.Value) {
   this(Sender sender) {
     this.sender = sender;
   }
-  OperationObject connect(ReceiverObjectBase!(Sender.Value) receiver) @trusted {
+  OperationObject connect(return ReceiverObjectBase!(Sender.Value) receiver) @trusted scope {
     auto state = sender.connectHeap(receiver);
     return OperationObject(cast(typeof(OperationObject._start))&state.start);
   }
-  OperationObject connect(Receiver)(Receiver receiver) {
+  OperationObject connect(Receiver)(return Receiver receiver) scope {
     auto base = cast(SenderObjectBase!(Sender.Value))this;
     return base.connect(receiver);
   }

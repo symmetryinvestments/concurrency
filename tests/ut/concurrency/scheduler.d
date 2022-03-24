@@ -87,3 +87,9 @@ import concurrency.scheduler;
 
   whenAll(sender, driver).syncWait.assumeOk.shouldThrowWithMessage("halt");
 }
+
+@("toSenderObject.Schedule")
+@safe unittest {
+  import concurrency.sender : toSenderObject;
+  Schedule().toSenderObject.syncWait.assumeOk;
+}
