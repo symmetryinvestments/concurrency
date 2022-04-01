@@ -545,3 +545,27 @@ DoneSender().forwardOn(pool.getScheduler).syncWait.isCancelled.should == true;
 @safe unittest {
   ErrorSender(new Error("precedence")).completeWithError(new Exception("hello")).syncWait.assumeOk.shouldThrowWithMessage!Error("precedence");
 }
+
+@("onCompletion.value")
+@safe unittest {
+  import core.atomic : atomicOp;
+  shared int g = 0;
+  just(42).onCompletion(() @safe shared => g.atomicOp!"+="(1)).syncWait.assumeOk;
+  g.should == 1;
+}
+
+@("onCompletion.done")
+@safe unittest {
+  import core.atomic : atomicOp;
+  shared int g = 0;
+  DoneSender().onCompletion(() @safe shared => g.atomicOp!"+="(1)).syncWait.isCancelled.should == true;
+  g.should == 1;
+}
+
+@("onCompletion.error")
+@safe unittest {
+  import core.atomic : atomicOp;
+  shared int g = 0;
+  ThrowingSender().onCompletion(() @safe shared => g.atomicOp!"+="(1)).syncWait.isError.should == true;
+  g.should == 0;
+}

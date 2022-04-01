@@ -99,6 +99,8 @@ Senders enjoy the following operations.
 
 - `onError`. Invokes the supplied callable whenever the underlying `Sender` completes with an error.
 
+- `onCompletion`. Invokes the supplied callable whenever the underlying `Sender` completes with either an value or cancellation.
+
 - `stopWhen`. Cancels the source when the trigger completes normally. If the either source or trigger completes with cancellation or with an error, the first one is propagates after both are completed.
 
 ## Streams
