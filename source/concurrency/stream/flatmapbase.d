@@ -45,8 +45,8 @@ template FlatMapBaseStreamOp(Stream, Fun, OnOverlap overlap) {
           if (isDoneOrErrorProduced(oldState)) {
             return;
           }
-          release(Counter.tick); // release early
           auto sender = fun();
+          release(Counter.tick); // release early
           runInnerSender(sender);
         }
       }
@@ -59,8 +59,8 @@ template FlatMapBaseStreamOp(Stream, Fun, OnOverlap overlap) {
           if (isDoneOrErrorProduced(oldState)) {
             return;
           }
-          release(Counter.tick); // release early
           auto sender = fun(t);
+          release(Counter.tick); // release early
           runInnerSender(sender);
         }
       }
@@ -68,7 +68,7 @@ template FlatMapBaseStreamOp(Stream, Fun, OnOverlap overlap) {
       innerOp = sender.connect(InnerSenderReceiver!(State)(state));
       innerOp.start();
     }
-    void start() nothrow @safe {
+    void start() nothrow @safe scope {
       op.start();
     }
   }

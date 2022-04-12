@@ -669,3 +669,35 @@ unittest {
     .assumeOk
     .shouldThrow();
 }
+
+@("flatmap.latest.justfrom.exception")
+@safe unittest {
+  import concurrency.sender : justFrom;
+
+  import core.time;
+
+  1.msecs
+    .intervalStream()
+    .flatMapLatest(() => justFrom(() { throw new Exception("oops"); }))
+    .collect(()shared{})
+    .syncWait
+    .assumeOk
+    .shouldThrow();
+}
+
+@("flatmap.latest.exception")
+@safe unittest {
+  import concurrency.sender : VoidSender;
+
+  import core.time;
+
+  1.msecs
+    .intervalStream()
+    .flatMapLatest(function VoidSender(){
+        throw new Exception("oops");
+      })
+    .collect(()shared{})
+    .syncWait
+    .assumeOk
+    .shouldThrow();
+}

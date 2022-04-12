@@ -151,7 +151,7 @@ auto intervalStream(Duration duration, bool emitAtStart = false) {
       this.receiver = receiver;
       this.emitAtStart = emitAtStart;
     }
-    void start() @trusted nothrow {
+    void start() @trusted nothrow scope {
       try {
         if (emitAtStart) {
           emitAtStart = false;
