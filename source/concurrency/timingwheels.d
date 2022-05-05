@@ -645,6 +645,10 @@ struct TimingWheels(T)
             advance_level(level_index+1);
         }
     }
+    void reset() {
+        this = TimingWheels!T();
+    }
+
 }
 
 version(twtesting):

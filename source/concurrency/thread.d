@@ -55,6 +55,9 @@ class LocalThreadExecutor : Executor {
   import core.atomic : atomicOp, atomicStore, atomicLoad, cas;
   import core.thread : ThreadID;
   import std.process : thisThreadID;
+  import concurrency.scheduler : Timer;
+  import concurrency.timingwheels;
+
   static struct Node {
     VoidDelegate dg;
     Node* next;
@@ -62,6 +65,7 @@ class LocalThreadExecutor : Executor {
   private {
     ThreadID threadId;
     WorkQueue queue;
+    TimingWheels!Timer wheels;
   }
 
   this() @safe {
@@ -94,7 +98,6 @@ package struct LocalThreadWorker {
   import concurrency.scheduler : Timer, TimerTrigger, TimerDelegate;
 
   private {
-    shared int counter;
     static shared ulong nextTimerId;
     LocalThreadExecutor executor;
   }
@@ -103,34 +106,35 @@ package struct LocalThreadWorker {
     executor = e;
   }
 
+  private void removeTimer(RemoveTimer cmd) {
+    executor.wheels.cancel(cmd.timer);
+    cmd.timer.dg(TimerTrigger.cancel);
+  }
+
   void start() @trusted {
     assert(isInContext); // start can only be called on the thread
-    import concurrency.timingwheels;
     import std.datetime.systime : Clock;
     import std.array : Appender;
     Appender!(Timer[]) expiredTimers;
-    TimingWheels!Timer wheels;
     auto ticks = 1.msecs; // represents the granularity
-    wheels.init();
+    executor.wheels.reset();
+    executor.wheels.init();
     bool running = true;
     while (running) {
       import std.meta : AliasSeq;
       alias handlers = AliasSeq!((typeof(null)){running = false;},
-                                 (RemoveTimer cmd) {
-                                   wheels.cancel(cmd.timer);
-                                   cmd.timer.dg(TimerTrigger.cancel);
-                                 },
+                                 (RemoveTimer cmd) => removeTimer(cmd),
                                  (AddTimer cmd) {
                                    auto real_now = Clock.currStdTime;
-                                   auto tw_now = wheels.currStdTime(ticks);
+                                   auto tw_now = executor.wheels.currStdTime(ticks);
                                    auto delay = (real_now - tw_now).hnsecs;
                                    auto at = (cmd.dur + delay)/ticks;
-                                   wheels.schedule(cmd.timer, at);
+                                   executor.wheels.schedule(cmd.timer, at);
                                  },
                                  (VoidFunction fn) => fn(),
                                  (VoidDelegate dg) => dg()
                                  );
-      auto nextTrigger = wheels.timeUntilNextEvent(ticks, Clock.currStdTime);
+      auto nextTrigger = executor.wheels.timeUntilNextEvent(ticks, Clock.currStdTime);
       bool handleIt = false;
       if (nextTrigger.isNull()) {
         auto work = executor.queue.pop();
@@ -146,10 +150,10 @@ package struct LocalThreadWorker {
             continue;
           }
         }
-        int advance = wheels.ticksToCatchUp(ticks, Clock.currStdTime);
+        int advance = executor.wheels.ticksToCatchUp(ticks, Clock.currStdTime);
         if (advance > 0) {
           import std.range : retro;
-          wheels.advance(advance, expiredTimers);
+          executor.wheels.advance(advance, expiredTimers);
           // NOTE timingwheels keeps the timers in reverse order, so we iterate in reverse
           foreach(t; expiredTimers.data.retro) {
             t.dg(TimerTrigger.trigger);
@@ -181,7 +185,11 @@ package struct LocalThreadWorker {
   }
 
   void cancelTimer(Timer timer) @trusted {
-    executor.queue.push(new WorkNode(WorkItem(RemoveTimer(timer))));
+    auto cmd = RemoveTimer(timer);
+    if (isInContext)
+      removeTimer(cmd);
+    else
+      executor.queue.push(new WorkNode(WorkItem(RemoveTimer(timer))));
   }
 
   void stop() nothrow @trusted {
