@@ -23,10 +23,8 @@ template FlatMapBaseStreamOp(Stream, Fun, OnOverlap overlap) {
   struct FlatMapBaseStreamOp(Receiver) {
     alias State = .State!(Properties.Sender.Value, InnerSender.Value, Receiver, overlap);
     alias Op = OpType!(Properties.Sender, StreamReceiver!State);
-    alias InnerOp = OpType!(InnerSender, InnerSenderReceiver!State);
     Fun fun;
     Op op;
-    InnerOp innerOp;
     State state;
     @disable this(ref return scope typeof(this) rhs);
     @disable this(this);
@@ -65,7 +63,8 @@ template FlatMapBaseStreamOp(Stream, Fun, OnOverlap overlap) {
         }
       }
     private void runInnerSender(ref InnerSender sender) {
-      innerOp = sender.connect(InnerSenderReceiver!(State)(state));
+      import concurrency.sender : connectHeap;
+      auto innerOp = sender.connectHeap(InnerSenderReceiver!(State)(state));
       innerOp.start();
     }
     void start() nothrow @safe scope {

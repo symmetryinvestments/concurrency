@@ -701,3 +701,65 @@ unittest {
     .assumeOk
     .shouldThrow();
 }
+
+@("flatmap.latest.intervalStream.overlap.delay")
+@safe unittest {
+  import concurrency.sender : delay;
+  import core.time;
+
+  1.msecs
+    .intervalStream()
+    .take(2)
+    .flatMapLatest(() => 2.msecs.delay())
+    .collect(()shared{})
+    .syncWait
+    .assumeOk();
+}
+
+@("flatmap.latest.intervalStream.intervalStream.take")
+@safe unittest {
+  import concurrency.sender : delay;
+  import core.time;
+
+  import core.atomic;
+  shared int p;
+
+  5.msecs
+    .intervalStream()
+    .take(2)
+    .flatMapLatest(() shared {
+        return 1.msecs
+          .intervalStream(true)
+          .take(10)
+          .collect(() shared { p.atomicOp!"+="(1); });
+      })
+    .collect(()shared{})
+    .syncWait
+    .assumeOk();
+  p.atomicLoad.shouldBeGreaterThan(13);
+}
+
+@("flatmap.latest.intervalStream.intervalStream.sample")
+@safe unittest {
+  import concurrency.sender : delay;
+  import core.time;
+
+  import core.atomic;
+  shared int p;
+
+  5.msecs
+    .intervalStream()
+    .take(2)
+    .flatMapLatest(() shared {
+        return 1.msecs
+          .intervalStream(true)
+          .scan((int i) => i + 1, 0)
+          .sample(2.msecs.intervalStream())
+          .take(10)
+          .collect((int i) shared { p.atomicOp!"+="(1); });
+      })
+    .collect(()shared{})
+    .syncWait
+    .assumeOk();
+  p.atomicLoad.shouldBeGreaterThan(11);
+}
