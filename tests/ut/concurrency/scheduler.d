@@ -18,6 +18,13 @@ import concurrency.scheduler;
   race(DelaySender(10.msecs), DelaySender(3.msecs)).syncWait;
 }
 
+@("scheduleAfter.stop-before-add")
+@safe unittest {
+  import concurrency.sender : delay, justFrom;
+  auto source = new shared StopSource();
+  whenAll(justFrom(() shared => source.stop), delay(10.msecs)).syncWait(source);
+}
+
 @("ManualTimeWorker")
 @safe unittest {
   import core.atomic : atomicOp;

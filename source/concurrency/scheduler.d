@@ -108,8 +108,10 @@ struct ScheduleAfterOp(Worker, Receiver) {
   import concurrency.receiver : setValueOrError;
 
   enum Flags {
-    locked = 0x1,
-    terminated = 0x2
+    locked = 0x0,
+    stop = 0x1,
+    triggered = 0x2,
+    setup = 0x4,
   }
   alias Timer = ReturnType!(Worker.addTimer);
   Worker worker;
@@ -121,36 +123,50 @@ struct ScheduleAfterOp(Worker, Receiver) {
   @disable this(ref return scope typeof(this) rhs);
   @disable this(this);
   void start() @trusted nothrow {
-    with(flags.lock()) {
-      if (receiver.getStopToken().isStopRequested) {
-        receiver.setDone();
-        return;
+    if (receiver.getStopToken().isStopRequested) {
+      receiver.setDone();
+      return;
+    }
+
+    stopCb = receiver.getStopToken().onStop(cast(void delegate() nothrow @safe shared)&stop);
+
+    try {
+      timer = worker.addTimer(cast(void delegate(TimerTrigger) @safe shared)&trigger, dur);
+    } catch (Exception e) {
+      receiver.setError(e);
+      return;
+    }
+
+    with (flags.add(Flags.setup)) {
+      if (has(Flags.stop)) {
+        try { worker.cancelTimer(timer); } catch (Exception e) {} // TODO: what to do here?
       }
-      stopCb = receiver.getStopToken().onStop(cast(void delegate() nothrow @safe shared)&stop);
-      try {
-        timer = worker.addTimer(cast(void delegate(TimerTrigger) @safe shared)&trigger, dur);
-      } catch (Exception e) {
-        receiver.setError(e);
+      if (has(Flags.triggered)) {
+        receiver.setValueOrError();
       }
     }
   }
   private void trigger(TimerTrigger cause) @trusted nothrow {
-    stopCb.dispose();
-    final switch (cause) {
-    case TimerTrigger.cancel:
-      receiver.setDone();
-      break;
-    case TimerTrigger.trigger:
-      with(flags.update(Flags.terminated)) {
-        if ((oldState & Flags.terminated) == 0)
-          receiver.setValueOrError();
+    with (flags.add(Flags.triggered)) {
+      if (!has(Flags.setup))
+        return;
+      stopCb.dispose();
+      final switch (cause) {
+      case TimerTrigger.cancel:
+        receiver.setDone();
+        break;
+      case TimerTrigger.trigger:
+        receiver.setValueOrError();
+        break;
       }
-      break;
     }
   }
   private void stop() @trusted nothrow {
-    with(flags.update(Flags.terminated)) {
-      if ((oldState & Flags.terminated) == 0) {
+    with (flags.add(Flags.stop)) {
+      if (!has(Flags.setup)) {
+        return;
+      }
+      if (!has(Flags.triggered)) {
         try { worker.cancelTimer(timer); } catch (Exception e) {} // TODO: what to do here?
       }
     }
