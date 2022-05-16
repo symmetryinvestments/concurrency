@@ -448,13 +448,13 @@ struct TimingWheels(T)
     ///Throws: 
     /// CancelTimerError
     ///  if timer not in wheel
-    void cancel(T)(T timer)
+    bool cancel(T)(T timer)
     {
         // get list element pointer
         auto v = ptrs.fetch(timer.id());
         if ( !v.ok )
         {
-            return;
+            return false;
         }
         auto le = v.value;
         immutable level_index = le.position>>8;
@@ -464,6 +464,7 @@ struct TimingWheels(T)
         dl_unlink(le, &levels[level_index].slots[slot_index].head);
         returnToFreeList(le);
         ptrs.remove(timer.id());
+        return true;
     }
     /// Number of ticks to rotate wheels until internal wheel 'now'
     /// catch up with real world realTime.

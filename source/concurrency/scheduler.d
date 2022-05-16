@@ -50,7 +50,7 @@ alias TimerDelegate = void delegate(TimerTrigger) shared @safe;
 struct Timer {
   TimerDelegate dg;
   ulong id_;
-  ulong id() { return id_; }
+  ulong id() @safe nothrow @nogc { return id_; }
 }
 
 auto localThreadScheduler() {

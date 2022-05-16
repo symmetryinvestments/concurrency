@@ -42,7 +42,9 @@ struct RemoveTimer {
   Timer timer;
 }
 
-alias WorkItem = Variant!(typeof(null), VoidDelegate, VoidFunction, AddTimer, RemoveTimer); // null signifies end
+struct Noop {}
+
+alias WorkItem = Variant!(typeof(null), VoidDelegate, VoidFunction, AddTimer, RemoveTimer, Noop); // null signifies end
 
 struct WorkNode {
   WorkItem payload;
@@ -69,7 +71,6 @@ class LocalThreadExecutor : Executor {
   }
 
   this() @safe {
-    // todo: probably use thisThreadID
     threadId = thisThreadID;
     queue = new WorkQueue;
   }
@@ -106,9 +107,10 @@ package struct LocalThreadWorker {
     executor = e;
   }
 
-  private void removeTimer(RemoveTimer cmd) {
-    executor.wheels.cancel(cmd.timer);
+  private bool removeTimer(RemoveTimer cmd) {
+    auto removed = executor.wheels.cancel(cmd.timer);
     cmd.timer.dg(TimerTrigger.cancel);
+    return removed;
   }
 
   void start() @trusted {
@@ -132,7 +134,8 @@ package struct LocalThreadWorker {
                                    executor.wheels.schedule(cmd.timer, at);
                                  },
                                  (VoidFunction fn) => fn(),
-                                 (VoidDelegate dg) => dg()
+                                 (VoidDelegate dg) => dg(),
+                                 (Noop){}
                                  );
       auto nextTrigger = executor.wheels.timeUntilNextEvent(ticks, Clock.currStdTime);
       bool handleIt = false;
@@ -169,6 +172,7 @@ package struct LocalThreadWorker {
         writeln("Got unwanted message ", work);
         assert(0);
       }
+      assert(executor.wheels.totalTimers == 0, "Still timers left");
     }
   }
 
@@ -185,10 +189,23 @@ package struct LocalThreadWorker {
   }
 
   void cancelTimer(Timer timer) @trusted {
+    import std.algorithm : find;
+
     auto cmd = RemoveTimer(timer);
-    if (isInContext)
-      removeTimer(cmd);
-    else
+    if (isInContext) {
+      if (removeTimer(cmd))
+        return;
+      // if the timer is still in the queue, rewrite the queue node to a Noop
+      auto nodes = executor.queue[].find!((node) {
+          if (!node.payload._is!AddTimer)
+            return false;
+          return node.payload.get!AddTimer.timer.id == timer.id;
+        });
+
+      if (!nodes.empty) {
+        nodes.front.payload = WorkItem(Noop());
+      }
+    } else
       executor.queue.push(new WorkNode(WorkItem(RemoveTimer(timer))));
   }
 
