@@ -63,4 +63,32 @@ final class MPSCQueue(Node) {
       }
     }
   }
+
+  auto opSlice() @safe nothrow @nogc {
+    import core.atomic : atomicLoad, MemoryOrder;
+    auto current = atomicLoad(tail);
+    if (current is &stub)
+      current = current.next.atomicLoad!(MemoryOrder.raw);
+    return Iterator!(Node)(current);
+  }
+}
+
+struct Iterator(Node) {
+  Node* head;
+  this(Node* head) @safe nothrow @nogc {
+    this.head = head;
+  }
+  bool empty() @safe nothrow @nogc {
+    return head is null;
+  }
+  Node* front() @safe nothrow @nogc {
+    return head;
+  }
+  void popFront() @safe nothrow @nogc {
+    import core.atomic : atomicLoad, MemoryOrder;
+    head = head.next.atomicLoad!(MemoryOrder.raw);
+  }
+  Iterator!(Node) safe() {
+    return Iterator!(Node)(head);
+  }
 }

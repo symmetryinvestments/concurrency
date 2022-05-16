@@ -44,6 +44,10 @@ final class WaitableQueue(Q) {
     return q.pop();
   }
 
+  auto opSlice() @safe nothrow @nogc {
+    return q.opSlice();
+  }
+
   static if (__traits(compiles, q.producer)) {
     shared(WaitableQueueProducer!Q) producer() @trusted nothrow @nogc {
       return shared WaitableQueueProducer!Q(cast(shared)q, cast(shared)sema);
