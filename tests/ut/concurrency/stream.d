@@ -719,35 +719,82 @@ unittest {
 @("flatmap.latest.intervalStream.intervalStream.take")
 @safe unittest {
   import concurrency.sender : delay;
+  import concurrency.scheduler : ManualTimeWorker;
+  import concurrency.operations : withScheduler, whenAll;
+  import concurrency.sender : justFrom;
   import core.time;
 
   import core.atomic;
   shared int p;
 
-  5.msecs
+  auto worker = new shared ManualTimeWorker();
+  auto sender = 5.msecs
     .intervalStream()
     .take(2)
     .flatMapLatest(() shared {
         return 1.msecs
           .intervalStream(true)
-          .take(10)
+          .take(5)
           .collect(() shared { p.atomicOp!"+="(1); });
       })
     .collect(()shared{})
-    .syncWait
-    .assumeOk();
-  p.atomicLoad.shouldBeGreaterThan(13);
+    .withScheduler(worker.getScheduler);
+
+  auto driver = justFrom(() shared {
+      p.atomicLoad.should == 0;
+      worker.timeUntilNextEvent().should == 5.msecs;
+
+      worker.advance(5.msecs);
+      p.atomicLoad.should == 1;
+      worker.timeUntilNextEvent().should == 1.msecs;
+
+      worker.advance(1.msecs);
+      p.atomicLoad.should == 2;
+
+      worker.advance(1.msecs);
+      p.atomicLoad.should == 3;
+
+      worker.advance(1.msecs);
+      p.atomicLoad.should == 4;
+
+      worker.advance(1.msecs);
+      p.atomicLoad.should == 5;
+
+      worker.advance(1.msecs);
+      p.atomicLoad.should == 6;
+
+      worker.advance(1.msecs);
+      p.atomicLoad.should == 7;
+
+      worker.advance(1.msecs);
+      p.atomicLoad.should == 8;
+
+      worker.advance(1.msecs);
+      p.atomicLoad.should == 9;
+
+      worker.advance(1.msecs);
+      p.atomicLoad.should == 10;
+
+      worker.timeUntilNextEvent().should == null;
+    });
+  whenAll(sender, driver).syncWait().assumeOk;
+
+  p.atomicLoad.should == 10;
 }
 
 @("flatmap.latest.intervalStream.intervalStream.sample")
 @safe unittest {
   import concurrency.sender : delay;
+  import concurrency.scheduler : ManualTimeWorker;
+  import concurrency.operations : withScheduler, whenAll;
+  import concurrency.sender : justFrom;
   import core.time;
 
   import core.atomic;
   shared int p;
 
-  5.msecs
+  auto worker = new shared ManualTimeWorker();
+  auto sender = 5.msecs
     .intervalStream()
     .take(2)
     .flatMapLatest(() shared {
@@ -759,7 +806,64 @@ unittest {
           .collect((int i) shared { p.atomicOp!"+="(1); });
       })
     .collect(()shared{})
-    .syncWait
-    .assumeOk();
-  p.atomicLoad.shouldBeGreaterThan(11);
+    .withScheduler(worker.getScheduler);
+
+  auto driver = justFrom(() shared {
+      p.atomicLoad.should == 0;
+      worker.timeUntilNextEvent().should == 5.msecs;
+
+      worker.advance(5.msecs);
+      p.atomicLoad.should == 0;
+      worker.timeUntilNextEvent().should == 1.msecs;
+
+      worker.advance(1.msecs);
+      p.atomicLoad.should == 0;
+
+      worker.advance(1.msecs);
+      p.atomicLoad.should == 1;
+
+      worker.advance(1.msecs);
+      p.atomicLoad.should == 1;
+
+      worker.advance(1.msecs);
+      p.atomicLoad.should == 2;
+
+      worker.advance(1.msecs);
+      p.atomicLoad.should == 2;
+
+      worker.advance(2.msecs);
+      p.atomicLoad.should == 3;
+
+      worker.advance(2.msecs);
+      p.atomicLoad.should == 4;
+
+      worker.advance(2.msecs);
+      p.atomicLoad.should == 5;
+
+      worker.advance(2.msecs);
+      p.atomicLoad.should == 6;
+
+      worker.advance(2.msecs);
+      p.atomicLoad.should == 7;
+
+      worker.advance(2.msecs);
+      p.atomicLoad.should == 8;
+
+      worker.advance(2.msecs);
+      p.atomicLoad.should == 9;
+
+      worker.advance(2.msecs);
+      p.atomicLoad.should == 10;
+
+      worker.advance(2.msecs);
+      p.atomicLoad.should == 11;
+
+      worker.advance(2.msecs);
+      p.atomicLoad.should == 12;
+
+      worker.timeUntilNextEvent().should == null;
+    });
+  whenAll(sender, driver).syncWait().assumeOk;
+
+  p.atomicLoad.should == 12;
 }
