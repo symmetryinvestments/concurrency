@@ -47,20 +47,22 @@ void checkSender(T)() @safe {
   T t = T.init;
   struct Scheduler {
     import core.time : Duration;
-    auto schedule() { return VoidSender(); }
-    auto scheduleAfter(Duration) { return VoidSender(); }
+    auto schedule() @safe { return VoidSender(); }
+    auto scheduleAfter(Duration) @safe { return VoidSender(); }
   }
   struct Receiver {
+    int* i; // force it scope
     static if (is(T.Value == void))
-      void setValue() {}
+      void setValue() @safe {}
     else
-      void setValue(T.Value) {}
-    void setDone() nothrow {}
-    void setError(Throwable e) nothrow {}
-    StopToken getStopToken() nothrow { return StopToken.init; }
-    Scheduler getScheduler() nothrow { return Scheduler.init; }
+      void setValue(T.Value) @safe {}
+    void setDone() @safe nothrow {}
+    void setError(Throwable e) @safe nothrow {}
+    StopToken getStopToken() @safe nothrow { return StopToken.init; }
+    Scheduler getScheduler() @safe nothrow { return Scheduler.init; }
   }
-  OpType!(T, Receiver) op = t.connect(Receiver.init);
+  scope receiver = Receiver.init;
+  OpType!(T, Receiver) op = t.connect(receiver);
   static if (!isValidOp!(T, Receiver))
     pragma(msg, "Warning: ", T, "'s operation state is not returned via the stack");
 }
@@ -212,7 +214,7 @@ interface SenderObjectBase(T) {
 /// used in polymorphic senders
 struct OperationObject {
   private void delegate() nothrow shared _start;
-  void start() nothrow @trusted { _start(); }
+  void start() scope nothrow @trusted { _start(); }
 }
 
 interface OperationalStateBase {
@@ -220,11 +222,11 @@ interface OperationalStateBase {
 }
 
 /// calls connect on the Sender but stores the OperationState on the heap
-OperationalStateBase connectHeap(Sender, Receiver)(Sender sender, Receiver receiver) {
+OperationalStateBase connectHeap(Sender, Receiver)(Sender sender, Receiver receiver) @safe {
   alias State = typeof(sender.connect(receiver));
   return new class(sender, receiver) OperationalStateBase {
     State state;
-    this(Sender sender, Receiver receiver) {
+    this(return Sender sender, return Receiver receiver) @trusted {
       state = sender.connect(receiver);
     }
     void start() @safe nothrow {
@@ -245,7 +247,7 @@ class SenderObjectImpl(Sender) : SenderObjectBase!(Sender.Value) {
     auto state = sender.connectHeap(receiver);
     return OperationObject(cast(typeof(OperationObject._start))&state.start);
   }
-  OperationObject connect(Receiver)(return Receiver receiver) scope {
+  OperationObject connect(Receiver)(return Receiver receiver) @safe scope {
     auto base = cast(SenderObjectBase!(Sender.Value))this;
     return base.connect(receiver);
   }
@@ -299,17 +301,18 @@ struct VoidSender {
   alias Value = void;
   struct VoidOp(Receiver) {
     Receiver receiver;
-    void start() nothrow @trusted scope {
+    void start() nothrow @safe {
       import concurrency.receiver : setValueOrError;
       receiver.setValueOrError();
     }
   }
-  auto connect(Receiver)(return Receiver receiver) @safe scope return{
+  auto connect(Receiver)(return Receiver receiver) @safe scope return {
     // ensure NRVO
     auto op = VoidOp!Receiver(receiver);
     return op;
   }
 }
+
 /// A sender that always calls setError
 struct ErrorSender {
   static assert (models!(typeof(this), isSender));
@@ -352,7 +355,7 @@ template OpType(Sender, Receiver) {
 struct DelaySender {
   alias Value = void;
   Duration dur;
-  auto connect(Receiver)(return Receiver receiver) @safe return scope {
+  auto connect(Receiver)(return Receiver receiver) @trusted scope return {
     // ensure NRVO
     auto op = receiver.getScheduler().scheduleAfter(dur).connect(receiver);
     return op;

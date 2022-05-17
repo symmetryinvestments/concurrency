@@ -107,7 +107,7 @@ private struct WhenAllOp(Receiver, Senders...) {
   Ops ops;
   @disable this(this);
   @disable this(ref return scope typeof(this) rhs);
-  this(Receiver receiver, Senders senders) {
+  this(return Receiver receiver, return Senders senders) @trusted scope return {
     this.receiver = receiver;
     state = new WhenAllState!R();
     static if (Senders.length > 1) {

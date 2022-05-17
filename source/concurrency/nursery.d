@@ -17,6 +17,8 @@ import std.typecons : Nullable;
 class Nursery : StopSource {
   import concurrency.sender : isSender, OperationalStateBase;
   import core.sync.mutex : Mutex;
+  import concepts;
+  static assert (models!(typeof(this), isSender));
 
   alias Value = void;
   private {
@@ -143,15 +145,15 @@ class Nursery : StopSource {
       op.start();
   }
 
-  auto connect(Receiver)(return Receiver receiver) @trusted scope {
+  auto connect(Receiver)(return Receiver receiver) @trusted scope return {
     return (cast(shared)this).connect(receiver);
   }
 
-  auto connect(Receiver)(Receiver receiver) shared scope @safe {
+  auto connect(Receiver)(return Receiver receiver) shared scope return @trusted {
     final class ReceiverImpl : ReceiverObject {
       Receiver receiver;
       SchedulerObjectBase scheduler;
-      this(Receiver receiver) { this.receiver = receiver; }
+      this(return Receiver receiver) @trusted { this.receiver = receiver; }
       void setValue() @safe { receiver.setValue(); }
       void setDone() nothrow @safe { receiver.setDone(); }
       void setError(Throwable e) nothrow @safe { receiver.setError(e); }

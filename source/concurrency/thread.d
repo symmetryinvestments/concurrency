@@ -382,10 +382,10 @@ struct StdTaskPool {
       assert(0);
     }
   }
-  auto getScheduler() scope @safe {
+  auto getScheduler() return @safe {
     return StdTaskPoolProtoScheduler(pool);
   }
-  auto getScheduler() scope @trusted shared {
+  auto getScheduler() return @trusted shared {
     return StdTaskPoolProtoScheduler(cast()pool);
   }
 }

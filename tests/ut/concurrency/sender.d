@@ -253,7 +253,7 @@ import core.atomic : atomicOp;
       this.receiver = receiver;
       atConstructor = cast(void*)&this;
     }
-    void start() @trusted nothrow {
+    void start() @trusted nothrow scope {
       void* atStart = cast(void*)&this;
       receiver.setValue(atConstructor == atStart);
     }
@@ -266,11 +266,11 @@ import core.atomic : atomicOp;
       return op;
     }
   }
-  NRVOSender().syncWait().assumeOk;
-  NRVOSender().via(ThreadSender()).syncWait().assumeOk;
-  whenAll(NRVOSender(),VoidSender()).syncWait.assumeOk;
-  whenAll(VoidSender(),NRVOSender()).syncWait.assumeOk;
-  race(NRVOSender(),NRVOSender()).syncWait.assumeOk;
+  NRVOSender().syncWait().value.should == true;
+  NRVOSender().via(ThreadSender()).syncWait().value.should == true;
+  whenAll(NRVOSender(),VoidSender()).syncWait.value.should == true;
+  whenAll(VoidSender(),NRVOSender()).syncWait.value.should == true;
+  race(NRVOSender(),NRVOSender()).syncWait.value.should == true;
 }
 
 @("justFrom")

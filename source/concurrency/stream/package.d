@@ -207,7 +207,7 @@ auto via(Stream, Sender)(Stream stream, Sender sender) if (models!(Sender, isSen
     Op op;
     @disable this(ref return scope typeof(this) rhs);
     @disable this(this);
-    this(Stream stream, Sender sender, DG dg, Receiver receiver) {
+    this(Stream stream, Sender sender, DG dg, Receiver receiver) @trusted {
       op = stream.collect(dg).senderVia(sender).connect(receiver);
     }
     void start() nothrow @safe {

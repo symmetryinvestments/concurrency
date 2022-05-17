@@ -93,7 +93,7 @@ struct SchedulerAdapter(Worker) {
   auto schedule() shared @trusted {
     return (cast()this).schedule();
   }
-  auto scheduleAfter(Duration dur) {
+  auto scheduleAfter(Duration dur) @safe {
     return ScheduleAfterSender!(Worker)(worker, dur);
   }
   auto scheduleAfter(Duration dur) shared @trusted {
@@ -122,7 +122,7 @@ struct ScheduleAfterOp(Worker, Receiver) {
   shared SharedBitField!Flags flags;
   @disable this(ref return scope typeof(this) rhs);
   @disable this(this);
-  void start() @trusted nothrow {
+  void start() @trusted scope nothrow {
     if (receiver.getStopToken().isStopRequested) {
       receiver.setDone();
       return;
@@ -287,7 +287,7 @@ struct ScheduleAfter {
   static assert (models!(typeof(this), isSender));
   alias Value = void;
   Duration duration;
-  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+  auto connect(Receiver)(return Receiver receiver) @trusted scope return {
     // ensure NRVO
     auto op = receiver.getScheduler.scheduleAfter(duration).connect(receiver);
     return op;
@@ -297,7 +297,7 @@ struct ScheduleAfter {
 struct Schedule {
   static assert (models!(typeof(this), isSender));
   alias Value = void;
-  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+  auto connect(Receiver)(return Receiver receiver) @trusted scope return {
     // ensure NRVO
     auto op = receiver.getScheduler.schedule().connect(receiver);
     return op;

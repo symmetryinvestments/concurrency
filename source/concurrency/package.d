@@ -171,7 +171,7 @@ private Result!(Sender.Value) syncWaitImpl(Sender)(auto scope ref Sender sender,
   parentStopSource = stopSource;
 
   auto state = Receiver.State(stopSource);
-  Receiver receiver = (()@trusted => Receiver(&state))();
+  scope receiver = (()@trusted => Receiver(&state))();
   auto op = sender.connect(receiver);
   op.start();
 
