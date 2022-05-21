@@ -38,7 +38,7 @@ import core.atomic : atomicOp;
   auto source = new shared StopSource();
 
   justFrom(() shared {
-      VoidSender().withStopToken((StopToken token){
+      VoidSender().withStopToken((StopToken token) shared @safe {
           source.stop();
           token.isStopRequested.should == true;
         }).syncWait().isCancelled.should == true;
@@ -51,7 +51,7 @@ import core.atomic : atomicOp;
   auto source = new shared StopSource();
 
   justFrom(() shared {
-      VoidSender().withStopToken((StopToken token){
+      VoidSender().withStopToken((StopToken token) shared @safe {
           source.stop();
           token.isStopRequested.should == true;
         }).syncWait().isCancelled.should == true;
@@ -66,7 +66,7 @@ import core.atomic : atomicOp;
   auto pool = stdTaskPool(2);
 
   justFrom(() shared {
-      VoidSender().withStopToken((StopToken token){
+      VoidSender().withStopToken((StopToken token) shared @safe {
           source.stop();
           token.isStopRequested.should == true;
         }).syncWait().isCancelled.should == true;
@@ -212,7 +212,7 @@ import core.atomic : atomicOp;
   import core.atomic : atomicStore, atomicLoad;
   shared bool g;
 
-  auto waiting = ThreadSender().withStopToken((StopToken token) @trusted {
+  auto waiting = ThreadSender().withStopToken((StopToken token) shared @trusted {
       while (!token.isStopRequested) { }
       g.atomicStore(true);
     });

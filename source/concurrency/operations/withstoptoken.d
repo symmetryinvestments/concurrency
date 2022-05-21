@@ -6,8 +6,14 @@ import concurrency.sender;
 import concurrency.stoptoken;
 import concepts;
 import std.traits;
+import concurrency.utils : isThreadSafeFunction;
 
-auto withStopToken(Sender, Fun)(Sender sender, Fun fun) {
+deprecated("function passed is not shared @safe delegate or @safe function.")
+auto withStopToken(Sender, Fun)(Sender sender, Fun fun) if (!isThreadSafeFunction!Fun) {
+  return STSender!(Sender, Fun)(sender, fun);
+ }
+
+auto withStopToken(Sender, Fun)(Sender sender, Fun fun) if (isThreadSafeFunction!Fun) {
   return STSender!(Sender, Fun)(sender, fun);
 }
 
