@@ -68,6 +68,7 @@ class LocalThreadExecutor : Executor {
     ThreadID threadId;
     WorkQueue queue;
     TimingWheels!Timer wheels;
+    shared ulong nextTimerId;
   }
 
   this() @safe {
@@ -99,7 +100,6 @@ package struct LocalThreadWorker {
   import concurrency.scheduler : Timer, TimerTrigger, TimerDelegate;
 
   private {
-    static shared ulong nextTimerId;
     LocalThreadExecutor executor;
   }
 
@@ -182,7 +182,7 @@ package struct LocalThreadWorker {
 
   Timer addTimer(TimerDelegate dg, Duration dur) @trusted {
     import core.atomic : atomicOp;
-    ulong id = nextTimerId.atomicOp!("+=")(1);
+    ulong id = executor.nextTimerId.atomicOp!("+=")(1);
     Timer timer = Timer(dg, id);
     executor.queue.push(new WorkNode(WorkItem(AddTimer(timer, dur))));
     return timer;
