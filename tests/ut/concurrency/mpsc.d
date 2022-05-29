@@ -6,7 +6,7 @@ import concurrency : syncWait;
 
 struct Node {
   int payload;
-  Node* next;
+  shared Node* next;
 }
 
 auto intProducer(Q)(Q q, int num) {
