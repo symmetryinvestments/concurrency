@@ -48,7 +48,7 @@ alias WorkItem = Variant!(typeof(null), VoidDelegate, VoidFunction, AddTimer, Re
 
 struct WorkNode {
   WorkItem payload;
-  WorkNode* next;
+  shared WorkNode* next;
 }
 
 alias WorkQueue = WaitableQueue!(MPSCQueue!WorkNode);
