@@ -23,6 +23,7 @@ private:
   shared Promise!void completion;
   shared StopSource stopSource;
   Throwable throwable;
+  shared StopCallback cb;
 
   void forward() @trusted nothrow shared {
     import core.atomic : atomicLoad;
@@ -61,9 +62,10 @@ public:
       cleanup.syncWait();
   }
 
-  this(shared StopSource stopSource) @safe shared {
+  this(shared StopSource stopSource) @trusted shared {
     completion = new shared Promise!void;
     this.stopSource = stopSource;
+    cb = cast(shared)this.stopSource.onStop(() @safe shared nothrow => cast(void)this.stop());
   }
 
   auto cleanup() @safe shared {
@@ -76,6 +78,7 @@ public:
   }
 
   bool stop() nothrow @trusted shared {
+    cb.dispose();
     import core.atomic : MemoryOrder;
     if ((flag.load!(MemoryOrder.acq) & Flag.stopped) > 0)
       return false;
