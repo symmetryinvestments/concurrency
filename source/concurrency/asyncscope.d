@@ -14,6 +14,12 @@ auto asyncScope() @safe {
   return as;
 }
 
+auto asyncScope(shared StopSource source) @safe {
+  // ensure NRVO
+  auto as = shared AsyncScope(source);
+  return as;
+}
+
 struct AsyncScope {
 private:
   import concurrency.bitfield : SharedBitField;
@@ -70,6 +76,10 @@ public:
 
   auto cleanup() @safe shared {
     stop();
+    return onComplete();
+  }
+
+  auto onComplete() @safe shared {
     return completion.sender();
   }
 
