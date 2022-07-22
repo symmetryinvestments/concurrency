@@ -235,6 +235,72 @@ unittest {
   p.should == 5;
 }
 
+@("retryWhen")
+unittest {
+  ValueSender!int(5).retryWhen(Wait(10.msecs)).syncWait.value.should == 5;
+
+  shared int m = 0;
+
+  struct Increment {
+    int s = 4;
+    auto failure(Exception e) {
+      if (m >= s)
+        throw e;
+      return justFrom(() @safe nothrow shared { import core.atomic; m.atomicOp!("+=")(1); });
+    }
+  }
+  ValueSender!int(5).retryWhen(Increment()).syncWait.value.should == 5;
+  m.should == 0;
+
+  int t = 3;
+  int n = 0;
+  struct Sender {
+    alias Value = void;
+    static struct Op(Receiver) {
+      Receiver receiver;
+      bool fail;
+      void start() @safe nothrow {
+        if (fail)
+          receiver.setError(new Exception("Fail fail fail"));
+        else
+          receiver.setValue();
+      }
+    }
+    auto connect(Receiver)(return Receiver receiver) @safe scope return {
+      // ensure NRVO
+      auto op = Op!(Receiver)(receiver, n++ < t);
+      return op;
+    }
+  }
+
+  Sender().retryWhen(Increment()).syncWait.assumeOk;
+  n.should == 4;
+  m.should == 3;
+  n = 0;
+  m = 0;
+
+  Sender().retryWhen(Increment(2)).syncWait.assumeOk.shouldThrowWithMessage("Fail fail fail");
+  n.should == 3;
+  m.should == 2;
+  m = 0;
+
+  shared int p = 0;
+  ThreadSender().then(()shared { import core.atomic; p.atomicOp!("+=")(1); throw new Exception("Failed"); }).retryWhen(Increment()).syncWait.assumeOk.shouldThrowWithMessage("Failed");
+  p.should == 5;
+  m.should == 4;
+}
+
+@("retryWhen.throw")
+unittest {
+  struct Throw {
+    auto failure(Exception t) @safe {
+      return ThrowingSender();
+    }
+  }
+
+  VoidSender().then(() {throw new Exception("A");}).retryWhen(Throw()).syncWait.assumeOk.shouldThrowWithMessage("ThrowingSender");
+}
+
 @("whenAll.oob")
 unittest {
   auto oob = OutOfBandValueSender!int(43);

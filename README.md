@@ -81,6 +81,8 @@ Senders enjoy the following operations.
 
 - `retry`. It retries the underlying Sender until success or cancellation. The retry logic is customizable. Included is a Times, that will retry n times and then propagate the latest failure.
 
+- `retryWhen`. It retries the underlying Sender until success or cancellation. The retry logic is customizable. Unlike `retry`, `retryWhen` logic returns an additional sender on failure to be run before the next retry, allowing deeper customisability such as delaying retries.
+
 - `completeWithCancellation`. Wraps the Sender and redirects the setValue termination to complete with cancellation. The Sender is not allowed to produce a Value.
 
 - `completeWithError`. Wraps the Sender and redirects the all terminations to complete with error. If an `Throwable` is forwarded in the Sender it takes precedence over the error value if the latter is only an `Exception`.
