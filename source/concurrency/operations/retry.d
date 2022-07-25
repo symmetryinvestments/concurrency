@@ -16,6 +16,16 @@ struct Times {
   }
 }
 
+
+// Checks T is retry logic
+void checkRetryLogic(T)() {
+  T t = T.init;
+  alias Ret = typeof((() nothrow => t.failure(Throwable.init))());
+  static assert(is(Ret == bool), T.stringof ~ ".failure(Throwable) should return a bool, but it returns a " ~ Ret.stringof);
+}
+
+enum isRetryLogic(T) = is(typeof(checkRetryLogic!T));
+
 auto retry(Sender, Logic)(Sender sender, Logic logic) {
   return RetrySender!(Sender, Logic)(sender, logic);
 }
@@ -69,7 +79,7 @@ private struct RetryOp(Receiver, Sender, Logic) {
   }
 }
 
-struct RetrySender(Sender, Logic) if (models!(Sender, isSender)) {
+struct RetrySender(Sender, Logic) if (models!(Sender, isSender) && models!(Logic, isRetryLogic)) {
   static assert(models!(typeof(this), isSender));
   alias Value = Sender.Value;
   Sender sender;
