@@ -73,9 +73,9 @@ Senders enjoy the following operations.
 
 - `race`. Runs multiple Senders and completes with the value produced by the first to complete, after first cancelling and awaiting the others. When all Senders complete with an error, the first error is propagated. When all Senders complete with cancellation, `race` completes with cancellation as well. Unlike `raceAll` it allows Senders to error or complete with cancellation as long as one is still running.
 
-- `raceAll`. Runs multiple Senders and completes with the value or error produced by the first to complete, after first cancelling and awaiting the others. Unlike `race` the only way it can complete with a value is if all Senders are still running at that one of them completes. So not only does it forward the first value, also the first error.
+- `raceAll`. Runs multiple Senders and completes with the value or error produced by the first to complete, after first cancelling and awaiting the others. Unlike `race`, the only way `raceAll` can complete succesfully is when all Senders are still running when one of them completes. So not only does it forward the first value, also the first error.
 
-- `ignoreError`. Redirects the `setException` to `setDone`, so as not to trigger the downstream error path.
+- `ignoreError`. Redirects the `setError` to `setDone`, so as not to trigger the downstream error path.
 
 - `whenAll`. Produces a tuple of values after all Senders produced their values. If one or more Senders complete with an error, `whenAll` will complete with the first error, after stopping and awaiting the remaining Senders. Likewise, if one Sender completes with cancellation, `whenAll` completes with cancellation as well, after stopping and awaiting the remaining Senders.
 
