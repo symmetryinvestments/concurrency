@@ -235,6 +235,81 @@ unittest {
   p.should == 5;
 }
 
+@("retryWhen.immediate.success")
+unittest {
+  static struct Immediate {
+    auto failure(Exception e) {
+      return VoidSender();
+    }
+  }
+
+  VoidSender().retryWhen(Immediate()).syncWait.assumeOk;
+}
+
+struct ConnectCounter {
+  alias Value = int;
+  int counter = 0;
+  auto connect(Receiver)(return Receiver receiver) @trusted scope return {
+    // ensure NRVO
+    auto op = ValueSender!int(counter++).connect(receiver);
+    return op;
+  }
+}
+
+@("retryWhen.immediate.retries")
+unittest {
+  static struct Immediate {
+    auto failure(Exception e) {
+      return VoidSender();
+    }
+  }
+  ConnectCounter()
+    .then((int c) { if (c < 3) throw new Exception("jada"); return c; })
+    .retryWhen(Immediate())
+    .syncWait.value.should == 3;
+}
+
+@("retryWhen.wait.retries")
+unittest {
+  import core.time : msecs;
+  import concurrency.scheduler : ManualTimeWorker;
+
+  static struct Wait {
+    auto failure(Exception e) @safe {
+      return delay(3.msecs);
+    }
+  }
+
+  auto worker = new shared ManualTimeWorker();
+  auto sender = ConnectCounter()
+    .then((int c) { if (c < 3) throw new Exception("jada"); return c; })
+    .retryWhen(Wait())
+    .withScheduler(worker.getScheduler);
+
+  auto driver = just(worker).then((shared ManualTimeWorker worker) {
+      worker.timeUntilNextEvent().should == 3.msecs;
+      worker.advance(3.msecs);
+      worker.timeUntilNextEvent().should == 3.msecs;
+      worker.advance(3.msecs);
+      worker.timeUntilNextEvent().should == 3.msecs;
+      worker.advance(3.msecs);
+      worker.timeUntilNextEvent().should == null;
+    });
+
+  whenAll(sender, driver).syncWait.value.should == 3;
+}
+
+@("retryWhen.throw")
+unittest {
+  static struct Throw {
+    auto failure(Exception t) @safe {
+      return ErrorSender(new Exception("inner"));
+    }
+  }
+
+  ErrorSender(new Exception("outer")).retryWhen(Throw()).syncWait.assumeOk.shouldThrowWithMessage("inner");
+}
+
 @("whenAll.oob")
 unittest {
   auto oob = OutOfBandValueSender!int(43);
