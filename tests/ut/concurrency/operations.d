@@ -235,70 +235,79 @@ unittest {
   p.should == 5;
 }
 
-@("retryWhen")
+@("retryWhen.immediate.success")
 unittest {
-  ValueSender!int(5).retryWhen(Wait(10.msecs)).syncWait.value.should == 5;
-
-  shared int m = 0;
-
-  struct Increment {
-    int s = 4;
+  static struct Immediate {
     auto failure(Exception e) {
-      if (m >= s)
-        throw e;
-      return justFrom(() @safe nothrow shared { import core.atomic; m.atomicOp!("+=")(1); });
-    }
-  }
-  ValueSender!int(5).retryWhen(Increment()).syncWait.value.should == 5;
-  m.should == 0;
-
-  int t = 3;
-  int n = 0;
-  struct Sender {
-    alias Value = void;
-    static struct Op(Receiver) {
-      Receiver receiver;
-      bool fail;
-      void start() @safe nothrow {
-        if (fail)
-          receiver.setError(new Exception("Fail fail fail"));
-        else
-          receiver.setValue();
-      }
-    }
-    auto connect(Receiver)(return Receiver receiver) @safe scope return {
-      // ensure NRVO
-      auto op = Op!(Receiver)(receiver, n++ < t);
-      return op;
+      return VoidSender();
     }
   }
 
-  Sender().retryWhen(Increment()).syncWait.assumeOk;
-  n.should == 4;
-  m.should == 3;
-  n = 0;
-  m = 0;
+  VoidSender().retryWhen(Immediate()).syncWait.assumeOk;
+}
 
-  Sender().retryWhen(Increment(2)).syncWait.assumeOk.shouldThrowWithMessage("Fail fail fail");
-  n.should == 3;
-  m.should == 2;
-  m = 0;
+struct ConnectCounter {
+  alias Value = int;
+  int counter = 0;
+  auto connect(Receiver)(return Receiver receiver) @trusted scope return {
+    // ensure NRVO
+    auto op = ValueSender!int(counter++).connect(receiver);
+    return op;
+  }
+}
 
-  shared int p = 0;
-  ThreadSender().then(()shared { import core.atomic; p.atomicOp!("+=")(1); throw new Exception("Failed"); }).retryWhen(Increment()).syncWait.assumeOk.shouldThrowWithMessage("Failed");
-  p.should == 5;
-  m.should == 4;
+@("retryWhen.immediate.retries")
+unittest {
+  static struct Immediate {
+    auto failure(Exception e) {
+      return VoidSender();
+    }
+  }
+  ConnectCounter()
+    .then((int c) { if (c < 3) throw new Exception("jada"); return c; })
+    .retryWhen(Immediate())
+    .syncWait.value.should == 3;
+}
+
+@("retryWhen.wait.retries")
+unittest {
+  import core.time : msecs;
+  import concurrency.scheduler : ManualTimeWorker;
+
+  static struct Wait {
+    auto failure(Exception e) @safe {
+      return delay(3.msecs);
+    }
+  }
+
+  auto worker = new shared ManualTimeWorker();
+  auto sender = ConnectCounter()
+    .then((int c) { if (c < 3) throw new Exception("jada"); return c; })
+    .retryWhen(Wait())
+    .withScheduler(worker.getScheduler);
+
+  auto driver = just(worker).then((shared ManualTimeWorker worker) {
+      worker.timeUntilNextEvent().should == 3.msecs;
+      worker.advance(3.msecs);
+      worker.timeUntilNextEvent().should == 3.msecs;
+      worker.advance(3.msecs);
+      worker.timeUntilNextEvent().should == 3.msecs;
+      worker.advance(3.msecs);
+      worker.timeUntilNextEvent().should == null;
+    });
+
+  whenAll(sender, driver).syncWait.value.should == 3;
 }
 
 @("retryWhen.throw")
 unittest {
-  struct Throw {
+  static struct Throw {
     auto failure(Exception t) @safe {
-      return ThrowingSender();
+      return ErrorSender(new Exception("inner"));
     }
   }
 
-  VoidSender().then(() {throw new Exception("A");}).retryWhen(Throw()).syncWait.assumeOk.shouldThrowWithMessage("ThrowingSender");
+  ErrorSender(new Exception("outer")).retryWhen(Throw()).syncWait.assumeOk.shouldThrowWithMessage("inner");
 }
 
 @("whenAll.oob")

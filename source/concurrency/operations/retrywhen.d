@@ -8,131 +8,95 @@ import concurrency.stoptoken;
 import concepts;
 import std.traits;
 
-version(unittest) {
-  struct Wait {
-    import core.time : Duration;
-    Duration dur;
-    int max = 5;
-    int n = 0;
-    auto failure(Exception e) @safe {
-      n++;
-      if (n >= max)
-        throw e;
-      return delay(dur);
-    }
-  }
-}
-
 enum isRetryWhenLogic(T) = models!(typeof(T.init.failure(Exception.init)), isSender);
 
-auto retryWhen(Sender, Logic)(Sender sender, Logic logic) {
+auto retryWhen(Sender, Logic)(Sender sender, Logic logic) if (isRetryWhenLogic!Logic) {
   return RetryWhenSender!(Sender, Logic)(sender, logic);
 }
 
-private class RetryWhenExceptionWrapper : Exception {
-  this(Throwable t) @safe nothrow {
-    super("Wrapper");
-    next = t;
-  }
-}
-
-private struct RetryWhenExceptionWrapperReceiver(Receiver, Value) {
-  private {
-    Receiver receiver;
-  }
-  static if (is(Value == void)) {
-    void setValue() @safe {
-      receiver.setValue();
-    }
-  } else {
-    void setValue(Value value) @safe {
-      receiver.setValue(value);
-    }
+private struct TriggerReceiver(Sender, Receiver, Logic) {
+  alias Value = void;
+  private RetryWhenOp!(Sender, Receiver, Logic)* op;
+  void setValue() @safe {
+    op.sourceOp = op.sender.connect(SourceReceiver!(Sender, Receiver, Logic)(op));
+    op.sourceOp.start();
   }
   void setDone() @safe nothrow {
-    receiver.setDone();
+    op.receiver.setDone();
   }
   void setError(Throwable t) @safe nothrow {
-    receiver.setError(new RetryWhenExceptionWrapper(t));
+    op.receiver.setError(t);
   }
-  mixin ForwardExtensionPoints!receiver;
+  private auto receiver() {
+    return op.receiver;
+  }
+  mixin ForwardExtensionPoints!(receiver);
 }
 
-private struct RetryWhenExceptionWrapperSender(Sender) {
-  static assert(models!(typeof(this), isSender));
+private struct SourceReceiver(Sender, Receiver, Logic) {
   alias Value = Sender.Value;
-  Sender sender;
-  auto connect(Receiver)(return Receiver receiver) @safe scope return {
-    // ensure NRVO
-    auto op = sender.connect(RetryWhenExceptionWrapperReceiver!(Receiver, Value)(receiver));
-    return op;
-  }
-}
-
-private struct RetryWhenReceiver(Receiver, Sender, Logic) {
-  private {
-    Sender sender;
-    Receiver receiver;
-    Logic logic;
-    alias Value = Sender.Value;
-  }
+  private RetryWhenOp!(Sender, Receiver, Logic)* op;
   static if (is(Value == void)) {
     void setValue() @safe {
-      receiver.setValueOrError();
+      op.receiver.setValueOrError();
     }
   } else {
     void setValue(Value value) @safe {
-      receiver.setValueOrError(value);
+      op.receiver.setValueOrError(value);
     }
   }
   void setDone() @safe nothrow {
-    receiver.setDone();
+    op.receiver.setDone();
   }
-  void setError(Throwable t) @safe nothrow {
-    auto w = cast(RetryWhenExceptionWrapper) t;
-    if (w) {
-      receiver.setError(w.next);
+  void setError(Throwable t) @trusted nothrow {
+    if (auto ex = cast(Exception) t) {
+      try {
+        op.triggerOp = op.logic.failure(ex).connect(TriggerReceiver!(Sender, Receiver, Logic)(op));
+        op.triggerOp.start();
+      } catch (Throwable t2) {
+        op.receiver.setError(t2);
+      }
       return;
     }
-    auto e = cast(Exception) t;
-    if (!e) {
-      receiver.setError(e);
-      return;
-    }
-    try {
-      auto s = logic.failure(e);
-      // TODO: we connect on the heap here but we can probably do something smart...
-      // Maybe we can store the new Op in the RetryWhenOp struct
-      // From what I gathered that is what libunifex does
-      sender.via(RetryWhenExceptionWrapperSender!(typeof(s))(s)).connectHeap(this).start();
-    } catch (Exception e) {
-      receiver.setError(e);
-    }
+    op.receiver.setError(t);
   }
-  mixin ForwardExtensionPoints!receiver;
+  private auto receiver() {
+    return op.receiver;
+  }
+  mixin ForwardExtensionPoints!(receiver);
 }
 
-private struct RetryWhenOp(Receiver, Sender, Logic) {
-  alias Op = OpType!(Sender, RetryWhenReceiver!(Receiver, Sender, Logic));
-  Op op;
+private struct RetryWhenOp(Sender, Receiver, Logic) {
+  import std.traits : ReturnType;
+  alias SourceOp = OpType!(Sender, SourceReceiver!(Sender, Receiver, Logic));
+  alias TriggerOp = OpType!(ReturnType!(Logic.failure), TriggerReceiver!(Sender, Receiver, Logic));
+  Sender sender;
+  Receiver receiver;
+  Logic logic;
+  // TODO: this could probably be a Variant to safe some space
+  SourceOp sourceOp;
+  TriggerOp triggerOp;
   @disable this(ref return scope typeof(this) rhs);
   @disable this(this);
-  this(Sender sender, return RetryWhenReceiver!(Receiver, Sender, Logic) receiver) @trusted scope {
-    op = sender.connect(receiver);
+  this(return Sender sender, Receiver receiver, Logic logic) @trusted scope {
+    this.sender = sender;
+    this.receiver = receiver;
+    this.logic = logic;
+    sourceOp = this.sender.connect(SourceReceiver!(Sender, Receiver, Logic)(&this));
   }
   void start() @trusted nothrow scope {
-    op.start();
+    sourceOp.start();
   }
 }
 
-struct RetryWhenSender(Sender, Logic) if (models!(Sender, isSender) && models!(Logic, isRetryWhenLogic)) {
+struct RetryWhenSender(Sender, Logic) if (isRetryWhenLogic!Logic) {
   static assert(models!(typeof(this), isSender));
   alias Value = Sender.Value;
   Sender sender;
   Logic logic;
   auto connect(Receiver)(return Receiver receiver) @safe scope return {
     // ensure NRVO
-    auto op = RetryWhenOp!(Receiver, Sender, Logic)(sender, RetryWhenReceiver!(Receiver, Sender, Logic)(sender, receiver, logic));
+    auto op = RetryWhenOp!(Sender, Receiver, Logic)(sender, receiver, logic);
     return op;
   }
 }
