@@ -11,13 +11,13 @@ lflags "--export-dynamic-symbol=concurrency_getLocalThreadExecutor" "--export-dy
 
 configuration "default" {
 	targetType "library"
-	dflags "-dip1000" "-dip25"
+	dflags "-dip1000"
 }
 configuration "unittest" {
 	dependency "unit-threaded" version="*"
 	targetType "executable"
 	mainSourceFile "tests/ut/ut_runner.d"
-	dflags "-dip1000" "-dip25"
+	dflags "-dip1000"
 	sourcePaths "source" "tests/ut"
 	importPaths "source" "tests/ut"
 }
@@ -25,7 +25,7 @@ configuration "unittest-release" {
 	dependency "unit-threaded" version="*"
 	targetType "executable"
 	mainSourceFile "tests/ut/ut_runner.d"
-	dflags "-dip1000" "-dip25" "-g"
+	dflags "-dip1000" "-g"
 	sourcePaths "source" "tests/ut"
 	importPaths "source" "tests/ut"
   # buildOptions "unittests"  "optimize"  "inline"
@@ -39,7 +39,7 @@ configuration "unittest-asan" {
 	dependency "unit-threaded" version="*"
 	targetType "executable"
 	mainSourceFile "tests/ut/ut_runner.d"
-	dflags "-dip1000" "-dip25" "-fsanitize=address"
+	dflags "-dip1000" "-fsanitize=address"
 	sourcePaths "source" "tests/ut"
 	importPaths "source" "tests/ut"
   # buildOptions "unittests"  "optimize"  "inline"
