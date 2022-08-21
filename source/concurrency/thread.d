@@ -169,7 +169,7 @@ package struct LocalThreadWorker {
       if (!executor.queue.empty) {
         auto work = executor.queue.pop();
         import std.stdio;
-        writeln("Got unwanted message ", work);
+        writeln("Got unwanted message ", work.payload);
         assert(0);
       }
       assert(executor.wheels.totalTimers == 0, "Still timers left");
