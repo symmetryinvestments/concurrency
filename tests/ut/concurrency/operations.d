@@ -644,3 +644,30 @@ DoneSender().forwardOn(pool.getScheduler).syncWait.isCancelled.should == true;
   ThrowingSender().onCompletion(() @safe shared => g.atomicOp!"+="(1)).syncWait.isError.should == true;
   g.should == 0;
 }
+
+@("onResult.value")
+@safe unittest {
+  import core.atomic : atomicOp;
+  shared int g = 0;
+  just(42).onResult((Result!int r) @safe shared => g.atomicOp!"+="(1)).syncWait.assumeOk;
+  just(42).tee((Result!int r) @safe shared => g.atomicOp!"+="(1)).syncWait.assumeOk;
+  g.should == 2;
+}
+
+@("onResult.done")
+@safe unittest {
+  import core.atomic : atomicOp;
+  shared int g = 0;
+  DoneSender().onResult((Result!void r) @safe shared => g.atomicOp!"+="(1)).syncWait.isCancelled.should == true;
+  DoneSender().tee((Result!void r) @safe shared => g.atomicOp!"+="(1)).syncWait.isCancelled.should == true;
+  g.should == 2;
+}
+
+@("onResult.error")
+@safe unittest {
+  import core.atomic : atomicOp;
+  shared int g = 0;
+  ThrowingSender().onResult((Result!void r) @safe shared => g.atomicOp!"+="(1)).syncWait.isError.should == true;
+  ThrowingSender().tee((Result!void r) @safe shared => g.atomicOp!"+="(1)).syncWait.isError.should == true;
+  g.should == 2;
+}
