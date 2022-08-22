@@ -384,42 +384,6 @@ import concurrency.thread : ThreadSender;
     .syncWait.assumeOk.shouldThrowWithMessage("Bla");
 }
 
-@("throttling.throttleLast.thread")
-@safe unittest {
-  import core.time;
-  import concurrency.scheduler : ManualTimeWorker;
-  import concurrency.operations : withScheduler, whenAll;
-  import concurrency.sender : justFrom;
-
-  shared int p = 0;
-  auto worker = new shared ManualTimeWorker();
-
-  auto throttled = 1.msecs
-    .intervalStream(true)
-    .via(ThreadSender())
-    .scan((int acc) => acc+1, 0)
-    .throttleLast(3.msecs)
-    .take(4)
-    .collect((int i) shared { p.atomicOp!"+="(i); })
-    .withScheduler(worker.getScheduler);
-
-  auto driver = justFrom(() shared @trusted {
-      worker.wait();
-      p.atomicLoad.should == 0;
-
-      foreach(expected; [0,0,3,3,3,9,9,9,18,18,18,30]) {
-        worker.advance(1.msecs);
-        p.atomicLoad.should == expected;
-      }
-
-      worker.timeUntilNextEvent().should == null;
-    });
-
-  whenAll(throttled, driver).syncWait().assumeOk;
-
-  p.atomicLoad.should == 30;
-}
-
 @("throttling.throttleLast.thread.arrayStream")
 @safe unittest {
   import core.time;
