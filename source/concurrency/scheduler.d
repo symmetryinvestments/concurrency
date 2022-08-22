@@ -199,21 +199,22 @@ class ManualTimeWorker {
   import concurrency.timingwheels : TimingWheels;
   import concurrency.executor : VoidDelegate;
   import core.sync.mutex : Mutex;
+  import core.sync.condition : Condition;
   import core.time : msecs, hnsecs;
   import std.array : Appender;
   private {
     TimingWheels!Timer wheels;
     Appender!(Timer[]) expiredTimers;
-    Mutex mutex;
+    Condition condition;
     size_t time = 1;
     shared ulong nextTimerId;
   }
   auto lock() @trusted shared {
     import concurrency.utils : SharedGuard;
-    return SharedGuard!(ManualTimeWorker).acquire(this, cast()mutex);
+    return SharedGuard!(ManualTimeWorker).acquire(this, cast()condition.mutex);
   }
   this() @trusted shared {
-    mutex = cast(shared)new Mutex();
+    condition = cast(shared)new Condition(new Mutex());
     (cast()wheels).init(time);
   }
   ManualTimeScheduler getScheduler() @safe shared {
@@ -228,7 +229,13 @@ class ManualTimeWorker {
       auto at = (dur + delay)/1.msecs;
       auto timer = Timer(dg, nextTimerId.atomicOp!("+=")(1));
       wheels.schedule(timer, at);
+      condition.notifyAll();
       return timer;
+    }
+  }
+  void wait() @trusted shared {
+    with(lock()) {
+      condition.wait();
     }
   }
   void cancelTimer(Timer timer) @trusted shared {
