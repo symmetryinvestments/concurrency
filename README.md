@@ -11,7 +11,7 @@ It can be used to model many asynchronous operations: Futures, Fiber, Coroutines
 
  `setValue` is the only one allowed to throw exceptions, and if it does, `setError` is called with the Throwable. `setDone` is called when the operation has been cancelled.
 
-See http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p0443r14.html for the C++ proposal for introducing Senders/Receivers.
+See https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2022/p2300r5.html for the C++ proposal for introducing Senders/Receivers.
 
 Currently we have the following Senders:
 
