@@ -54,15 +54,20 @@ struct FiberSenderOp(Receiver) {
     auto fiber = cast(OpFiber!Op)f;
     if (!inline_)
       return schedule(fiber);
+    import std.stdio;
+    debug writeln("enter fiber");
     if (auto throwable = fiber.call!(Fiber.Rethrow.no)) {
+      debug writeln("fiber threw ", throwable);
       receiver.setError(throwable);
       return;
     }
+    debug writeln("exit fiber");
     if (fiber.continuation !is null) {
       auto sender = cast(SenderObjectBase!void)fiber.continuation;
       fiber.continuation = null;
       try {
         auto op = sender.connectHeap(InnerFiberSchedulerReceiver!Receiver(fiber, &cycle, receiver));
+        debug writeln("starting yielded sender");
         op.start();
       } catch (Throwable t) {
         receiver.setError(t);
@@ -81,11 +86,15 @@ struct FiberSenderOp(Receiver) {
 
     parentStopSource = receiver.getStopToken().source;
 
+    import std.stdio;
     try {
+      debug writeln("FiberSender.run");
       receiver.setValue();
     } catch (Exception e) {
+      debug writeln("FiberSender.run.exception");
       receiver.setError(e);
     } catch (Throwable t) {
+      debug writeln("FiberSender.run.throwable");
       receiver.setError(t.clone());
     }
 
@@ -95,16 +104,20 @@ struct FiberSenderOp(Receiver) {
 
 struct InnerFiberSchedulerReceiver(Receiver) {
   import concurrency.receiver : ForwardExtensionPoints;
+  import std.stdio;
   BaseFiber fiber;
   void delegate(BaseFiber, bool) nothrow @trusted cycle;
   Receiver receiver;
   void setDone() nothrow @safe {
+    debug writeln("InnerFiberSchedulerReceiver.setDone");
     cycle(fiber, true);
   }
   void setError(Throwable e) nothrow @safe {
+    debug writeln("InnerFiberSchedulerReceiver.setError");
     cycle(fiber, true);
   }
   void setValue() nothrow @safe {
+    debug writeln("InnerFiberSchedulerReceiver.setValue");
     cycle(fiber, true);
   }
   mixin ForwardExtensionPoints!receiver;
@@ -119,12 +132,16 @@ auto yield(Sender)(Sender sender) @trusted {
   import concurrency : Result;
   import concurrency.operations : onResult;
   import concurrency.sender : toSenderObject;
+  import std.stdio;
 
   auto fiber = BaseFiber.getThis();
 
   shared Result!(Sender.Value) local;
+  debug writeln("Setup sender continuation");
   fiber.continuation = cast(Object)sender.onResult((Result!(Sender.Value) r) @safe shared { local = r; }).toSenderObject;
+  debug writeln("Yield");
   yield();
+  debug writeln("Resume");
 
   static if (!is(Sender.Value == void))
     return local.value;
