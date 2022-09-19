@@ -50,7 +50,7 @@ void checkSender(T)() @safe {
     auto schedule() @safe { return VoidSender(); }
     auto scheduleAfter(Duration) @safe { return VoidSender(); }
   }
-  struct Receiver {
+  static struct Receiver {
     int* i; // force it scope
     static if (is(T.Value == void))
       void setValue() @safe {}
@@ -91,6 +91,8 @@ struct ValueSender(T) {
     Receiver receiver;
     static if (!is(T == void))
       T value;
+    @disable this(ref return scope typeof(this) rhs);
+    @disable this(this);
     void start() nothrow @trusted scope {
       import concurrency.receiver : setValueOrError;
       static if (!is(T == void))
@@ -125,6 +127,8 @@ struct JustFromSender(Fun) {
   static struct Op(Receiver) {
     Receiver receiver;
     Fun fun;
+    @disable this(ref return scope typeof(this) rhs);
+    @disable this(this);
     void start() @trusted nothrow {
       import std.traits : hasFunctionAttributes;
       static if (hasFunctionAttributes!(Fun, "nothrow")) {
@@ -267,6 +271,8 @@ struct ThrowingSender {
   alias Value = void;
   static struct Op(Receiver) {
     Receiver receiver;
+    @disable this(ref return scope typeof(this) rhs);
+    @disable this(this);
     void start() {
       receiver.setError(new Exception("ThrowingSender"));
     }
@@ -284,6 +290,8 @@ struct DoneSender {
   alias Value = void;
   static struct DoneOp(Receiver) {
     Receiver receiver;
+    @disable this(ref return scope typeof(this) rhs);
+    @disable this(this);
     void start() nothrow @trusted scope {
       receiver.setDone();
     }
@@ -301,6 +309,8 @@ struct VoidSender {
   alias Value = void;
   struct VoidOp(Receiver) {
     Receiver receiver;
+    @disable this(ref return scope typeof(this) rhs);
+    @disable this(this);
     void start() nothrow @safe {
       import concurrency.receiver : setValueOrError;
       receiver.setValueOrError();
@@ -321,6 +331,8 @@ struct ErrorSender {
   static struct ErrorOp(Receiver) {
     Receiver receiver;
     Throwable exception;
+    @disable this(ref return scope typeof(this) rhs);
+    @disable this(this);
     void start() nothrow @trusted scope {
       receiver.setError(exception);
     }
@@ -381,6 +393,8 @@ struct PromiseSenderOp(T, Receiver) {
   Receiver receiver;
   StopCallback cb;
   shared SharedBitField!Flags bitfield;
+  @disable this(ref return scope typeof(this) rhs);
+  @disable this(this);
   void start() nothrow @trusted scope {
     // if already completed we can optimize
     if (parent.isCompleted) {

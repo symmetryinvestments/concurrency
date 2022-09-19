@@ -335,6 +335,8 @@ struct ThreadSender {
   alias Value = void;
   static struct Op(Receiver) {
     private Receiver receiver;
+    @disable this(ref return scope typeof(this) rhs);
+    @disable this(this);
     this(Receiver receiver) {
       this.receiver = receiver;
     }

@@ -19,6 +19,8 @@ struct OutOfBandValueSender(T) {
   struct Op(Receiver) {
     Receiver receiver;
     T value;
+    @disable this(ref return scope typeof(this) rhs);
+    @disable this(this);
     void run() {
       receiver.setValue(value);
     }

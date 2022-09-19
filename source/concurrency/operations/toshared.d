@@ -129,6 +129,8 @@ private struct SharedSenderOp(Sender, Scheduler, ResetLogic resetLogic, Receiver
   SharedSender!(Sender, Scheduler, resetLogic) parent;
   Receiver receiver;
   StopCallback cb;
+  @disable this(ref return scope typeof(this) rhs);
+  @disable this(this);
   void start() nothrow @trusted scope {
     parent.add(&(cast(shared)this).onValue);
     cb = receiver.getStopToken.onStop(&(cast(shared)this).onStop);
