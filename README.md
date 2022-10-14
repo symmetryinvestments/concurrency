@@ -39,6 +39,8 @@ struct ValueSender(T) {
   static struct Op(Receiver) {
     Receiver receiver;
     T value;
+    @disable this(ref return scope typeof(this) rhs);
+    @disable this(this);
     void start() {
       receiver.setValue(value);
     }
