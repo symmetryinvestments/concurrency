@@ -890,3 +890,130 @@ unittest {
   shared S s;
   deferStream(s).take(3).toList().syncWait().value.should == [1,1,1];
 }
+
+@("cron.timeTillNextMinute.Always")
+@safe unittest {
+  import concurrency.stream.cron;
+  import core.time;
+  import std.datetime : SysTime, DateTime;
+
+  auto spec = Always().Spec;
+  spec.timeTillNextMinute(SysTime(DateTime(2018, 1, 1, 10, 30, 0))).should == 1.minutes;
+  spec.timeTillNextMinute(SysTime(DateTime(2018, 1, 1, 10, 30, 59))).should == 1.seconds;
+}
+
+@("cron.timeTillNextMinute.Exact")
+@safe unittest {
+  import concurrency.stream.cron;
+  import core.time;
+  import std.datetime : SysTime, DateTime;
+
+  auto spec = Exact(5).Spec;
+  spec.timeTillNextMinute(SysTime(DateTime(2018, 1, 1, 10, 30, 0))).should == 35.minutes;
+  spec.timeTillNextMinute(SysTime(DateTime(2018, 1, 1, 10, 30, 59))).should == 34.minutes + 1.seconds;
+  spec.timeTillNextMinute(SysTime(DateTime(2018, 1, 1, 10, 0, 0))).should == 5.minutes;
+  spec.timeTillNextMinute(SysTime(DateTime(2018, 1, 1, 10, 4, 59))).should == 1.seconds;
+}
+
+@("cron.timeTillNextMinute.Every.basic")
+@safe unittest {
+  import concurrency.stream.cron;
+  import core.time;
+  import std.datetime : SysTime, DateTime;
+
+  auto spec = Every(5).Spec;
+  spec.timeTillNextMinute(SysTime(DateTime(2018, 1, 1, 10, 30, 0))).should == 5.minutes;
+  spec.timeTillNextMinute(SysTime(DateTime(2018, 1, 1, 10, 30, 59))).should == 4.minutes + 1.seconds;
+  spec.timeTillNextMinute(SysTime(DateTime(2018, 1, 1, 10, 0, 0))).should == 5.minutes;
+  spec.timeTillNextMinute(SysTime(DateTime(2018, 1, 1, 10, 4, 59))).should == 1.seconds;
+}
+
+@("cron.timeTillNextMinute.Every.offset")
+@safe unittest {
+  import concurrency.stream.cron;
+  import core.time;
+  import std.datetime : SysTime, DateTime;
+
+  auto spec = Every(5, 3).Spec;
+  spec.timeTillNextMinute(SysTime(DateTime(2018, 1, 1, 10, 30, 0))).should == 3.minutes;
+  spec.timeTillNextMinute(SysTime(DateTime(2018, 1, 1, 10, 30, 59))).should == 2.minutes + 1.seconds;
+  spec.timeTillNextMinute(SysTime(DateTime(2018, 1, 1, 10, 0, 0))).should == 3.minutes;
+  spec.timeTillNextMinute(SysTime(DateTime(2018, 1, 1, 10, 4, 59))).should == 3.minutes + 1.seconds;
+}
+
+@("cron.timeTillNextMinute.Each")
+@safe unittest {
+  import concurrency.stream.cron;
+  import core.time;
+  import std.datetime : SysTime, DateTime;
+
+  auto spec = Each([1,15,19,44]).Spec;
+  spec.timeTillNextMinute(SysTime(DateTime(2018, 1, 1, 10, 30, 0))).should == 14.minutes;
+  spec.timeTillNextMinute(SysTime(DateTime(2018, 1, 1, 10, 30, 59))).should == 13.minutes + 1.seconds;
+  spec.timeTillNextMinute(SysTime(DateTime(2018, 1, 1, 10, 0, 0))).should == 1.minutes;
+  spec.timeTillNextMinute(SysTime(DateTime(2018, 1, 1, 10, 4, 59))).should == 10.minutes + 1.seconds;
+}
+
+@("cron.timeTillNextTrigger.Always")
+@safe unittest {
+  import concurrency.stream.cron;
+  import core.time;
+  import std.datetime : SysTime, DateTime;
+
+  auto spec = CronSchedule(Spec(Always()), Spec(Always()));
+  spec.timeTillNextTrigger(SysTime(DateTime(2018, 1, 1, 10, 30, 0))).should == 1.minutes;
+  spec.timeTillNextTrigger(SysTime(DateTime(2018, 1, 1, 10, 30, 59))).should == 1.seconds;
+}
+
+@("cron.timeTillNextTrigger.5.over.every.hour")
+@safe unittest {
+  import concurrency.stream.cron;
+  import core.time;
+  import std.datetime : SysTime, DateTime;
+
+  auto spec = CronSchedule(Spec(Always()), Spec(Exact(5)));
+  spec.timeTillNextTrigger(SysTime(DateTime(2018, 1, 1, 10, 30, 0))).should == 35.minutes;
+  spec.timeTillNextTrigger(SysTime(DateTime(2018, 1, 1, 10, 30, 59))).should == 34.minutes + 1.seconds;
+}
+
+@("cron.timeTillNextTrigger.5.over.5.hour")
+@safe unittest {
+  import concurrency.stream.cron;
+  import core.time;
+  import std.datetime : SysTime, DateTime;
+  import std.datetime.timezone : UTC;
+
+  auto spec = CronSchedule(Spec(Exact(5)), Spec(Exact(5)));
+  spec.timeTillNextTrigger(SysTime(DateTime(2018, 1, 1, 5, 5, 0), UTC())).should == 24.hours;
+  spec.timeTillNextTrigger(SysTime(DateTime(2018, 1, 1, 10, 30, 0), UTC())).should == 18.hours + 35.minutes;
+  spec.timeTillNextTrigger(SysTime(DateTime(2018, 1, 1, 10, 30, 59), UTC())).should == 18.hours + 34.minutes + 1.seconds;
+}
+
+@("cron.timeTillNextTrigger.5.over.every.2.hours")
+@safe unittest {
+  import concurrency.stream.cron;
+  import core.time;
+  import std.datetime : SysTime, DateTime;
+  import std.datetime.timezone : UTC;
+
+  auto spec = CronSchedule(Spec(Every(2)), Spec(Exact(5)));
+  spec.timeTillNextTrigger(SysTime(DateTime(2018, 1, 1, 6, 5, 0), UTC())).should == 2.hours;
+  spec.timeTillNextTrigger(SysTime(DateTime(2018, 1, 1, 5, 5, 0), UTC())).should == 1.hours;
+  spec.timeTillNextTrigger(SysTime(DateTime(2018, 1, 1, 10, 30, 0), UTC())).should == 1.hours + 35.minutes;
+  spec.timeTillNextTrigger(SysTime(DateTime(2018, 1, 1, 10, 30, 59), UTC())).should == 1.hours + 34.minutes + 1.seconds;
+}
+
+@("cron.timeTillNextTrigger.every.5.over.every.2.hours")
+@safe unittest {
+  import concurrency.stream.cron;
+  import core.time;
+  import std.datetime : SysTime, DateTime;
+  import std.datetime.timezone : UTC;
+
+  auto spec = CronSchedule(Spec(Every(2)), Spec(Every(5)));
+  spec.timeTillNextTrigger(SysTime(DateTime(2018, 1, 1, 6, 5, 0), UTC())).should == 5.minutes;
+  spec.timeTillNextTrigger(SysTime(DateTime(2018, 1, 1, 5, 5, 0), UTC())).should == 1.hours;
+  spec.timeTillNextTrigger(SysTime(DateTime(2018, 1, 1, 10, 30, 0), UTC())).should == 5.minutes;
+  spec.timeTillNextTrigger(SysTime(DateTime(2018, 1, 1, 10, 30, 59), UTC())).should == 4.minutes + 1.seconds;
+  spec.timeTillNextTrigger(SysTime(DateTime(2018, 1, 1, 10, 59, 59), UTC())).should == 1.hours + 5.minutes + 1.seconds;
+}
