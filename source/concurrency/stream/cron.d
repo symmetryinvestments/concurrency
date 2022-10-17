@@ -21,7 +21,7 @@ struct Each {
 
 alias Spec = Algebraic!(Always, Exact, Every, Each);
 
-struct CronSchedule {
+struct CronSpec {
   import std.datetime.timezone : TimeZone, UTC;
   Spec hours;
   Spec minutes;
@@ -29,9 +29,9 @@ struct CronSchedule {
 }
 
 struct Deferrer {
-  CronSchedule schedule;
+  CronSpec schedule;
   shared bool emitAtStart;
-  this(CronSchedule schedule, bool emitAtStart) @safe shared {
+  this(CronSpec schedule, bool emitAtStart) @safe shared {
     this.schedule = schedule;
   }
   auto opCall() @safe shared {
@@ -47,13 +47,13 @@ struct Deferrer {
   }
 }
 
-auto cronStream(CronSchedule schedule, bool emitAtStart) @safe {
+auto cronStream(CronSpec schedule, bool emitAtStart) @safe {
   auto d = shared Deferrer(schedule, emitAtStart);
   import concurrency.stream.defer;
   return deferStream(d);
 }
 
-auto timeTillNextTrigger(CronSchedule schedule, SysTime time) {
+auto timeTillNextTrigger(CronSpec schedule, SysTime time) {
   import core.time;
   auto now = time.toOtherTZ(schedule.timezone);
   Duration dur;

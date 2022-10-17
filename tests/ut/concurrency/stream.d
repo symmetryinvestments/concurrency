@@ -960,7 +960,7 @@ unittest {
   import core.time;
   import std.datetime : SysTime, DateTime;
 
-  auto spec = CronSchedule(Spec(Always()), Spec(Always()));
+  auto spec = CronSpec(Spec(Always()), Spec(Always()));
   spec.timeTillNextTrigger(SysTime(DateTime(2018, 1, 1, 10, 30, 0))).should == 1.minutes;
   spec.timeTillNextTrigger(SysTime(DateTime(2018, 1, 1, 10, 30, 59))).should == 1.seconds;
 }
@@ -971,7 +971,7 @@ unittest {
   import core.time;
   import std.datetime : SysTime, DateTime;
 
-  auto spec = CronSchedule(Spec(Always()), Spec(Exact(5)));
+  auto spec = CronSpec(Spec(Always()), Spec(Exact(5)));
   spec.timeTillNextTrigger(SysTime(DateTime(2018, 1, 1, 10, 30, 0))).should == 35.minutes;
   spec.timeTillNextTrigger(SysTime(DateTime(2018, 1, 1, 10, 30, 59))).should == 34.minutes + 1.seconds;
 }
@@ -983,7 +983,7 @@ unittest {
   import std.datetime : SysTime, DateTime;
   import std.datetime.timezone : UTC;
 
-  auto spec = CronSchedule(Spec(Exact(5)), Spec(Exact(5)));
+  auto spec = CronSpec(Spec(Exact(5)), Spec(Exact(5)));
   spec.timeTillNextTrigger(SysTime(DateTime(2018, 1, 1, 5, 5, 0), UTC())).should == 24.hours;
   spec.timeTillNextTrigger(SysTime(DateTime(2018, 1, 1, 10, 30, 0), UTC())).should == 18.hours + 35.minutes;
   spec.timeTillNextTrigger(SysTime(DateTime(2018, 1, 1, 10, 30, 59), UTC())).should == 18.hours + 34.minutes + 1.seconds;
@@ -996,7 +996,7 @@ unittest {
   import std.datetime : SysTime, DateTime;
   import std.datetime.timezone : UTC;
 
-  auto spec = CronSchedule(Spec(Every(2)), Spec(Exact(5)));
+  auto spec = CronSpec(Spec(Every(2)), Spec(Exact(5)));
   spec.timeTillNextTrigger(SysTime(DateTime(2018, 1, 1, 6, 5, 0), UTC())).should == 2.hours;
   spec.timeTillNextTrigger(SysTime(DateTime(2018, 1, 1, 5, 5, 0), UTC())).should == 1.hours;
   spec.timeTillNextTrigger(SysTime(DateTime(2018, 1, 1, 10, 30, 0), UTC())).should == 1.hours + 35.minutes;
@@ -1010,7 +1010,7 @@ unittest {
   import std.datetime : SysTime, DateTime;
   import std.datetime.timezone : UTC;
 
-  auto spec = CronSchedule(Spec(Every(2)), Spec(Every(5)));
+  auto spec = CronSpec(Spec(Every(2)), Spec(Every(5)));
   spec.timeTillNextTrigger(SysTime(DateTime(2018, 1, 1, 6, 5, 0), UTC())).should == 5.minutes;
   spec.timeTillNextTrigger(SysTime(DateTime(2018, 1, 1, 5, 5, 0), UTC())).should == 1.hours;
   spec.timeTillNextTrigger(SysTime(DateTime(2018, 1, 1, 10, 30, 0), UTC())).should == 5.minutes;
