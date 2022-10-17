@@ -867,3 +867,26 @@ unittest {
 
   p.atomicLoad.should == 12;
 }
+
+@("deferStream.function")
+@safe unittest {
+  import concurrency.stream.defer;
+  static auto getSender() @safe {
+    import concurrency.sender;
+    return just(1);
+  }
+  deferStream(&getSender).take(3).toList().syncWait().value.should == [1,1,1];
+}
+
+@("deferStream.callable")
+@safe unittest {
+  import concurrency.stream.defer;
+  static struct S {
+    auto opCall() shared @safe {
+      import concurrency.sender;
+      return just(1);
+    }
+  }
+  shared S s;
+  deferStream(s).take(3).toList().syncWait().value.should == [1,1,1];
+}
