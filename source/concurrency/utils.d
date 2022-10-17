@@ -81,6 +81,8 @@ static if (__traits(compiles, () { import core.atomic : casWeak; }) && __traits(
 
 enum isThreadSafeFunction(alias Fun) = !hasFunctionAttributes!(Fun, "@system") && (isFunction!Fun || isFunctionPointer!Fun || hasFunctionAttributes!(Fun, "shared"));
 
+enum isThreadSafeCallable(alias Fun) = (isAggregateType!Fun && isCallable!Fun && __traits(compiles, () @safe { shared Fun f; f(); })) || (isSomeFunction!Fun && isThreadSafeFunction!Fun);
+
 // Loads a function from the main process.
 // When using dynamic libraries globals and TLS variables are duplicated.
 // We need a way to ensure globals used across dynamic libraries and the host

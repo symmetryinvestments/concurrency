@@ -1,9 +1,9 @@
 module ut.concurrency.utils;
 
+import concurrency.utils;
+
 @("isThreadSafeFunction")
 unittest {
-  import concurrency.utils : isThreadSafeFunction;
-
   auto local = (int i) => i*2;
   static assert(isThreadSafeFunction!local);
 
@@ -14,7 +14,7 @@ unittest {
   shared int k = 13;
   auto sharedClosure = (int i) shared => i*k;
   static assert(isThreadSafeFunction!sharedClosure);
-  
+
   static int system() @system { return 42; }
   auto systemLocal = (int i) => i * system();
   static assert(!isThreadSafeFunction!systemLocal);
@@ -24,4 +24,31 @@ unittest {
 
   auto trustedSharedClosure = (int i) shared @trusted => i * system() * k;
   static assert(isThreadSafeFunction!trustedSharedClosure);
+}
+
+@("isThreadSafeCallable.no.safe")
+unittest {
+  static struct S {
+    void opCall() shared @system {
+    }
+  }
+  static assert(!isThreadSafeCallable!S);
+}
+
+@("isThreadSafeCallable.no.shared")
+unittest {
+  static struct S {
+    void opCall() @safe {
+    }
+  }
+  static assert(!isThreadSafeCallable!S);
+}
+
+@("isThreadSafeCallable.yes")
+unittest {
+  static struct S {
+    void opCall() @safe shared {
+    }
+  }
+  static assert(isThreadSafeCallable!(shared S));
 }
