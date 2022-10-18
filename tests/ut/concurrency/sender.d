@@ -346,3 +346,14 @@ import core.atomic : atomicOp;
   just(14, 53).then((int a, int b) => a*b).syncWait.value.should == 742;
   just(14, 54).withStopToken((StopToken s, int a, int b) => a*b).syncWait.value.should == 756;
 }
+
+@("just.scope")
+@safe unittest {
+  void disappearSender(Sender)(Sender s) @safe;
+  int g;
+  scope int* s = &g;
+  just(s).syncWait().value.should == s;
+  just(s).retry(Times(5)).syncWait().value.should == s;
+  static assert(!__traits(compiles, disappearSender(just(s))));
+  static assert(!__traits(compiles, disappearSender(just(s).retry(Times(5)))));
+}

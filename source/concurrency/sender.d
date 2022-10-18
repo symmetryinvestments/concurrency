@@ -103,7 +103,7 @@ struct ValueSender(T) {
   }
   static if (!is(T == void))
     T value;
-  Op!Receiver connect(Receiver)(return Receiver receiver) @safe scope return {
+  Op!Receiver connect(Receiver)(return Receiver receiver) @safe {
     // ensure NRVO
     static if (!is(T == void))
       auto op = Op!(Receiver)(receiver, value);
