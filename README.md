@@ -110,6 +110,8 @@ Senders enjoy the following operations.
 
 - `onResult`. Invokes the supplied callable on termination and passes the resulting value, similar to the return value of `.syncWait`.
 
+- `repeat`. Repeats the supplied sender until it is cancelled or produces an error.
+
 ## Streams
 
 A Stream has a `.collect` function that accepts a `shared` callable and returns a Sender. Once the Sender is connected and started the Stream will call the callable zero or more times before one of the three terminal functions of the Receiver is called.

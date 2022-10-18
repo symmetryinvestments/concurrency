@@ -25,3 +25,4 @@ public import concurrency.operations.stopwhen;
 public import concurrency.operations.completewitherror;
 public import concurrency.operations.oncompletion;
 public import concurrency.operations.onresult;
+public import concurrency.operations.repeat;

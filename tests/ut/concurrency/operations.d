@@ -675,3 +675,54 @@ DoneSender().forwardOn(pool.getScheduler).syncWait.isCancelled.should == true;
   ThrowingSender().tee((Result!void r) @safe shared => g.atomicOp!"+="(1)).syncWait.isError.should == true;
   g.should == 2;
 }
+
+@("repeat.race")
+@safe unittest {
+  import core.atomic : atomicOp;
+  import concurrency.scheduler : ManualTimeWorker;
+  shared int p = 0;
+
+  auto worker = new shared ManualTimeWorker();
+
+  auto base = delay(1.msecs).then(() shared => cast(void)p.atomicOp!"+="(1)).repeat();
+
+  auto driver = just(worker).then((shared ManualTimeWorker worker) {
+      worker.timeUntilNextEvent().should == 1.msecs;
+      worker.advance(1.msecs);
+      worker.timeUntilNextEvent().should == 1.msecs;
+      worker.advance(1.msecs);
+      worker.timeUntilNextEvent().should == 1.msecs;
+    });
+
+  race(base, driver).withScheduler(worker.getScheduler).syncWait().assumeOk;
+  p.should == 2;
+}
+
+@("repeat.error")
+@safe unittest {
+  static struct CountdownOp(Receiver) {
+    Receiver receiver;
+    bool fail;
+    @disable this(ref return scope typeof(this) rhs);
+    @disable this(this);
+    void start() @safe nothrow {
+      if (fail)
+        receiver.setError(new Exception("Bye!"));
+      else
+        receiver.setValue();
+    }
+  }
+
+  static struct Countdown {
+    alias Value = void;
+    int countdown;
+    auto connect(Receiver)(return Receiver receiver) @safe scope return {
+      // ensure NRVO
+      auto op = CountdownOp!(Receiver)(receiver, countdown-- == 0);
+      return op;
+    }
+  }
+
+  Countdown(3).syncWait().assumeOk();
+  Countdown(3).repeat().syncWait().isError.should == true;
+}
