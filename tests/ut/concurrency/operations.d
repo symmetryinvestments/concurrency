@@ -213,6 +213,8 @@ unittest {
     static struct Op(Receiver) {
       Receiver receiver;
       bool fail;
+      @disable this(ref return scope typeof(this) rhs);
+      @disable this(this);
       void start() @safe nothrow {
         if (fail)
           receiver.setError(new Exception("Fail fail fail"));
