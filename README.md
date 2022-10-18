@@ -24,6 +24,7 @@ Currently we have the following Senders:
 - `VoidSender`. Always calls setValue with no arguments.
 - `ErrorSender`. Always calls setError with supplied exception.
 - `PromiseSender`. Creates a promise-like object that can be fulfilled, canceled or errored manually. Useful for when the Sender/Receiver connection isn't statically known or very dynamic.
+- `DeferSender`. Creates a sender that calls a supplied callable and runs the returned Sender. `defer` is a convenient constructor function for it.
 
 ### Writing your own Sender
 

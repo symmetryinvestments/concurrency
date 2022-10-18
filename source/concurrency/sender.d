@@ -596,3 +596,21 @@ struct PromiseSender(T) {
     return op;
   }
 }
+
+struct Defer(Fun) {
+  import concurrency.utils;
+  static assert (isThreadSafeCallable!Fun);
+  alias Sender = typeof(fun());
+  static assert(models!(Sender, isSender));
+  alias Value = Sender.Value;
+  Fun fun;
+  auto connect(Receiver)(return Receiver receiver) @safe {
+    // ensure NRVO
+    auto op = fun().connect(receiver);
+    return op;
+  }
+}
+
+auto defer(Fun)(Fun fun) {
+  return Defer!(Fun)(fun);
+}

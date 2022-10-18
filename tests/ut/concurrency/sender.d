@@ -357,3 +357,28 @@ import core.atomic : atomicOp;
   static assert(!__traits(compiles, disappearSender(just(s))));
   static assert(!__traits(compiles, disappearSender(just(s).retry(Times(5)))));
 }
+
+@("defer.static.fun")
+@safe unittest {
+  static auto fun() {
+    return just(1);
+  }
+
+  defer(&fun).syncWait().value.should == 1;
+}
+
+@("defer.delegate")
+@safe unittest {
+  defer(() => just(1)).syncWait().value.should == 1;
+}
+
+@("defer.opCall")
+@safe unittest {
+  static struct S {
+    auto opCall() @safe shared {
+      return just(1);
+    }
+  }
+  shared S s;
+  defer(s).syncWait().value.should == 1;
+}
