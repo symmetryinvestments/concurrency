@@ -139,17 +139,6 @@ unittest {
   just(1,2,3).then((int a,int b,int c) shared => a+b).syncWait.value.shouldEqual(3);
 }
 
-@("finally")
-unittest {
-  ValueSender!int(1).finally_(() => 4).syncWait.value.should == 4;
-  ValueSender!int(2).finally_(3).syncWait.value.should == 3;
-  ThrowingSender().finally_(3).syncWait.value.should == 3;
-  ThrowingSender().finally_(() => 4).syncWait.value.should == 4;
-  ThrowingSender().finally_(3).syncWait.value.should == 3;
-  DoneSender().finally_(() => 4).syncWait.isCancelled.should == true;
-  DoneSender().finally_(3).syncWait.isCancelled.should == true;
-}
-
 @("whenAll.basic")
 unittest {
   whenAll(ValueSender!int(1), ValueSender!int(2)).syncWait.value.should == tuple(1,2);
