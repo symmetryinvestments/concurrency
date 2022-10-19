@@ -33,25 +33,25 @@ LocalThreadExecutor getLocalThreadExecutor() @trusted {
   return localThreadExecutor;
 }
 
-struct AddTimer {
+private struct AddTimer {
   Timer timer;
   Duration dur;
 }
 
-struct RemoveTimer {
+private struct RemoveTimer {
   Timer timer;
 }
 
-struct Noop {}
+private struct Noop {}
 
-alias WorkItem = Variant!(typeof(null), VoidDelegate, VoidFunction, AddTimer, RemoveTimer, Noop); // null signifies end
+private alias WorkItem = Variant!(typeof(null), VoidDelegate, VoidFunction, AddTimer, RemoveTimer, Noop); // null signifies end
 
-struct WorkNode {
+private struct WorkNode {
   WorkItem payload;
   shared WorkNode* next;
 }
 
-alias WorkQueue = WaitableQueue!(MPSCQueue!WorkNode);
+private alias WorkQueue = WaitableQueue!(MPSCQueue!WorkNode);
 
 class LocalThreadExecutor : Executor {
   import core.atomic : atomicOp, atomicStore, atomicLoad, cas;

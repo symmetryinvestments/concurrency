@@ -2,7 +2,7 @@ module concurrency.asyncscope;
 
 import concurrency.stoptoken;
 
-enum Flag {
+private enum Flag {
   locked = 0,
   stopped = 1,
   tick = 2
