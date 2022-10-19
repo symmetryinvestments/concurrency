@@ -45,13 +45,13 @@ struct OutOfBandValueSender(T) {
 }
 
 @("oob")
-unittest {
+@safe unittest {
   auto oob = OutOfBandValueSender!int(43);
   oob.syncWait.value.should == 43;
 }
 
 @("race")
-unittest {
+@safe unittest {
   race(ValueSender!int(4), ValueSender!int(5)).syncWait.value.should == 4;
   auto fastThread = ThreadSender().then(() shared => 1);
   auto slowThread = ThreadSender().then(() shared @trusted { Thread.sleep(50.msecs); return 2; });
@@ -60,25 +60,25 @@ unittest {
 }
 
 @("race.multiple")
-unittest {
+@safe unittest {
   race(ValueSender!int(4), ValueSender!int(5), ValueSender!int(6)).syncWait.value.should == 4;
 }
 
 @("race.exception.single")
-unittest {
+@safe unittest {
   race(ThrowingSender(), ValueSender!int(5)).syncWait.value.should == 5;
   race(ThrowingSender(), ThrowingSender()).syncWait.assumeOk.shouldThrow();
 }
 
 @("race.exception.double")
-unittest {
+@safe unittest {
   auto slow = ThreadSender().then(() shared @trusted { Thread.sleep(50.msecs); throw new Exception("Slow"); });
   auto fast = ThreadSender().then(() shared { throw new Exception("Fast"); });
   race(slow, fast).syncWait.assumeOk.shouldThrowWithMessage("Fast");
 }
 
 @("race.cancel-other")
-unittest {
+@safe unittest {
   auto waiting = ThreadSender().withStopToken((StopToken token) @trusted {
       while (!token.isStopRequested) { Thread.yield(); }
     });
@@ -86,7 +86,7 @@ unittest {
 }
 
 @("race.cancel")
-unittest {
+@safe unittest {
   auto waiting = ThreadSender().withStopToken((StopToken token) @trusted {
       while (!token.isStopRequested) { Thread.yield(); }
     });
@@ -107,7 +107,7 @@ unittest {
 }
 
 @("via")
-unittest {
+@safe unittest {
   import std.typecons : tuple;
   ValueSender!int(3).via(ValueSender!int(6)).syncWait.value.should == tuple(6,3);
   ValueSender!int(5).via(VoidSender()).syncWait.value.should == 5;
@@ -140,7 +140,7 @@ unittest {
 }
 
 @("whenAll.basic")
-unittest {
+@safe unittest {
   whenAll(ValueSender!int(1), ValueSender!int(2)).syncWait.value.should == tuple(1,2);
   whenAll(ValueSender!int(1), ValueSender!int(2), ValueSender!int(3)).syncWait.value.should == tuple(1,2,3);
   whenAll(VoidSender(), ValueSender!int(2)).syncWait.value.should == 2;
@@ -156,7 +156,7 @@ unittest {
 }
 
 @("whenAll.cancel")
-unittest {
+@safe unittest {
   auto waiting = ThreadSender().withStopToken((StopToken token) @trusted {
       while (!token.isStopRequested) { Thread.yield(); }
     });
@@ -173,7 +173,7 @@ unittest {
 }
 
 @("whenAll.stop")
-unittest {
+@safe unittest {
   auto waiting = ThreadSender().withStopToken((StopToken token) @trusted {
       while (!token.isStopRequested) { Thread.yield(); }
     });
@@ -183,17 +183,17 @@ unittest {
 }
 
 @("whenAll.array.just")
-unittest {
+@safe unittest {
   whenAll([just(4), just(5)]).syncWait.value.should == [4,5];
 }
 
 @("whenAll.array.void")
-unittest {
+@safe unittest {
   whenAll([VoidSender(), VoidSender()]).syncWait.assumeOk;
 }
 
 @("retry")
-unittest {
+@safe unittest {
   ValueSender!int(5).retry(Times(5)).syncWait.value.should == 5;
   int t = 3;
   int n = 0;
@@ -229,7 +229,7 @@ unittest {
 }
 
 @("retryWhen.immediate.success")
-unittest {
+@safe unittest {
   static struct Immediate {
     auto failure(Exception e) {
       return VoidSender();
@@ -250,7 +250,7 @@ struct ConnectCounter {
 }
 
 @("retryWhen.immediate.retries")
-unittest {
+@safe unittest {
   static struct Immediate {
     auto failure(Exception e) {
       return VoidSender();
@@ -263,7 +263,7 @@ unittest {
 }
 
 @("retryWhen.wait.retries")
-unittest {
+@safe unittest {
   import core.time : msecs;
   import concurrency.scheduler : ManualTimeWorker;
 
@@ -293,7 +293,7 @@ unittest {
 }
 
 @("retryWhen.throw")
-unittest {
+@safe unittest {
   static struct Throw {
     auto failure(Exception t) @safe {
       return ErrorSender(new Exception("inner"));
@@ -304,26 +304,26 @@ unittest {
 }
 
 @("whenAll.oob")
-unittest {
+@safe unittest {
   auto oob = OutOfBandValueSender!int(43);
   auto value = ValueSender!int(11);
   whenAll(oob, value).syncWait.value.should == tuple(43, 11);
 }
 
 @("withStopToken.oob")
-unittest {
+@safe unittest {
   auto oob = OutOfBandValueSender!int(44);
   oob.withStopToken((StopToken stopToken, int t) => t).syncWait.value.should == 44;
 }
 
 @("withStopSource.oob")
-unittest {
+@safe unittest {
   auto oob = OutOfBandValueSender!int(45);
   oob.withStopSource(new StopSource()).syncWait.value.should == 45;
 }
 
 @("withStopSource.tuple")
-unittest {
+@safe unittest {
   just(14, 53).withStopToken((StopToken s, Tuple!(int, int) t) => t[0]*t[1]).syncWait.value.should == 742;
 }
 

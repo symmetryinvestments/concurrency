@@ -3,7 +3,7 @@ module ut.concurrency.utils;
 import concurrency.utils;
 
 @("isThreadSafeFunction")
-unittest {
+@safe unittest {
   auto local = (int i) => i*2;
   static assert(isThreadSafeFunction!local);
 
@@ -27,7 +27,7 @@ unittest {
 }
 
 @("isThreadSafeCallable.no.safe")
-unittest {
+@safe unittest {
   static struct S {
     void opCall() shared @system {
     }
@@ -36,7 +36,7 @@ unittest {
 }
 
 @("isThreadSafeCallable.no.shared")
-unittest {
+@safe unittest {
   static struct S {
     void opCall() @safe {
     }
@@ -45,7 +45,7 @@ unittest {
 }
 
 @("isThreadSafeCallable.yes")
-unittest {
+@safe unittest {
   static struct S {
     void opCall() @safe shared {
     }

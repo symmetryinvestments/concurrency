@@ -131,7 +131,7 @@ import unit_threaded;
 }
 
 @("withStopSource.1")
-unittest {
+@safe unittest {
   import core.thread : Thread;
   auto stopSource = new StopSource();
   auto nursery = new shared Nursery();
@@ -153,7 +153,7 @@ unittest {
 }
 
 @("withStopSource.2")
-unittest {
+@safe unittest {
   import core.thread : Thread;
   auto stopSource = new StopSource();
   auto nursery = new shared Nursery();
