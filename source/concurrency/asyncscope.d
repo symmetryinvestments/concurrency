@@ -1,6 +1,7 @@
 module concurrency.asyncscope;
 
 import concurrency.stoptoken;
+import concurrency.scheduler : NullScheduler;
 
 private enum Flag {
   locked = 0,
@@ -128,5 +129,3 @@ struct AsyncScopeReceiver {
     return NullScheduler();
   }
 }
-
-struct NullScheduler {}

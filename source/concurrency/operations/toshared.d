@@ -1,9 +1,9 @@
 module concurrency.operations.toshared;
 
-import concurrency;
 import concurrency.receiver;
 import concurrency.sender;
 import concurrency.stoptoken;
+import concurrency.scheduler : NullScheduler;
 import concepts;
 import std.traits;
 import mir.algebraic : Algebraic, Nullable, match;
@@ -21,7 +21,6 @@ auto toShared(Sender)(Sender sender) {
   return new SharedSender!(Sender, NullScheduler, ResetLogic.keepLatest)(sender, NullScheduler());
 }
 
-struct NullScheduler {}
 enum ResetLogic {
   keepLatest,
   alwaysReset

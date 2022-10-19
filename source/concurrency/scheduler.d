@@ -40,6 +40,8 @@ SchedulerObjectBase toSchedulerObject(S)(S scheduler) {
   return new SchedulerObject!(S)(scheduler);
 }
 
+struct NullScheduler {}
+
 enum TimerTrigger {
   trigger,
   cancel

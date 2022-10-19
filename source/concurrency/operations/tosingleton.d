@@ -1,6 +1,7 @@
 module concurrency.operations.tosingleton;
 
-import concurrency.operations.toshared : SharedSender, NullScheduler, ResetLogic;
+import concurrency.operations.toshared : SharedSender, ResetLogic;
+import concurrency.scheduler : NullScheduler;
 
 /// `toSingleton` ensures there is only one underlying Sender running at one time, eventhough many receivers may be connected.
 /// After the underlying Sender completed, the next connecting Receiver will start it again.
