@@ -286,9 +286,21 @@ import core.atomic : atomicOp;
 @("delay")
 @safe unittest {
   import core.time : msecs;
+  import core.time : msecs;
+  import concurrency.scheduler : ManualTimeWorker;
 
-  race(delay(20.msecs).then(() shared => 2),
-       delay(1.msecs).then(() shared => 1)).syncWait.value.should == 1;
+  auto worker = new shared ManualTimeWorker();
+
+  auto d = race(delay(20.msecs).then(() shared => 2),
+                delay(1.msecs).then(() shared => 1))
+    .withScheduler(worker.getScheduler);
+
+  auto driver = just(worker).then((shared ManualTimeWorker worker) {
+      worker.timeUntilNextEvent().should == 1.msecs;
+      worker.advance(1.msecs);
+    });
+
+  whenAll(d, driver).syncWait.value.should == 1;
 }
 
 @("promise.basic")
