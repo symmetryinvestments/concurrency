@@ -14,7 +14,7 @@ auto repeat(Sender)(Sender sender) {
 
 private struct RepeatReceiver(Receiver) {
   private Receiver receiver;
-  private void delegate() @safe nothrow scope reset;
+  private void delegate() @safe scope reset;
   void setValue() @safe {
     reset();
   }
@@ -39,7 +39,14 @@ private struct RepeatOp(Receiver, Sender) {
     this.receiver = receiver;
   }
   void start() @trusted nothrow scope {
-    op = sender.connect(RepeatReceiver!(Receiver)(receiver, &start));
+    try {
+      reset();
+    } catch (Exception e) {
+      receiver.setError(e);
+    }
+  }
+  private void reset() @trusted scope {
+    op = sender.connect(RepeatReceiver!(Receiver)(receiver, &reset));
     op.start();
   }
 }

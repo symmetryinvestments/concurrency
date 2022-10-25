@@ -698,7 +698,7 @@ DoneSender().forwardOn(pool.getScheduler).syncWait.isCancelled.should == true;
       if (fail)
         receiver.setError(new Exception("Bye!"));
       else
-        receiver.setValue();
+        receiver.setValueOrError();
     }
   }
 
