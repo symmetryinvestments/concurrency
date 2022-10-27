@@ -36,7 +36,6 @@ bool setGlobalStopSource(shared StopSource stopSource) @safe {
 
 /// Sets the stopSource to be called when receiving an interrupt
 void setupCtrlCHandler(shared StopSource stopSource) @trusted {
-  import core.sys.posix.signal;
   import core.atomic;
 
   if (stopSource is null)
@@ -52,8 +51,9 @@ void setupCtrlCHandler(shared StopSource stopSource) @trusted {
     import core.sys.windows.windows;
     SetConsoleCtrlHandler(&signalHandler, true);
   } else {
+    import core.sys.posix.signal;
+
     static void handleSignal(int s) @trusted {
-      import core.sys.posix.signal;
       sigaction_t old;
       sigset_t sigset;
       sigemptyset(&sigset);
@@ -180,7 +180,7 @@ shared static ~this() {
 version (Windows) {
   import core.sys.windows.windows;
   extern (Windows) static BOOL signalHandler(DWORD dwCtrlType) nothrow @system {
-    import core.sys.posix.signal;
+    import core.stdc.signal;
     if (dwCtrlType == CTRL_C_EVENT ||
         dwCtrlType == CTRL_BREAK_EVENT ||
         dwCtrlType == CTRL_CLOSE_EVENT ||

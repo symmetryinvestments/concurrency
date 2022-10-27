@@ -131,7 +131,7 @@ private Result!(Sender.Value) syncWaitImpl(Sender)(auto scope ref Sender sender,
   import mir.algebraic : Algebraic, Nullable;
   static assert(models!(Sender, isSender));
   import concurrency.signal;
-  import core.sys.posix.signal : SIGTERM, SIGINT;
+  import core.stdc.signal : SIGTERM, SIGINT;
 
   alias Value = Sender.Value;
   alias Receiver = SyncWaitReceiver2!(Value);
