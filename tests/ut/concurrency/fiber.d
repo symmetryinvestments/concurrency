@@ -19,21 +19,35 @@ import unit_threaded;
 @("yield.delay")
 @safe unittest {
   auto fiber = FiberSender().then(() @trusted shared {
-      delay(100.msecs).yield();
+      delay(100.msecs).yield().assumeOk;
     });
   whenAll(fiber, fiber).syncWait().assumeOk;
 }
 
-@("yield.error")
+@("yield.error.basic")
 @safe unittest {
   FiberSender().then(() @trusted shared {
-      ThrowingSender().yield();
+      ThrowingSender().yield().isError.should == true;
+    }).syncWait();
+}
+
+@("yield.error.propagate")
+@safe unittest {
+  FiberSender().then(() @trusted shared {
+      ThrowingSender().yield().assumeOk;
     }).syncWait().isError.should == true;
 }
 
-@("yield.cancel")
+@("yield.cancel.basic")
 @safe unittest {
   FiberSender().then(() @trusted shared {
-      DoneSender().yield();
+      DoneSender().yield().isCancelled.should == true;
+    }).syncWait().assumeOk;
+}
+
+@("yield.cancel.propagate")
+@safe unittest {
+  FiberSender().then(() @trusted shared {
+      DoneSender().yield().assumeOk;
     }).syncWait().isCancelled.should == true;
 }

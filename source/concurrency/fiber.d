@@ -41,6 +41,8 @@ struct FiberSenderOp(Receiver) {
   Receiver receiver;
   alias BaseSender = typeof(receiver.getScheduler().schedule());
   alias Op = OpType!(BaseSender, InnerFiberSchedulerReceiver!Receiver);
+  @disable this(this);
+  @disable this(ref return scope typeof(this) rhs);
   void start() @trusted nothrow scope {
     auto fiber = new OpFiber!Op(cast(void delegate()shared nothrow @safe)&run);
     cycle(fiber, true);
@@ -55,7 +57,7 @@ struct FiberSenderOp(Receiver) {
     if (!inline_)
       return schedule(fiber);
     import std.stdio;
-    debug writeln("enter fiber");
+    debug writeln("enter fiber, ", cast(void*)fiber.continuation);
     if (auto throwable = fiber.call!(Fiber.Rethrow.no)) {
       debug writeln("fiber threw ", throwable);
       receiver.setError(throwable);
@@ -82,7 +84,7 @@ struct FiberSenderOp(Receiver) {
   private void run() nothrow @trusted {
     import concurrency.receiver : setValueOrError;
     import concurrency.error : clone;
-    import concurrency : parentStopSource;
+    import concurrency : parentStopSource, CancelledException;
 
     parentStopSource = receiver.getStopToken().source;
 
@@ -90,6 +92,9 @@ struct FiberSenderOp(Receiver) {
     try {
       debug writeln("FiberSender.run");
       receiver.setValue();
+    } catch (CancelledException e) {
+      debug writeln("FiberSender.run.cancelled");
+      receiver.setDone();
     } catch (Exception e) {
       debug writeln("FiberSender.run.exception");
       receiver.setError(e);
@@ -143,8 +148,5 @@ auto yield(Sender)(Sender sender) @trusted {
   yield();
   debug writeln("Resume");
 
-  static if (!is(Sender.Value == void))
-    return local.value;
-  else
-    (cast()local).assumeOk;
+  return cast()local;
 }
