@@ -16,7 +16,7 @@ struct WithChildSender(SenderParent, SenderChild) if (models!(SenderParent, isSe
   alias Value = void;
   SenderParent a;
   SenderChild b;
-  auto connect(Receiver)(return Receiver receiver) @trusted scope return {
+  auto connect(Receiver)(return Receiver receiver) @safe return scope {
     import concurrency.operations.whenall;
     import concurrency.operations.stopon;
     // ensure NRVO

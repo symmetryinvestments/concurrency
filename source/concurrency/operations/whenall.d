@@ -153,7 +153,7 @@ struct WhenAllSender(Senders...)
   else
     alias Value = void;
   Senders senders;
-  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+  auto connect(Receiver)(return Receiver receiver) @safe return scope {
     // ensure NRVO
     auto op = WhenAllOp!(Receiver, Senders)(receiver, senders);
     return op;

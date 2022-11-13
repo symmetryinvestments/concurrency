@@ -42,7 +42,7 @@ struct OnTerminationSender(Sender, SideEffect) if (models!(Sender, isSender)) {
   alias Value = Sender.Value;
   Sender sender;
   SideEffect effect;
-  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+  auto connect(Receiver)(return Receiver receiver) @safe return scope {
     // ensure NRVO
     auto op = sender.connect(OnTerminationReceiver!(Sender.Value, SideEffect, Receiver)(receiver, effect));
     return op;

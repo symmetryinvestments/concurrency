@@ -182,7 +182,7 @@ auto intervalStream(Duration duration, bool emitAtStart = false) {
     Duration duration;
     DG dg;
     bool emitAtStart;
-    auto connect(Receiver)(return Receiver receiver) @safe scope return {
+    auto connect(Receiver)(return Receiver receiver) @safe return scope {
       // ensure NRVO
       auto op = Op!(Receiver)(duration, dg, receiver, emitAtStart);
       return op;
@@ -308,7 +308,7 @@ shared struct SharedStream(T) {
       alias Value = void;
       shared SharedStream!T source;
       DG dg;
-      auto connect(Receiver)(return Receiver receiver) @safe scope return {
+      auto connect(Receiver)(return Receiver receiver) @safe return scope {
         // ensure NRVO
         auto op = Op!(Receiver)(source, dg, receiver);
         return op;

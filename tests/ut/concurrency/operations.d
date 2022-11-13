@@ -28,7 +28,7 @@ struct OutOfBandValueSender(T) {
       auto value = new Thread(&this.run).start();
     }
   }
-  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+  auto connect(Receiver)(return Receiver receiver) @safe return scope {
     // ensure NRVO
     auto op = Op!(Receiver)(receiver, value);
     return op;
@@ -242,7 +242,7 @@ struct OutOfBandValueSender(T) {
 struct ConnectCounter {
   alias Value = int;
   int counter = 0;
-  auto connect(Receiver)(return Receiver receiver) @trusted scope return {
+  auto connect(Receiver)(return Receiver receiver) @safe {
     // ensure NRVO
     auto op = ValueSender!int(counter++).connect(receiver);
     return op;

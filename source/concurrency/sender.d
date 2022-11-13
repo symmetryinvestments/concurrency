@@ -159,7 +159,7 @@ struct JustFromSender(Fun) {
     }
   }
   Fun fun;
-  Op!Receiver connect(Receiver)(return Receiver receiver) @safe scope return {
+  Op!Receiver connect(Receiver)(return Receiver receiver) @safe return scope {
     // ensure NRVO
     auto op = Op!(Receiver)(receiver, fun);
     return op;
@@ -277,7 +277,7 @@ struct ThrowingSender {
       receiver.setError(new Exception("ThrowingSender"));
     }
   }
-  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+  auto connect(Receiver)(return Receiver receiver) @safe {
     // ensure NRVO
     auto op = Op!Receiver(receiver);
     return op;
@@ -296,7 +296,7 @@ struct DoneSender {
       receiver.setDone();
     }
   }
-  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+  auto connect(Receiver)(return Receiver receiver) @safe {
     // ensure NRVO
     auto op = DoneOp!(Receiver)(receiver);
     return op;
@@ -316,7 +316,7 @@ struct VoidSender {
       receiver.setValueOrError();
     }
   }
-  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+  auto connect(Receiver)(return Receiver receiver) @safe {
     // ensure NRVO
     auto op = VoidOp!Receiver(receiver);
     return op;
@@ -337,7 +337,7 @@ struct ErrorSender {
       receiver.setError(exception);
     }
   }
-  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+  auto connect(Receiver)(return Receiver receiver) @safe {
     // ensure NRVO
     auto op = ErrorOp!(Receiver)(receiver, exception);
     return op;
@@ -367,7 +367,7 @@ template OpType(Sender, Receiver) {
 struct DelaySender {
   alias Value = void;
   Duration dur;
-  auto connect(Receiver)(return Receiver receiver) @trusted scope return {
+  auto connect(Receiver)(return Receiver receiver) @safe {
     // ensure NRVO
     auto op = receiver.getScheduler().scheduleAfter(dur).connect(receiver);
     return op;
@@ -590,7 +590,7 @@ struct PromiseSender(T) {
     auto op = (cast(shared)this).connect(receiver);
     return op;
   }
-  auto connect(Receiver)(return Receiver receiver) @safe shared scope return {
+  auto connect(Receiver)(return Receiver receiver) @safe shared return scope {
     // ensure NRVO
     auto op = PromiseSenderOp!(T, Receiver)(promise, receiver);
     return op;

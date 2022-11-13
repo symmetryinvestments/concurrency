@@ -29,7 +29,7 @@ struct CompleteWithCancellationSender(Sender) if (models!(Sender, isSender)) {
   static assert(is(Sender.Value == void), "Sender must produce void to be able to complete with cancellation.");
   alias Value = void;
   Sender sender;
-  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+  auto connect(Receiver)(return Receiver receiver) @safe return scope {
     /// ensure NRVO
     auto op = sender.connect(CompleteWithCancellationReceiver!(Receiver)(receiver));
     return op;

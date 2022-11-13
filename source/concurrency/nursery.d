@@ -145,8 +145,12 @@ class Nursery : StopSource {
       op.start();
   }
 
-  auto connect(Receiver)(return Receiver receiver) @trusted scope return {
-    return (cast(shared)this).connect(receiver);
+  auto connect(Receiver)(return Receiver receiver) @safe return scope {
+    return asShared.connect(receiver);
+  }
+
+  private shared(Nursery) asShared() @trusted return scope {
+    return cast(shared)this;
   }
 
   auto connect(Receiver)(return Receiver receiver) shared scope return @trusted {

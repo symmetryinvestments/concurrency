@@ -40,7 +40,7 @@ struct ForwardOnSender(Sender, Scheduler) if (models!(Sender, isSender)) {
   alias Value = Sender.Value;
   Sender sender;
   Scheduler scheduler;
-  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+  auto connect(Receiver)(return Receiver receiver) @safe return scope {
     alias R = ForwardOnReceiver!(Receiver, Sender.Value, Scheduler);
     // ensure NRVO
     auto op = sender.connect(R(receiver, scheduler));

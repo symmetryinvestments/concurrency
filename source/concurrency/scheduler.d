@@ -84,7 +84,7 @@ struct SchedulerAdapter(Worker) {
     static struct ScheduleSender {
       alias Value = void;
       Worker worker;
-      auto connect(Receiver)(return Receiver receiver) @safe scope return {
+      auto connect(Receiver)(return Receiver receiver) @safe return scope {
         // ensure NRVO
         auto op = ScheduleOp!(Receiver)(worker, receiver);
         return op;
@@ -296,7 +296,7 @@ struct ScheduleAfter {
   static assert (models!(typeof(this), isSender));
   alias Value = void;
   Duration duration;
-  auto connect(Receiver)(return Receiver receiver) @trusted scope return {
+  auto connect(Receiver)(return Receiver receiver) @safe {
     // ensure NRVO
     auto op = receiver.getScheduler.scheduleAfter(duration).connect(receiver);
     return op;
@@ -306,7 +306,7 @@ struct ScheduleAfter {
 struct Schedule {
   static assert (models!(typeof(this), isSender));
   alias Value = void;
-  auto connect(Receiver)(return Receiver receiver) @trusted scope return {
+  auto connect(Receiver)(return Receiver receiver) @safe {
     // ensure NRVO
     auto op = receiver.getScheduler.schedule().connect(receiver);
     return op;
