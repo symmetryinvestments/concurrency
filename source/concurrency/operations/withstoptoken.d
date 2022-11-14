@@ -20,6 +20,10 @@ auto withStopToken(Sender, Fun)(Sender sender, Fun fun) if (isThreadSafeFunction
 private struct STReceiver(Receiver, Value, Fun) {
   Receiver receiver;
   Fun fun;
+  this(return scope Receiver receiver, return Fun fun) @safe return scope {
+    this.receiver = receiver;
+    this.fun = fun;
+  }
   static if (is(Value == void)) {
     void setValue() @safe {
       static if (is(ReturnType!Fun == void)) {
@@ -67,7 +71,7 @@ struct STSender(Sender, Fun) if (models!(Sender, isSender)) {
   alias Value = ReturnType!fun;
   Sender sender;
   Fun fun;
-  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+  auto connect(Receiver)(return Receiver receiver) @safe return scope {
     alias R = STReceiver!(Receiver, Sender.Value, Fun);
     // ensure NRVO
     auto op = sender.connect(R(receiver, fun));

@@ -102,7 +102,7 @@ struct RaceSender(Senders...)
   alias Value = Result!(Senders);
   Senders senders;
   bool noDropouts; // if true then we fail the moment one contender does, otherwise we keep running until one finishes
-  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+  auto connect(Receiver)(return Receiver receiver) @safe return scope {
     // ensure NRVO
     auto op = RaceOp!(Receiver, Senders)(receiver, senders, noDropouts);
     return op;

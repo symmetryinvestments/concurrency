@@ -50,7 +50,7 @@ struct CompleteWithErrorSender(Sender) if (models!(Sender, isSender)) {
   alias Value = Sender.Value;
   Sender sender;
   Throwable t;
-  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+  auto connect(Receiver)(return Receiver receiver) @safe return scope {
     /// ensure NRVO
     auto op = sender.connect(CompleteWithErrorReceiver!(Receiver)(receiver, t));
     return op;

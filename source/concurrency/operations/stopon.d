@@ -42,7 +42,7 @@ struct StopOn(Sender) if (models!(Sender, isSender)) {
   alias Value = Sender.Value;
   Sender sender;
   StopToken stopToken;
-  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+  auto connect(Receiver)(return Receiver receiver) @safe return scope {
     alias R = StopOnReceiver!(Receiver, Sender.Value);
     // ensure NRVO
     auto op = sender.connect(R(receiver, stopToken));

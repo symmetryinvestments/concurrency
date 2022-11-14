@@ -11,6 +11,8 @@ version (Posix)
 struct ForkSender {
   alias Value = void;
   static assert(models!(typeof(this), isSender));
+  alias Fun = void delegate() shared;
+  alias AfterFork = void delegate(int);
   static struct Operation(Receiver) {
     private {
       Executor executor;
@@ -79,6 +81,12 @@ struct ForkSender {
         }
       }
     }
+    this(Executor executor, Fun fun, Receiver receiver, AfterFork afterFork) {
+      this.executor = executor;
+      this.fun = fun;
+      this.receiver = receiver;
+      this.afterFork = afterFork;
+    }
     void start() @trusted nothrow {
       import concurrency.thread : executeInNewThread, executeAndWait;
       import concurrency.utils : closure;
@@ -94,7 +102,7 @@ struct ForkSender {
     this.fun = fun;
     this.afterFork = afterFork;
   }
-  auto connect(Receiver)(Receiver receiver) @safe {
+  auto connect(Receiver)(return Receiver receiver) @safe {
     return new Operation!Receiver(executor, fun, receiver, afterFork);
   }
   static void reinitThreadLocks() {

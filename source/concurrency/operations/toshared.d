@@ -96,7 +96,7 @@ class SharedSender(Sender, Scheduler, ResetLogic resetLogic) if (models!(Sender,
     this.sender = sender;
     this.scheduler = scheduler;
   }
-  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+  auto connect(Receiver)(return Receiver receiver) @safe return scope {
     // ensure NRVO
     auto op = SharedSenderOp!(Sender, Scheduler, resetLogic, Receiver)(this, receiver);
     return op;

@@ -74,7 +74,7 @@ auto fromStreamOp(StreamElementType, SenderValue, alias Op, Args...)(Args args) 
     alias Value = SenderValue;
     Args args;
     DG dg;
-    auto connect(Receiver)(return Receiver receiver) @safe scope return {
+    auto connect(Receiver)(return Receiver receiver) @safe return scope {
       // ensure NRVO
       auto op = Op!(Receiver)(args, dg, receiver);
       return op;
@@ -130,7 +130,7 @@ template loopStream(E) {
         alias Value = void;
         T t;
         DG dg;
-        auto connect(Receiver)(return Receiver receiver) @safe scope return {
+        auto connect(Receiver)(return Receiver receiver) @safe return scope {
           // ensure NRVO
           auto op = LoopOp!(Receiver)(t, dg, receiver);
           return op;

@@ -84,7 +84,7 @@ struct RetrySender(Sender, Logic) if (models!(Sender, isSender) && models!(Logic
   alias Value = Sender.Value;
   Sender sender;
   Logic logic;
-  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+  auto connect(Receiver)(return Receiver receiver) @safe return scope {
     // ensure NRVO
     auto op = RetryOp!(Receiver, Sender, Logic)(sender, RetryReceiver!(Receiver, Sender, Logic)(sender, receiver, logic));
     return op;

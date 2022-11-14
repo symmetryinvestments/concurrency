@@ -43,7 +43,7 @@ private struct SSReceiver(Receiver, Value) {
     resetStopCallback();
     receiver.setError(e);
   }
-  auto getStopToken() nothrow @trusted {
+  auto getStopToken() nothrow @trusted scope {
     import core.atomic;
     if (this.combinedSource is null) {
       auto local = new StopSource();
@@ -77,7 +77,7 @@ struct SSSender(Sender) if (models!(Sender, isSender)) {
   alias Value = Sender.Value;
   Sender sender;
   StopSource stopSource;
-  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+  auto connect(Receiver)(return Receiver receiver) @safe return scope {
     alias R = SSReceiver!(Receiver, Sender.Value);
     // ensure NRVO
     auto op = sender.connect(R(receiver, stopSource));

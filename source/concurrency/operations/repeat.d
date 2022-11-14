@@ -55,7 +55,7 @@ struct RepeatSender(Sender) if (models!(Sender, isSender)) {
   static assert(models!(typeof(this), isSender));
   alias Value = Sender.Value;
   Sender sender;
-  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+  auto connect(Receiver)(return Receiver receiver) @safe return scope {
     // ensure NRVO
     auto op = RepeatOp!(Receiver, Sender)(sender, receiver);
     return op;

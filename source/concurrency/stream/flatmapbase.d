@@ -28,7 +28,7 @@ template FlatMapBaseStreamOp(Stream, Fun, OnOverlap overlap) {
     State state;
     @disable this(ref return scope typeof(this) rhs);
     @disable this(this);
-    this(Stream stream, Fun fun, return DG dg, return Receiver receiver) @trusted scope return {
+    this(Stream stream, Fun fun, return DG dg, return Receiver receiver) @trusted return scope {
       this.fun = fun;
       state = new State(dg, receiver);
       // TODO: would it be good to do the fun in a transform operation?

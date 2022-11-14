@@ -15,7 +15,7 @@ struct ToListSender(Stream) {
   alias Properties = StreamProperties!Stream;
   alias Value = Properties.ElementType[];
   Stream stream;
-  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+  auto connect(Receiver)(return Receiver receiver) @safe return scope {
     // ensure NRVO
     auto op = ToListOp!(Stream, Receiver)(stream, receiver);
     return op;
@@ -30,7 +30,7 @@ struct ToListOp(Stream, Receiver) {
   Op op;
   @disable this(this);
   @disable this(ref return scope typeof(this) rhs);
-  this(Stream stream, return Receiver receiver) @trusted scope return {
+  this(Stream stream, return Receiver receiver) @trusted return scope {
     state.receiver = receiver;
     op = stream.collect(cast(Properties.DG)&item).connect(ToListReceiver!(State)(&state));
   }

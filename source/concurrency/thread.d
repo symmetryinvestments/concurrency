@@ -361,7 +361,7 @@ struct ThreadSender {
       parentStopSource = null;
     }
   }
-  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+  auto connect(Receiver)(return Receiver receiver) @safe return scope {
     // ensure NRVO
     auto op = Op!(Receiver)(receiver);
     return op;
@@ -458,7 +458,7 @@ private struct TaskPoolSender {
       }
     }
   }
-  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+  auto connect(Receiver)(return Receiver receiver) @safe return scope {
     // ensure NRVO
     auto op = Op!(Receiver)(receiver, pool);
     return op;

@@ -44,7 +44,7 @@ struct StopWhenSender(Sender, Trigger) if (models!(Sender, isSender) && models!(
   alias Value = Sender.Value;
   Sender sender;
   Trigger trigger;
-  auto connect(Receiver)(return Receiver receiver) @safe scope return {
+  auto connect(Receiver)(return Receiver receiver) @safe return scope {
     // ensure NRVO
     auto op = StopWhenOp!(Receiver, Sender, Trigger)(receiver, sender, trigger);
     return op;
