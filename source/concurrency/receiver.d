@@ -72,7 +72,8 @@ void setValueOrError(Receiver)(auto ref Receiver receiver) @safe {
     try {
       receiver.setValue();
     } catch (Exception e) {
-      receiver.setError(e);
+      import concurrency.error;
+      receiver.setError(e.unscopeException);
     }
   }
 }
@@ -85,7 +86,8 @@ void setValueOrError(Receiver, T)(auto ref Receiver receiver, auto ref T value) 
     try {
       receiver.setValue(value);
     } catch (Exception e) {
-      receiver.setError(e);
+      import concurrency.error;
+      receiver.setError(e.unscopeException);
     }
   }
 }

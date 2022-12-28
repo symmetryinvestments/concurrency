@@ -353,7 +353,8 @@ struct ThreadSender {
       try {
         receiver.setValue();
       } catch (Exception e) {
-        receiver.setError(e);
+        import concurrency.error;
+        receiver.setError(e.unscopeException);
       } catch (Throwable t) {
         receiver.setError(t.clone());
       }
@@ -435,7 +436,8 @@ private struct TaskPoolSender {
       try {
         receiver.setValue();
       } catch (Exception e) {
-        receiver.setError(e);
+        import concurrency.error;
+        receiver.setError(e.unscopeException);
       } catch (Throwable t) {
         receiver.setError(t.clone);
       }
@@ -454,7 +456,8 @@ private struct TaskPoolSender {
       try {
         pool.put(myTask);
       } catch (Exception e) {
-        myTask.args[0].setError(e);
+        import concurrency.error;
+        myTask.args[0].setError(e.unscopeException);
       }
     }
   }

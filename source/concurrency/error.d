@@ -19,6 +19,8 @@ Throwable clone(Throwable t) nothrow @safe {
     return new ThrowableClone!RangeError(t.info, r.file, r.line, r.next);
   if (auto e = cast(Error)t)
     return new ThrowableClone!Error(t.info, t.msg, t.file, t.line, t.next);
+  if (auto e = cast(Exception)t)
+    return new ThrowableClone!Exception(t.info, t.msg, t.file, t.line, t.next);
   return new ThrowableClone!Throwable(t.info, t.msg, t.file, t.line, t.next);
 }
 
@@ -52,4 +54,22 @@ class ClonedTraceInfo : Throwable.TraceInfo {
       buf ~= i ? "\n" ~ line : line;
     return buf;
   }
+}
+
+Exception unscopeException(scope Exception e) @trusted nothrow {
+  if (e.refcount == 0) {
+    //TODO: what if exception is allocated on stack or TLS?
+    return cast(Exception)e;
+  }
+
+  return cast(Exception)e.clone();
+}
+
+Throwable unscopeException(scope Throwable e) @trusted nothrow {
+  if (e.refcount == 0) {
+    //TODO: what if exception is allocated on stack or TLS?
+    return cast(Throwable)e;
+  }
+
+  return e.clone();
 }

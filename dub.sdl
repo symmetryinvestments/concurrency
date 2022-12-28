@@ -17,7 +17,7 @@ configuration "unittest" {
 	dependency "unit-threaded" version="*"
 	targetType "executable"
 	mainSourceFile "tests/ut/ut_runner.d"
-	dflags "-dip1000"
+	dflags "-dip1000" "-dip1008"
 	sourcePaths "source" "tests/ut"
 	importPaths "source" "tests/ut"
 }
@@ -25,7 +25,7 @@ configuration "unittest-release" {
 	dependency "unit-threaded" version="*"
 	targetType "executable"
 	mainSourceFile "tests/ut/ut_runner.d"
-	dflags "-dip1000" "-g"
+	dflags "-dip1000" "-g" "-dip1008"
 	sourcePaths "source" "tests/ut"
 	importPaths "source" "tests/ut"
   # buildOptions "unittests"  "optimize"  "inline"

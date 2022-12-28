@@ -72,6 +72,7 @@ struct OutOfBandValueSender(T) {
 
 @("race.exception.double")
 @safe unittest {
+  // TODO: this is flaky. Find another way.
   auto slow = ThreadSender().then(() shared @trusted { Thread.sleep(50.msecs); throw new Exception("Slow"); });
   auto fast = ThreadSender().then(() shared { throw new Exception("Fast"); });
   race(slow, fast).syncWait.assumeOk.shouldThrowWithMessage("Fast");

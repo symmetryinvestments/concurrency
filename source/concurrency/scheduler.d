@@ -77,7 +77,8 @@ struct SchedulerAdapter(Worker) {
         try {
           worker.schedule(cast(VoidDelegate)()=>receiver.setValueOrError());
         } catch (Exception e) {
-          receiver.setError(e);
+          import concurrency.error;
+          receiver.setError(e.unscopeException);
         }
       }
     }
@@ -135,7 +136,8 @@ struct ScheduleAfterOp(Worker, Receiver) {
     try {
       timer = worker.addTimer(cast(void delegate(TimerTrigger) @safe shared)&trigger, dur);
     } catch (Exception e) {
-      receiver.setError(e);
+      import concurrency.error;
+      receiver.setError(e.unscopeException);
       return;
     }
 

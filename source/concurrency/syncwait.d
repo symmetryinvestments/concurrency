@@ -32,7 +32,8 @@ package struct SyncWaitReceiver2(Value) {
   }
 
   void setError(Throwable e) nothrow @safe {
-    state.throwable = e;
+    import concurrency.error;
+    state.throwable = e.unscopeException;
     state.worker.stop();
   }
   static if (is(Value == void))
