@@ -296,7 +296,7 @@ struct ScheduleAfter {
   static assert (models!(typeof(this), isSender));
   alias Value = void;
   Duration duration;
-  auto connect(Receiver)(return Receiver receiver) @safe {
+  auto connect(Receiver)(return Receiver receiver) @safe return scope {
     // ensure NRVO
     auto op = receiver.getScheduler.scheduleAfter(duration).connect(receiver);
     return op;
@@ -306,7 +306,7 @@ struct ScheduleAfter {
 struct Schedule {
   static assert (models!(typeof(this), isSender));
   alias Value = void;
-  auto connect(Receiver)(return Receiver receiver) @safe {
+  auto connect(Receiver)(return Receiver receiver) @safe return scope {
     // ensure NRVO
     auto op = receiver.getScheduler.schedule().connect(receiver);
     return op;

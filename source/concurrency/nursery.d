@@ -153,7 +153,7 @@ class Nursery : StopSource {
     return cast(shared)this;
   }
 
-  auto connect(Receiver)(return Receiver receiver) shared scope return @trusted {
+  auto connect(Receiver)(return Receiver receiver) shared @trusted return scope {
     final class ReceiverImpl : ReceiverObject {
       Receiver receiver;
       SchedulerObjectBase scheduler;
@@ -243,7 +243,7 @@ private struct NurseryOp {
   ReceiverObject receiver;
   @disable this(ref return scope typeof(this) rhs);
   @disable this(this);
-  this(return shared Nursery n, StopCallback cb, ReceiverObject r) @safe scope return {
+  this(return shared Nursery n, StopCallback cb, ReceiverObject r) @safe return scope {
     nursery = n;
     this.cb = cb;
     receiver = r;

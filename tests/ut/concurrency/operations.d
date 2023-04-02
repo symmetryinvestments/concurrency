@@ -211,7 +211,7 @@ struct OutOfBandValueSender(T) {
           receiver.setValue();
       }
     }
-    auto connect(Receiver)(return Receiver receiver) @safe scope return {
+    auto connect(Receiver)(return Receiver receiver) @safe return scope {
       // ensure NRVO
       auto op = Op!(Receiver)(receiver, n++ < t);
       return op;
@@ -242,7 +242,7 @@ struct OutOfBandValueSender(T) {
 struct ConnectCounter {
   alias Value = int;
   int counter = 0;
-  auto connect(Receiver)(return Receiver receiver) @safe {
+  auto connect(Receiver)(return Receiver receiver) @safe return scope {
     // ensure NRVO
     auto op = ValueSender!int(counter++).connect(receiver);
     return op;
@@ -705,7 +705,7 @@ DoneSender().forwardOn(pool.getScheduler).syncWait.isCancelled.should == true;
   static struct Countdown {
     alias Value = void;
     int countdown;
-    auto connect(Receiver)(return Receiver receiver) @safe scope return {
+    auto connect(Receiver)(return Receiver receiver) @safe return scope {
       // ensure NRVO
       auto op = CountdownOp!(Receiver)(receiver, countdown-- == 0);
       return op;
