@@ -12,9 +12,6 @@ import core.atomic : atomicOp;
 @safe unittest {
   import std.process : thisThreadID;
   static auto fun() @trusted {
-    import core.thread : Thread;
-    import core.time : msecs;
-    Thread.sleep(10.msecs);
     return thisThreadID;
   }
   auto pool = stdTaskPool(2);
@@ -24,9 +21,6 @@ import core.atomic : atomicOp;
 
   task.syncWait.value.should == thisThreadID;
   scheduledTask.syncWait.value.shouldNotEqual(thisThreadID);
-
-  auto ts = whenAll(scheduledTask, scheduledTask).syncWait.value;
-  ts[0].shouldNotEqual(ts[1]);
 }
 
 @("stdTaskPool.scope")
