@@ -4,3 +4,6 @@ leak:_D4core6memory__T10pureMallocZQnFNaNbNiNemZPv
 leak:_D4core6memory__T10pureCallocZQnFNaNbNiNemmZPv
 leak:_D2rt8monitor_13ensureMonitorFNbC6ObjectZPOSQBqQBq7Monitor
 leak:_D2rt5tlsgc4initFNbNiZPv
+# druntime internals:
+# 7 Throwables constructed via core.exception.staticError() leak their malloc'd .info backtrace (these Throwables aren't finalized)
+leak:_D4core7runtime19defaultTraceHandlerFPvZC6object9Throwable9TraceInfo
