@@ -17,5 +17,6 @@ int main(string[] args)
                         "ut.concurrency.mpsc",
                         "ut.concurrency.waitable",
                         "ut.concurrency.asyncscope",
+                        "concurrency.timingwheels",
                         );
 }
