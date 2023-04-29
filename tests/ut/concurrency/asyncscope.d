@@ -182,3 +182,30 @@ auto waitingTask() {
   s.spawn(VoidSender().withScheduler(localThreadScheduler));
   s.cleanup.syncWait.assumeOk;
 }
+
+@("onComplete.inline")
+@safe unittest {
+  auto s = asyncScope();
+
+  s.stop();
+  s.onComplete().syncWait.assumeOk;
+}
+
+@("onComplete.wait")
+@safe unittest {
+  import concurrency.thread : ThreadSender;
+  import concurrency.stoptoken : StopSource;
+  import concurrency.operations : then;
+
+  auto source = new shared StopSource();
+  auto s = asyncScope(source);
+
+  s.spawn(ThreadSender().then(() shared @trusted {
+        import core.thread : Thread;
+        import core.time : msecs;
+        Thread.sleep(10.msecs);
+        source.stop();
+      }));
+
+  s.onComplete().syncWait.assumeOk;
+}
