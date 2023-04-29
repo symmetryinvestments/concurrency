@@ -55,6 +55,12 @@ package struct SyncWaitReceiver2(Value) {
 
 @reflectErr enum Cancelled { cancelled }
 
+class CancelledException : Exception {
+  this(string file = __FILE__, size_t line = __LINE__, Throwable next = null) @nogc @safe pure nothrow {
+    super("Cancelled", file, line, next);
+  }
+}
+
 struct Result(T) {
   alias V = Variant!(Cancelled, Exception, T);
   V result;
@@ -79,7 +85,7 @@ struct Result(T) {
     import mir.algebraic : match;
     return result.match!(valueHandler,
                          function T (Cancelled c) {
-                           throw new Exception("Cancelled");
+                           throw new CancelledException();
                          },
                          function T (Exception e) {
                            throw e;
