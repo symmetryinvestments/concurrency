@@ -30,6 +30,10 @@ final class MPSCQueue(Node) {
     return shared MPSCQueueProducer!Node(cast(shared)this);
   }
 
+  bool push(Node* n) @trusted nothrow @nogc shared {
+    return (cast()this).push(n);
+  }
+
   /// returns true if first to push
   bool push(Node* n) @safe nothrow @nogc {
     import core.atomic : atomicExchange;
