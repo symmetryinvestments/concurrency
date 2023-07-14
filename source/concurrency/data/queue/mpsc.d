@@ -48,6 +48,32 @@ final class MPSCQueue(Node) {
     return head.atomicLoad is &stub;
   }
 
+  /// returns chain with head and tail
+  Chain!Node popAll() @safe nothrow @nogc {
+    import core.atomic : atomicExchange;
+
+    Node* first = atomicExchange(&head, &stub);
+    Node* last = tail;
+    tail = &stub;
+    if (last is &stub)
+      last = last.next.toUnshared();
+    if (first is &stub)
+      first = null;
+    return Chain!Node(first, last);
+  }
+
+  // pushed list of items, can only be done by consumer
+  bool push(Chain!Node chain) @safe nothrow @nogc {
+    if (chain.head is null || chain.tail is null)
+      return false;
+
+    import core.atomic : atomicExchange;
+    chain.head.next = null;
+    Node* prev = atomicExchange(&head, chain.head);
+    prev.next = toShared(chain.tail);
+    return prev is &stub;
+  }
+
   /// returns node or null if none
   Node* pop() @safe nothrow @nogc {
     import core.atomic : atomicLoad, MemoryOrder;
@@ -84,6 +110,11 @@ final class MPSCQueue(Node) {
       current = current.next.atomicLoad!(MemoryOrder.raw).toUnshared();
     return Iterator!(Node)(current);
   }
+}
+
+struct Chain(Node) {
+  Node* head;
+  Node* tail;
 }
 
 struct Iterator(Node) {
