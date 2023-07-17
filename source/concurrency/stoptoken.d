@@ -53,9 +53,7 @@ struct NeverStopToken {
 
 StopCallback onStop(StopSource stopSource, void delegate() nothrow @safe shared callback) nothrow @safe {
   auto cb = new StopCallback(callback);
-  if (stopSource.state.try_add_callback(cb, true))
-    cb.source = stopSource;
-  return cb;
+  return onStop(stopSource, cb);
 }
 
 StopCallback onStop(StopSource stopSource, void function() nothrow @safe callback) nothrow @trusted {
@@ -73,6 +71,19 @@ StopCallback onStop(StopToken)(StopToken stopToken, void delegate() nothrow @saf
 StopCallback onStop(StopToken)(StopToken stopToken, void function() nothrow @safe callback) nothrow @trusted {
   import std.functional : toDelegate;
   return stopToken.onStop(cast(void delegate() nothrow @safe shared)callback.toDelegate);
+}
+
+StopCallback onStop(StopToken)(StopToken stopToken, StopCallback cb) nothrow @safe {
+  if (stopToken.isStopPossible) {
+    return stopToken.source.onStop(cb);
+  }
+  return cb;
+}
+
+StopCallback onStop(StopSource stopSource, StopCallback cb) nothrow @safe {
+  if (stopSource.state.try_add_callback(cb, true))
+    cb.source = stopSource;
+  return cb;
 }
 
 class StopCallback {
