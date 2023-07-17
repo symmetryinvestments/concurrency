@@ -13,11 +13,11 @@ WithChildSender!(SenderParent, SenderChild) withChild(SenderParent, SenderChild)
 }
 
 struct WithChildSender(SenderParent, SenderChild) if (models!(SenderParent, isSender) && models!(SenderChild, isSender)) {
-  alias Value = void;
+  import concurrency.operations.whenall;
+  alias Value = WhenAllSender!(SenderChild, SenderParent).Value;
   SenderParent a;
   SenderChild b;
   auto connect(Receiver)(return Receiver receiver) @safe return scope {
-    import concurrency.operations.whenall;
     import concurrency.operations.stopon;
     // ensure NRVO
     auto op = whenAll(b.stopOn(receiver.getStopToken), a).stopOn(StopToken()).connect(receiver);
