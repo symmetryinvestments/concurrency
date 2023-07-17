@@ -110,10 +110,10 @@ class StopCallback {
     (cast()this).dispose();
   }
 
-private:
   this(void delegate() nothrow shared @safe callback) nothrow @safe @nogc {
     this.callback = callback;
   }
+private:
 
   void delegate() nothrow shared @safe callback;
   StopSource source;
