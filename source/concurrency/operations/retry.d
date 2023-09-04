@@ -59,7 +59,8 @@ private struct RetryReceiver(Receiver, Sender, Logic) {
         // From what I gathered that is what libunifex does
         sender.connectHeap(this).start();
       } catch (Exception e) {
-        receiver.setError(e);
+        import concurrency.error;
+        receiver.setError(e.unscopeException);
       }
     }
   }

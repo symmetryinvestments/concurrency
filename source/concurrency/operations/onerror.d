@@ -34,7 +34,8 @@ private struct OnErrorReceiver(Value, SideEffect, Receiver) {
       try
         sideEffect(e);
       catch (Exception e2) {
-        receiver.setError(() @trusted { return Throwable.chainTogether(e2, e); } ());
+        import concurrency.error;
+        receiver.setError(() @trusted { return Throwable.chainTogether(e2.unscopeException, e); } ());
         return;
       }
     }

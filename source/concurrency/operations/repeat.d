@@ -42,7 +42,8 @@ private struct RepeatOp(Receiver, Sender) {
     try {
       reset();
     } catch (Exception e) {
-      receiver.setError(e);
+      import concurrency.error;
+      receiver.setError(e.unscopeException);
     }
   }
   private void reset() @trusted scope {

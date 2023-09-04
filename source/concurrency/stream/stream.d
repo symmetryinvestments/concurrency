@@ -118,7 +118,8 @@ template loopStream(E) {
           try {
             t.loop(dg, receiver.getStopToken);
           } catch (Exception e) {
-            receiver.setError(e);
+            import concurrency.error;
+            receiver.setError(e.unscopeException);
           }
           if (receiver.getStopToken().isStopRequested)
             receiver.setDone();

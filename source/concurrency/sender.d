@@ -137,7 +137,8 @@ struct JustFromSender(Fun) {
         try {
           set();
         } catch (Exception e) {
-          receiver.setError(e);
+          import concurrency.error;
+          receiver.setError(e.unscopeException);
         }
       }
     }
@@ -463,14 +464,15 @@ struct PromiseSenderOp(T, Receiver) {
       // calling the receiver's termination functions.
       if (cb)
         cb.dispose();
-      value.match!((Sender.ValueRep v){
+      value.match!((Sender.ValueRep v) @safe {
+          import concurrency.error;
           try {
             static if (is(Sender.Value == void))
               receiver.setValue();
             else
               receiver.setValue(v);
           } catch (Exception e) {
-            receiver.setError(e);
+            receiver.setError(e.unscopeException);
           }
         }, (Throwable e){
           receiver.setError(e);

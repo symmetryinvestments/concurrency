@@ -120,14 +120,16 @@ auto intervalStream(Duration duration, bool emitAtStart = false) {
         }
         op.load();
       } catch (Exception e) {
-        op.receiver.setError(e);
+        import concurrency.error;
+        op.receiver.setError(e.unscopeException);
       }
     }
     void setDone() @safe nothrow {
       op.receiver.setDone();
     }
     void setError(Throwable t) @safe nothrow {
-      op.receiver.setError(t);
+      import concurrency.error;
+      op.receiver.setError(t.unscopeException);
     }
     auto getStopToken() @safe {
       return op.receiver.getStopToken();
@@ -165,7 +167,8 @@ auto intervalStream(Duration duration, bool emitAtStart = false) {
         }
         load();
       } catch (Exception e) {
-        receiver.setError(e);
+        import concurrency.error;
+        receiver.setError(e.unscopeException);
       }
     }
     private void load() @trusted nothrow {
@@ -173,7 +176,8 @@ auto intervalStream(Duration duration, bool emitAtStart = false) {
         op = receiver.getScheduler().scheduleAfter(duration).connect(ItemReceiver!(typeof(this))(&this));
         op.start();
       } catch (Exception e) {
-        receiver.setError(e);
+        import concurrency.error;
+        receiver.setError(e.unscopeException);
       }
     }
   }
@@ -294,9 +298,10 @@ shared struct SharedStream(T) {
           try {
             dg(element);
           } catch (Exception e) {
+            import concurrency.error;
             source.remove(&this.onItem);
             cb.dispose();
-            receiver.setError(e);
+            receiver.setError(e.unscopeException);
           }
         }
       }

@@ -102,9 +102,10 @@ template ThrottleStreamOp(Stream, ThrottleEmitLogic emitLogic, ThrottleTimerLogi
           dg();
           return true;
         } catch (Exception e) {
+          import concurrency.error;
           with (flags.lock(ThrottleFlags.doneOrError_produced)) {
             if ((oldState & ThrottleFlags.doneOrError_produced) == 0) {
-              throwable = e;
+              throwable = e.unscopeException;
             }
             release();
             process(newState);
@@ -136,9 +137,10 @@ template ThrottleStreamOp(Stream, ThrottleEmitLogic emitLogic, ThrottleTimerLogi
           dg(t);
           return true;
         } catch (Exception e) {
+          import concurrency.error;
           with (flags.lock(ThrottleFlags.doneOrError_produced)) {
             if ((oldState & ThrottleFlags.doneOrError_produced) == 0) {
-              throwable = e;
+              throwable = e.unscopeException;
             }
             release();
             process(newState);
@@ -198,7 +200,8 @@ template ThrottleStreamOp(Stream, ThrottleEmitLogic emitLogic, ThrottleTimerLogi
               else
                 dg();
             } catch (Exception e) {
-              receiver.setError(e);
+              import concurrency.error;
+              receiver.setError(e.unscopeException);
               return;
             }
           }

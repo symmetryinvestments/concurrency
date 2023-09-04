@@ -105,7 +105,8 @@ class Nursery : StopSource {
           try {
             localReceiver.setValue();
           } catch (Exception e) {
-            localReceiver.setError(e);
+            import concurrency.error;
+            localReceiver.setError(e.unscopeException);
           }
         }
       }

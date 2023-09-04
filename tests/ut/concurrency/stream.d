@@ -604,11 +604,11 @@ unittest {
 
 @("flatmap.concat.error")
 @safe unittest {
-  import concurrency.sender : just, ErrorSender;
+  import concurrency.sender : just, ThrowingSender;
   import concurrency.operations : via;
 
   [1,2,3].arrayStream
-    .flatMapConcat((int i) => ErrorSender())
+    .flatMapConcat((int i) => ThrowingSender())
     .collect(()shared{})
     .syncWait
     .assumeOk
@@ -659,11 +659,11 @@ unittest {
 
 @("flatmap.latest.error")
 @safe unittest {
-  import concurrency.sender : just, ErrorSender;
+  import concurrency.sender : just, ThrowingSender;
   import concurrency.operations : via;
 
   [1,2,3].arrayStream
-    .flatMapLatest((int i) => ErrorSender())
+    .flatMapLatest((int i) => ThrowingSender())
     .collect(()shared{})
     .syncWait
     .assumeOk

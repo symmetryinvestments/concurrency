@@ -51,7 +51,8 @@ class SharedSender(Sender, Scheduler, ResetLogic resetLogic) if (models!(Sender,
             try {
               localState.op = sender.connect(SharedSenderReceiver!(Sender, Scheduler, resetLogic)(&state, scheduler));
             } catch (Exception e) {
-              state.process!(resetLogic)(InternalValue(e));
+              import concurrency.error;
+              state.process!(resetLogic)(InternalValue(e.unscopeException));
             }
             localState.op.start();
           } else {
@@ -158,10 +159,12 @@ private struct SharedSenderOp(Sender, Scheduler, ResetLogic resetLogic, Receiver
             /// this onValue can sometimes be called immediately,
             /// leaving no room to set cb.dispose...
             cb.dispose();
-            receiver.setError(e);
+            import concurrency.error;
+            receiver.setError(e.unscopeException);
           }
         }, (Throwable e){
-          receiver.setError(e);
+          import concurrency.error;
+          receiver.setError(e.unscopeException);
         }, (Done d){
           receiver.setDone();
         });
