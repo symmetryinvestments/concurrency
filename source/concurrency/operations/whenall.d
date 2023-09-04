@@ -57,7 +57,7 @@ private template WhenAllResult(Senders...) if (Senders.length > 1) {
 	static if (ValueTypes.length > 0) {
 		struct WhenAllResult {
 			Values values;
-			void setValue(T)(T t, size_t index) {
+			void setValue(T)(T t, size_t index) @trusted {
 				switch (index) {
 					foreach (idx, I; Indexes) {
 						case idx:
