@@ -8,86 +8,97 @@ import concurrency.receiver;
 import unit_threaded;
 import core.atomic : atomicOp;
 
-@("stdTaskPool")
-@safe unittest {
-  import std.process : thisThreadID;
-  static auto fun() @trusted {
-    return thisThreadID;
-  }
-  auto pool = stdTaskPool(2);
+@("stdTaskPool") @safe
+unittest {
+	import std.process : thisThreadID;
+	static auto fun() @trusted {
+		return thisThreadID;
+	}
 
-  auto task = justFrom(&fun);
-  auto scheduledTask = task.on(pool.getScheduler);
+	auto pool = stdTaskPool(2);
 
-  task.syncWait.value.should == thisThreadID;
-  scheduledTask.syncWait.value.shouldNotEqual(thisThreadID);
+	auto task = justFrom(&fun);
+	auto scheduledTask = task.on(pool.getScheduler);
+
+	task.syncWait.value.should == thisThreadID;
+	scheduledTask.syncWait.value.shouldNotEqual(thisThreadID);
 }
 
-@("stdTaskPool.scope")
-@safe unittest {
-  void disappearScheduler(StdTaskPoolProtoScheduler p) @safe;
-  void disappearSender(Sender)(Sender s) @safe;
+@("stdTaskPool.scope") @safe
+unittest {
+	void disappearScheduler(StdTaskPoolProtoScheduler p) @safe;
+	void disappearSender(Sender)(Sender s) @safe;
 
-  auto pool = stdTaskPool(2);
+	auto pool = stdTaskPool(2);
 
-  auto scheduledTask = VoidSender().on(pool.getScheduler);
+	auto scheduledTask = VoidSender().on(pool.getScheduler);
 
-  // ensure we can't leak the scheduler
-  static assert(!__traits(compiles, disappearScheduler(pool.getScheduler)));
+	// ensure we can't leak the scheduler
+	static assert(!__traits(compiles, disappearScheduler(pool.getScheduler)));
 
-  // ensure we can't leak a sender that scheduled on the scoped pool
-  static assert(!__traits(compiles, disappearSender(scheduledTask)));
+	// ensure we can't leak a sender that scheduled on the scoped pool
+	static assert(!__traits(compiles, disappearSender(scheduledTask)));
 }
 
-@("stdTaskPool.assert")
-@system unittest {
-  import std.exception : assertThrown;
-  import core.exception : AssertError;
-  auto pool = stdTaskPool(2);
-  just(42).then((int i) => assert(i == 99, "i must be 99")).via(pool.getScheduler.schedule()).syncWait.assertThrown!(AssertError)("i must be 99");
+@("stdTaskPool.assert") @system
+unittest {
+	import std.exception : assertThrown;
+	import core.exception : AssertError;
+	auto pool = stdTaskPool(2);
+	just(42)
+		.then((int i) => assert(i == 99, "i must be 99"))
+		.via(pool.getScheduler.schedule())
+		.syncWait
+		.assertThrown!(AssertError)("i must be 99");
 }
 
-@("ThreadSender.assert")
-@system unittest {
-  import std.exception : assertThrown;
-  import core.exception : AssertError;
-  just(42).then((int i) => assert(i == 99, "i must be 99")).via(ThreadSender()).syncWait.assertThrown!(AssertError)("i must be 99");
+@("ThreadSender.assert") @system
+unittest {
+	import std.exception : assertThrown;
+	import core.exception : AssertError;
+	just(42)
+		.then((int i) => assert(i == 99, "i must be 99")).via(ThreadSender())
+		.syncWait.assertThrown!(AssertError)("i must be 99");
 }
 
-@("localThreadWorker.assert")
-@system unittest {
-  import std.exception : assertThrown;
-  import core.exception : AssertError;
-  just(42).then((int i) => assert(i == 99, "i must be 99")).syncWait.assertThrown!(AssertError)("i must be 99");
+@("localThreadWorker.assert") @system
+unittest {
+	import std.exception : assertThrown;
+	import core.exception : AssertError;
+	just(42).then((int i) => assert(i == 99, "i must be 99")).syncWait
+	        .assertThrown!(AssertError)("i must be 99");
 }
 
-@("ThreadSender.whenAll.assert")
-@system unittest {
-  import std.exception : assertThrown;
-  import core.time : msecs;
-  import core.exception : AssertError;
-  auto fail = just(42).then((int i) => assert(i == 99, "i must be 99")).via(ThreadSender());
-  auto slow = delay(100.msecs);
-  whenAll(fail,slow).syncWait.assertThrown!(AssertError)("i must be 99");
+@("ThreadSender.whenAll.assert") @system
+unittest {
+	import std.exception : assertThrown;
+	import core.time : msecs;
+	import core.exception : AssertError;
+	auto fail = just(42).then((int i) => assert(i == 99, "i must be 99"))
+	                    .via(ThreadSender());
+	auto slow = delay(100.msecs);
+	whenAll(fail, slow).syncWait.assertThrown!(AssertError)("i must be 99");
 }
 
-@("dynamicLoadRaw.getThreadLocalExecutor")
-@safe unittest {
-  import concurrency.utils;
-  dynamicLoadRaw!concurrency_getLocalThreadExecutor.should.not == null;
+@("dynamicLoadRaw.getThreadLocalExecutor") @safe
+unittest {
+	import concurrency.utils;
+	dynamicLoadRaw!concurrency_getLocalThreadExecutor.should.not == null;
 }
 
-@("nested.intervalStream")
-@safe unittest {
-  import core.time : msecs;
-  import concurrency.stream : intervalStream, take;
+@("nested.intervalStream") @safe
+unittest {
+	import core.time : msecs;
+	import concurrency.stream : intervalStream, take;
 
-  static auto interval() {
-    return intervalStream(1.msecs).take(90).collect(() shared {});
-  }
-  auto sender = justFrom(() => interval().syncWait()).via(ThreadSender());
+	static auto interval() {
+		return intervalStream(1.msecs).take(90).collect(() shared {});
+	}
 
-  auto d = delay(10.msecs);
+	auto sender = justFrom(() => interval().syncWait()).via(ThreadSender());
 
-  whenAll(interval, sender, interval, sender, interval, sender, d, d, d).syncWait().assumeOk;
+	auto d = delay(10.msecs);
+
+	whenAll(interval, sender, interval, sender, interval, sender, d, d, d)
+		.syncWait().assumeOk;
 }
