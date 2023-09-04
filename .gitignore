@@ -14,3 +14,10 @@ concurrency-test-*
 *.obj
 *.lst
 .dsemver
+/.reggae
+/.ninja_*
+/build.ninja
+/compile_commands.json
+/reggaefile.d
+/rules.ninja
+/ut

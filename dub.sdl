@@ -18,8 +18,8 @@ configuration "unittest" {
 	targetType "executable"
 	mainSourceFile "tests/ut/ut_runner.d"
 	dflags "-dip1000"
-	sourcePaths "source" "tests/ut"
-	importPaths "source" "tests/ut"
+	sourcePaths "source" "tests"
+	importPaths "source" "tests"
 }
 configuration "unittest-release" {
 	dependency "unit-threaded" version="*"
