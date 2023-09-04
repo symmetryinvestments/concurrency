@@ -5,7 +5,6 @@ import concurrency.scheduler;
 import concurrency.sender;
 import concepts;
 import core.sync.semaphore : Semaphore;
-import mir.algebraic;
 import concurrency.scheduler : Timer;
 import core.time : Duration;
 import concurrency.data.queue.waitable;
@@ -47,9 +46,13 @@ private struct RemoveTimer {
 
 private struct Noop {}
 
+private struct StopSignal {}
+
+import std.sumtype;
+
 private alias WorkItem =
-	Variant!(typeof(null), VoidDelegate, VoidFunction, AddTimer, RemoveTimer,
-	         Noop); // null signifies end
+	SumType!(StopSignal, VoidDelegate, VoidFunction, AddTimer, RemoveTimer,
+	         Noop);
 
 private struct WorkNode {
 	WorkItem payload;
@@ -130,15 +133,17 @@ package struct LocalThreadWorker {
 		bool running = true;
 		while (running) {
 			import std.meta : AliasSeq;
-			alias handlers = AliasSeq!((typeof(null)) {
+			alias handlers = AliasSeq!((StopSignal s) {
 				running = false;
-			}, (RemoveTimer cmd) => removeTimer(cmd), (AddTimer cmd) {
+			}, (RemoveTimer cmd) { removeTimer(cmd); }, (AddTimer cmd) {
 				auto real_now = Clock.currStdTime;
 				auto tw_now = executor.wheels.currStdTime(ticks);
 				auto delay = (real_now - tw_now).hnsecs;
 				auto at = (cmd.dur + delay) / ticks;
 				executor.wheels.schedule(cmd.timer, at);
-			}, (VoidFunction fn) => fn(), (VoidDelegate dg) => dg(), (Noop) {});
+			}, (VoidFunction fn) => fn(),
+			(VoidDelegate dg) => dg(),
+			(Noop) {});
 			auto nextTrigger =
 				executor.wheels.timeUntilNextEvent(ticks, Clock.currStdTime);
 			bool handleIt = false;
@@ -204,9 +209,9 @@ package struct LocalThreadWorker {
 				return;
 			// if the timer is still in the queue, rewrite the queue node to a Noop
 			auto nodes = executor.queue[].find!((node) {
-				if (!node.payload._is!AddTimer)
-					return false;
-				return node.payload.get!AddTimer.timer.id == timer.id;
+				return node.payload.match!((AddTimer t) {
+					return t.timer.id == timer.id;
+				}, (x) => false);
 			});
 
 			if (!nodes.empty) {
@@ -218,7 +223,7 @@ package struct LocalThreadWorker {
 
 	void stop() nothrow @trusted {
 		try {
-			executor.queue.push(new WorkNode(WorkItem(null)));
+			executor.queue.push(new WorkNode(WorkItem(StopSignal())));
 		} catch (Exception e) {
 			assert(false, e.msg);
 		}
