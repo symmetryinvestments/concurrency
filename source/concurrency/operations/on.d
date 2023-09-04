@@ -8,6 +8,6 @@ import concepts;
 import std.traits;
 
 auto on(Sender, Scheduler)(Sender sender, Scheduler scheduler) {
-  import concurrency.operations : via, withScheduler;
-  return sender.via(scheduler.schedule()).withScheduler(scheduler);
+	import concurrency.operations : via, withScheduler;
+	return sender.via(scheduler.schedule()).withScheduler(scheduler);
 }

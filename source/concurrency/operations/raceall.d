@@ -13,5 +13,5 @@ import std.traits;
 /// if both error out the first exception is propagated,
 /// uses mir.algebraic if the Sender value types differ
 RaceSender!(Senders) raceAll(Senders...)(Senders senders) {
-  return RaceSender!(Senders)(senders, true);
+	return RaceSender!(Senders)(senders, true);
 }
