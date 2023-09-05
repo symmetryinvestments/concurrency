@@ -513,7 +513,7 @@ struct PromiseSenderOp(T, Receiver) {
 	}
 
 	void onValue(InternalValue value) nothrow @safe shared {
-		import mir.algebraic : match;
+		import std.sumtype : match;
 		// we toggle the stop bit and return early if setup bit isn't set
 		with (bitfield.add(Flags.value)) if (!has(Flags.setup))
 			return;
@@ -551,7 +551,7 @@ class Promise(T) {
 	import std.traits : ReturnType;
 	import concurrency.slist;
 	import concurrency.bitfield;
-	import mir.algebraic : Algebraic, match, Nullable;
+	import std.sumtype;
 	alias Value = T;
 	static if (is(Value == void)) {
 		static struct ValueRep {}
@@ -559,11 +559,11 @@ class Promise(T) {
 		alias ValueRep = Value;
 	static struct Done {}
 
-	alias InternalValue = Algebraic!(Throwable, ValueRep, Done);
+	alias InternalValue = SumType!(Throwable, ValueRep, Done);
 	alias DG = void delegate(InternalValue) nothrow @safe shared;
 	private {
 		shared SList!DG dgs;
-		Nullable!InternalValue value;
+		SumType!(typeof(null), InternalValue) value;
 		enum Flags {
 			locked = 0x1,
 			completed = 0x2
@@ -574,7 +574,7 @@ class Promise(T) {
 			with (unshared) {
 				with (counter.lock()) {
 					if (was(Flags.completed)) {
-						auto val = value.get;
+						auto val = value.match!((typeof(null)) => assert(0, "not happening"), v => v);
 						release(); // release early
 						dg(val);
 						return true;
