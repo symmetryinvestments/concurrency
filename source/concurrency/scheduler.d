@@ -3,7 +3,7 @@ module concurrency.scheduler;
 import concurrency.sender : SenderObjectBase, isSender;
 import core.time : Duration;
 import concepts;
-import mir.algebraic : Nullable, nullable;
+import std.typecons : Nullable, nullable;
 
 void checkScheduler(T)() {
 	import concurrency.sender : checkSender;

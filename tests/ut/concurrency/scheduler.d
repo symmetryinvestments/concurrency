@@ -7,6 +7,7 @@ import unit_threaded;
 import concurrency.stoptoken;
 import core.time : msecs;
 import concurrency.scheduler;
+import std.typecons : nullable;
 
 @("scheduleAfter") @safe
 unittest {
@@ -39,24 +40,24 @@ unittest {
 		h.atomicOp!"+="(1);
 	}, 5.msecs);
 
-	worker.timeUntilNextEvent().should == 5.msecs;
+	worker.timeUntilNextEvent().should == 5.msecs.nullable;
 	g.should == 0;
 	h.should == 0;
 
 	worker.advance(4.msecs);
-	worker.timeUntilNextEvent().should == 1.msecs;
+	worker.timeUntilNextEvent().should == 1.msecs.nullable;
 	h.should == 0;
 	g.should == 0;
 
 	worker.advance(1.msecs);
-	worker.timeUntilNextEvent().should == 5.msecs;
+	worker.timeUntilNextEvent().should == 5.msecs.nullable;
 	h.should == 1;
 	g.should == 0;
 
 	worker.advance(5.msecs);
 	h.should == 1;
 	g.should == 1;
-	worker.timeUntilNextEvent().should == null;
+	worker.timeUntilNextEvent().isNull.should == true;
 }
 
 @("ManualTimeWorker.cancel") @safe
@@ -68,15 +69,15 @@ unittest {
 	auto timer = worker.addTimer((TimerTrigger trigger) shared {
 		g.atomicOp!"+="(1 + (trigger == TimerTrigger.cancel));
 	}, 10.msecs);
-	worker.timeUntilNextEvent().should == 10.msecs;
+	worker.timeUntilNextEvent().should == 10.msecs.nullable;
 	g.should == 0;
 
 	worker.advance(4.msecs);
-	worker.timeUntilNextEvent().should == 6.msecs;
+	worker.timeUntilNextEvent().should == 6.msecs.nullable;
 	g.should == 0;
 
 	worker.cancelTimer(timer);
-	worker.timeUntilNextEvent().should == null;
+	worker.timeUntilNextEvent().isNull.should == true;
 	g.should == 2;
 }
 

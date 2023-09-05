@@ -26,7 +26,7 @@ import core.memory;
 
 import ikod.containers.hashmap;
 import automem;
-import mir.algebraic : Nullable, nullable;
+import std.typecons : Nullable, nullable;
 
 version(twtesting) {
 	import unit_threaded;

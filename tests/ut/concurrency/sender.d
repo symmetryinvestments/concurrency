@@ -7,6 +7,7 @@ import concurrency.operations;
 import concurrency.receiver;
 import unit_threaded;
 import core.atomic : atomicOp;
+import std.typecons : nullable;
 
 @("syncWait.value") @safe
 unittest {
@@ -310,7 +311,7 @@ unittest {
 		.withScheduler(worker.getScheduler);
 
 	auto driver = just(worker).then((shared ManualTimeWorker worker) {
-		worker.timeUntilNextEvent().should == 1.msecs;
+		worker.timeUntilNextEvent().should == 1.msecs.nullable;
 		worker.advance(1.msecs);
 	});
 
