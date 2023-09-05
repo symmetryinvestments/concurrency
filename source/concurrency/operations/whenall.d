@@ -31,7 +31,6 @@ template GetSenderValues(Senders...) {
 private template WhenAllResult(Senders...) if (Senders.length > 1) {
 	import std.meta;
 	import std.typecons;
-	import mir.algebraic : Algebraic, Nullable;
 	import concurrency.utils : NoVoid;
 	template Cummulative(size_t count, Ts...) {
 		static if (Ts.length > 0) {
