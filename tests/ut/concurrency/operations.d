@@ -73,7 +73,8 @@ unittest {
 
 @("race.exception.single") @safe
 unittest {
-	race(ThrowingSender(), ValueSender!int(5)).syncWait.value.should == 5;
+	import std.sumtype : tryMatch;
+	race(ThrowingSender(), ValueSender!int(5)).syncWait.value.tryMatch!((int i) => i.should == 5);
 	race(ThrowingSender(), ThrowingSender()).syncWait.assumeOk.shouldThrow();
 }
 
@@ -96,7 +97,8 @@ unittest {
 			Thread.yield();
 		}
 	});
-	race(waiting, ValueSender!int(88)).syncWait.value.get.should == 88;
+	import std.sumtype : tryMatch;
+	race(waiting, ValueSender!int(88)).syncWait.value.tryMatch!((int i) => i.should == 88);
 }
 
 @("race.cancel") @safe
@@ -401,8 +403,9 @@ unittest {
 			Thread.yield();
 		}
 	});
+	import std.sumtype : tryMatch;
 	raceAll(waiting, DoneSender()).syncWait.isCancelled.should == true;
-	raceAll(waiting, just(42)).syncWait.value.should == 42;
+	raceAll(waiting, just(42)).syncWait.value.tryMatch!(i => i.should == 42);
 	raceAll(waiting, ThrowingSender()).syncWait.isError.should == true;
 }
 
