@@ -1,6 +1,6 @@
 module concurrency.stream.cron;
 
-import mir.algebraic;
+import std.sumtype;
 import std.datetime.systime : SysTime;
 
 struct Always {}
@@ -18,7 +18,7 @@ struct Each {
 	uint[] values;
 }
 
-alias Spec = Algebraic!(Always, Exact, Every, Each);
+alias Spec = SumType!(Always, Exact, Every, Each);
 
 struct CronSpec {
 	import std.datetime.timezone : TimeZone, UTC;
