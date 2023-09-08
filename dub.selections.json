@@ -4,7 +4,6 @@
 		"automem": "0.6.4",
 		"concepts": "0.0.8",
 		"ikod-containers": "0.0.22",
-		"mir-core": "1.1.109",
 		"test_allocator": "0.3.3",
 		"unit-threaded": "2.0.5"
 	}

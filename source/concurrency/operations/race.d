@@ -10,14 +10,14 @@ import std.traits;
 
 /// Runs both Senders and propagates the value of whoever completes first
 /// if both error out the first exception is propagated,
-/// uses mir.algebraic if the Sender value types differ
+/// uses std.sumtype.SumType if the Sender value types differ
 RaceSender!(Senders) race(Senders...)(Senders senders) {
 	return RaceSender!(Senders)(senders, false);
 }
 
 private template Result(Senders...) if (Senders.length > 1) {
 	import concurrency.utils : NoVoid;
-	import mir.algebraic : Algebraic, Nullable;
+	import std.sumtype : SumType;
 	import std.meta : staticMap, Filter, NoDuplicates;
 	alias getValue(Sender) = Sender.Value;
 	alias SenderValues = staticMap!(getValue, Senders);
@@ -29,11 +29,11 @@ private template Result(Senders...) if (Senders.length > 1) {
 		alias Result = void;
 	else static if (ValueTypes.length == 1)
 		static if (HasVoid)
-			alias Result = Nullable!(ValueTypes[0]);
+			alias Result = SumType!(typeof(null), ValueTypes[0]);
 		else
 			alias Result = ValueTypes[0];
 	else {
-		alias Result = Algebraic!(ValueTypes);
+		alias Result = SumType!(ValueTypes);
 	}
 }
 

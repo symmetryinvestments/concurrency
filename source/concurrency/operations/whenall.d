@@ -31,7 +31,6 @@ template GetSenderValues(Senders...) {
 private template WhenAllResult(Senders...) if (Senders.length > 1) {
 	import std.meta;
 	import std.typecons;
-	import mir.algebraic : Algebraic, Nullable;
 	import concurrency.utils : NoVoid;
 	template Cummulative(size_t count, Ts...) {
 		static if (Ts.length > 0) {
@@ -57,7 +56,7 @@ private template WhenAllResult(Senders...) if (Senders.length > 1) {
 	static if (ValueTypes.length > 0) {
 		struct WhenAllResult {
 			Values values;
-			void setValue(T)(T t, size_t index) {
+			void setValue(T)(T t, size_t index) @trusted {
 				switch (index) {
 					foreach (idx, I; Indexes) {
 						case idx:

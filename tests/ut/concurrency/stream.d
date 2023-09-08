@@ -6,6 +6,7 @@ import unit_threaded;
 import concurrency.stoptoken;
 import core.atomic;
 import concurrency.thread : ThreadSender;
+import std.typecons : nullable;
 
 // TODO: it would be good if we can get the Sender .collect returns to be scoped if the delegates are.
 
@@ -30,13 +31,13 @@ unittest {
 	                 .withScheduler(worker.getScheduler);
 
 	auto driver = justFrom(() shared {
-		worker.timeUntilNextEvent().should == 5.msecs;
+		worker.timeUntilNextEvent().should == 5.msecs.nullable;
 		worker.advance(5.msecs);
 
-		worker.timeUntilNextEvent().should == 5.msecs;
+		worker.timeUntilNextEvent().should == 5.msecs.nullable;
 		worker.advance(5.msecs);
 
-		worker.timeUntilNextEvent().should == null;
+		worker.timeUntilNextEvent().isNull.should == true;
 	});
 
 	whenAll(interval, driver).syncWait().assumeOk;
@@ -245,31 +246,31 @@ unittest {
 	auto driver = justFrom(() shared {
 		worker.advance(7.msecs);
 		p.atomicLoad.should == 0;
-		worker.timeUntilNextEvent().should == 3.msecs;
+		worker.timeUntilNextEvent().should == 3.msecs.nullable;
 
 		worker.advance(3.msecs);
 		p.atomicLoad.should == 1;
-		worker.timeUntilNextEvent().should == 4.msecs;
+		worker.timeUntilNextEvent().should == 4.msecs.nullable;
 
 		worker.advance(4.msecs);
 		p.atomicLoad.should == 1;
-		worker.timeUntilNextEvent().should == 6.msecs;
+		worker.timeUntilNextEvent().should == 6.msecs.nullable;
 
 		worker.advance(6.msecs);
 		p.atomicLoad.should == 3;
-		worker.timeUntilNextEvent().should == 1.msecs;
+		worker.timeUntilNextEvent().should == 1.msecs.nullable;
 
 		worker.advance(1.msecs);
 		p.atomicLoad.should == 3;
-		worker.timeUntilNextEvent().should == 7.msecs;
+		worker.timeUntilNextEvent().should == 7.msecs.nullable;
 
 		worker.advance(7.msecs);
 		p.atomicLoad.should == 3;
-		worker.timeUntilNextEvent().should == 2.msecs;
+		worker.timeUntilNextEvent().should == 2.msecs.nullable;
 
 		worker.advance(2.msecs);
 		p.atomicLoad.should == 7;
-		worker.timeUntilNextEvent().should == null;
+		worker.timeUntilNextEvent().isNull.should == true;
 	});
 
 	whenAll(sampler, driver).syncWait().assumeOk;
@@ -297,39 +298,39 @@ unittest {
 	auto driver = justFrom(() shared {
 		worker.advance(3.msecs);
 		p.atomicLoad.should == 0;
-		worker.timeUntilNextEvent().should == 3.msecs;
+		worker.timeUntilNextEvent().should == 3.msecs.nullable;
 
 		worker.advance(3.msecs);
 		p.atomicLoad.should == 0;
-		worker.timeUntilNextEvent().should == 1.msecs;
+		worker.timeUntilNextEvent().should == 1.msecs.nullable;
 
 		worker.advance(1.msecs);
 		p.atomicLoad.should == 0;
-		worker.timeUntilNextEvent().should == 2.msecs;
+		worker.timeUntilNextEvent().should == 2.msecs.nullable;
 
 		worker.advance(2.msecs);
 		p.atomicLoad.should == 1;
-		worker.timeUntilNextEvent().should == 3.msecs;
+		worker.timeUntilNextEvent().should == 3.msecs.nullable;
 
 		worker.advance(3.msecs);
 		p.atomicLoad.should == 1;
-		worker.timeUntilNextEvent().should == 2.msecs;
+		worker.timeUntilNextEvent().should == 2.msecs.nullable;
 
 		worker.advance(2.msecs);
 		p.atomicLoad.should == 1;
-		worker.timeUntilNextEvent().should == 1.msecs;
+		worker.timeUntilNextEvent().should == 1.msecs.nullable;
 
 		worker.advance(1.msecs);
 		p.atomicLoad.should == 3;
-		worker.timeUntilNextEvent().should == 3.msecs;
+		worker.timeUntilNextEvent().should == 3.msecs.nullable;
 
 		worker.advance(3.msecs);
 		p.atomicLoad.should == 3;
-		worker.timeUntilNextEvent().should == 3.msecs;
+		worker.timeUntilNextEvent().should == 3.msecs.nullable;
 
 		worker.advance(3.msecs);
 		p.atomicLoad.should == 6;
-		worker.timeUntilNextEvent().should == null;
+		worker.timeUntilNextEvent().isNull.should == true;
 	});
 
 	whenAll(sampler, driver).syncWait().assumeOk;
@@ -375,14 +376,14 @@ unittest {
 
 	auto driver = justFrom(() shared {
 		p.atomicLoad.should == 0;
-		worker.timeUntilNextEvent().should == 1.msecs;
+		worker.timeUntilNextEvent().should == 1.msecs.nullable;
 
 		foreach (expected; [0, 0, 3, 3, 3, 9, 9, 9, 18, 18, 18, 30]) {
 			worker.advance(1.msecs);
 			p.atomicLoad.should == expected;
 		}
 
-		worker.timeUntilNextEvent().should == null;
+		worker.timeUntilNextEvent().isNull.should == true;
 	});
 
 	whenAll(throttled, driver).syncWait().assumeOk;
@@ -466,7 +467,7 @@ unittest {
 		worker.advance(1.msecs);
 		p.atomicLoad.should == 5;
 
-		worker.timeUntilNextEvent().should == null;
+		worker.timeUntilNextEvent().isNull.should == true;
 	});
 	whenAll(throttled, driver).syncWait().assumeOk;
 
@@ -491,31 +492,31 @@ unittest {
 	auto driver = justFrom(() shared {
 		source.emit(1);
 		p.atomicLoad.should == 0;
-		worker.timeUntilNextEvent().should == 3.msecs;
+		worker.timeUntilNextEvent().should == 3.msecs.nullable;
 
 		worker.advance(3.msecs);
 		p.atomicLoad.should == 1;
 
 		source.emit(2);
 		p.atomicLoad.should == 1;
-		worker.timeUntilNextEvent().should == 3.msecs;
+		worker.timeUntilNextEvent().should == 3.msecs.nullable;
 
 		source.emit(3);
 		p.atomicLoad.should == 1;
-		worker.timeUntilNextEvent().should == 3.msecs;
+		worker.timeUntilNextEvent().should == 3.msecs.nullable;
 
 		worker.advance(1.msecs);
 		p.atomicLoad.should == 1;
-		worker.timeUntilNextEvent().should == 2.msecs;
+		worker.timeUntilNextEvent().should == 2.msecs.nullable;
 
 		source.emit(4);
 		p.atomicLoad.should == 1;
-		worker.timeUntilNextEvent().should == 3.msecs;
+		worker.timeUntilNextEvent().should == 3.msecs.nullable;
 
 		worker.advance(3.msecs);
 		p.atomicLoad.should == 5;
 
-		worker.timeUntilNextEvent().should == null;
+		worker.timeUntilNextEvent().isNull.should == true;
 	});
 	whenAll(throttled, driver).syncWait().assumeOk;
 
@@ -691,11 +692,11 @@ unittest {
 
 	auto driver = justFrom(() shared {
 		p.atomicLoad.should == 0;
-		worker.timeUntilNextEvent().should == 5.msecs;
+		worker.timeUntilNextEvent().should == 5.msecs.nullable;
 
 		worker.advance(5.msecs);
 		p.atomicLoad.should == 1;
-		worker.timeUntilNextEvent().should == 1.msecs;
+		worker.timeUntilNextEvent().should == 1.msecs.nullable;
 
 		worker.advance(1.msecs);
 		p.atomicLoad.should == 2;
@@ -724,7 +725,7 @@ unittest {
 		worker.advance(1.msecs);
 		p.atomicLoad.should == 10;
 
-		worker.timeUntilNextEvent().should == null;
+		worker.timeUntilNextEvent().isNull.should == true;
 	});
 	whenAll(sender, driver).syncWait().assumeOk;
 
@@ -753,11 +754,11 @@ unittest {
 
 	auto driver = justFrom(() shared {
 		p.atomicLoad.should == 0;
-		worker.timeUntilNextEvent().should == 5.msecs;
+		worker.timeUntilNextEvent().should == 5.msecs.nullable;
 
 		worker.advance(5.msecs);
 		p.atomicLoad.should == 0;
-		worker.timeUntilNextEvent().should == 1.msecs;
+		worker.timeUntilNextEvent().should == 1.msecs.nullable;
 
 		worker.advance(1.msecs);
 		p.atomicLoad.should == 0;
@@ -804,7 +805,7 @@ unittest {
 		worker.advance(2.msecs);
 		p.atomicLoad.should == 12;
 
-		worker.timeUntilNextEvent().should == null;
+		worker.timeUntilNextEvent().isNull.should == true;
 	});
 	whenAll(sender, driver).syncWait().assumeOk;
 

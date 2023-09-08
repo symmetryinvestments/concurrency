@@ -7,6 +7,7 @@ import concurrency.operations;
 import concurrency.receiver;
 import unit_threaded;
 import core.atomic : atomicOp;
+import std.typecons : nullable;
 
 @("syncWait.value") @safe
 unittest {
@@ -24,13 +25,13 @@ unittest {
 
 @("syncWait.match") @safe
 unittest {
-	ValueSender!(int)(5).syncWait.match!((int i) => true, "false").should
+	ValueSender!(int)(5).syncWait.match!((int i) => true, x => false).should
 		== true;
 }
 
 @("syncWait.match.void") @safe
 unittest {
-	VoidSender().syncWait.match!((typeof(null)) => true, "false").should
+	VoidSender().syncWait.match!((Completed c) => true, x => false).should
 		== true;
 }
 
@@ -310,7 +311,7 @@ unittest {
 		.withScheduler(worker.getScheduler);
 
 	auto driver = just(worker).then((shared ManualTimeWorker worker) {
-		worker.timeUntilNextEvent().should == 1.msecs;
+		worker.timeUntilNextEvent().should == 1.msecs.nullable;
 		worker.advance(1.msecs);
 	});
 

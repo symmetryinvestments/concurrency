@@ -4,7 +4,7 @@ import concurrency.stoptoken;
 import concurrency.sender;
 import concurrency.thread;
 import concepts;
-import mir.algebraic : reflectErr, Variant, Algebraic, assumeOk;
+import std.sumtype;
 
 bool isMainThread() @trusted {
 	import core.thread : Thread;
@@ -43,7 +43,7 @@ package struct SyncWaitReceiver2(Value) {
 		}
 
 	else
-		void setValue(Value value) nothrow @safe {
+		void setValue(Value value) nothrow @trusted {
 			state.result = value;
 			state.worker.stop();
 		}
@@ -58,46 +58,60 @@ package struct SyncWaitReceiver2(Value) {
 	}
 }
 
-@reflectErr
-enum Cancelled {
-	cancelled
+struct Cancelled {
+}
+
+template isA(T) {
+	bool isA(S)(ref S s) if (isSumType!S) {
+		return std.sumtype.match!((ref T t) => true, x => false)(s);
+	}
+}
+
+struct Completed {
 }
 
 struct Result(T) {
-	alias V = Variant!(Cancelled, Exception, T);
+	static if (is(T == void)) {
+		alias Value = Completed;
+	} else {
+		alias Value = T;
+	}
+
+	alias V = SumType!(Cancelled, Exception, Value);
+	
 	V result;
 	this(P)(P p) {
 		result = p;
 	}
 
 	bool isCancelled() {
-		return result._is!Cancelled;
+		return result.isA!Cancelled;
 	}
 
 	bool isError() {
-		return result._is!Exception;
+		return result.isA!Exception;
 	}
 
 	bool isOk() {
-		return result.isOk;
+		return result.isA!Value;
 	}
 
 	auto value() {
-		static if (!is(T == void))
-			alias valueHandler = (T v) => v;
+		static if (is(T == void))
+			alias valueHandler = (Completed c) {};
 		else
-			alias valueHandler = () {};
+			alias valueHandler = (T t) => t;
 
-		import mir.algebraic : match;
-		return result.match!(valueHandler, function T(Cancelled c) {
+		return std.sumtype.match!(valueHandler, function T(Cancelled C) {
 			throw new Exception("Cancelled");
-		}, function T(Exception e) {
+		},
+		function T(Exception e) {
 			throw e;
-		});
+		})(result);
 	}
 
 	auto get(T)() {
-		return result.get!T;
+		return std.sumtype.match!((T t) => t, function T(x) { throw new Exception("Unexpected value"); })(result);
 	}
 
 	auto assumeOk() {
@@ -109,8 +123,7 @@ struct Result(T) {
 template match(Handlers...) {
 	// has to be separate because of dual-context limitation
 	auto match(T)(Result!T r) {
-		import mir.algebraic : match, optionalMatch;
-		return r.result.optionalMatch!(r => r).match!(Handlers);
+		return std.sumtype.match!(Handlers)(r.result);
 	}
 }
 
@@ -148,7 +161,6 @@ auto syncWait(Sender)(auto scope ref Sender sender) {
 private
 Result!(Sender.Value) syncWaitImpl(Sender)(auto scope ref Sender sender,
                                            StopSource stopSource) @safe {
-	import mir.algebraic : Algebraic, Nullable;
 	static assert(models!(Sender, isSender));
 	import concurrency.signal;
 	import core.stdc.signal : SIGTERM, SIGINT;
@@ -179,7 +191,7 @@ Result!(Sender.Value) syncWaitImpl(Sender)(auto scope ref Sender sender,
 	}
 
 	static if (is(Value == void))
-		return Result!Value();
+		return Result!Value(Completed());
 	else
 		return Result!Value(state.result);
 }

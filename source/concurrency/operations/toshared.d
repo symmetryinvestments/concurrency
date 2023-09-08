@@ -6,7 +6,6 @@ import concurrency.stoptoken;
 import concurrency.scheduler : NullScheduler;
 import concepts;
 import std.traits;
-import mir.algebraic : Algebraic, Nullable, match;
 
 /// Wraps a Sender in a SharedSender. A SharedSender allows many receivers to connect to the same underlying Sender, forwarding the same termination call to each receiver.
 /// The underlying Sender is connected and started only once. It can be explicitely `reset` so that it connects and starts the underlying Sender the next time it started. Calling `reset` when the underlying Sender hasn't completed is a no-op.
@@ -31,6 +30,7 @@ enum ResetLogic {
 class SharedSender(Sender, Scheduler, ResetLogic resetLogic)
 		if (models!(Sender, isSender)) {
 	import std.traits : ReturnType;
+	import std.sumtype : match;
 	static assert(models!(typeof(this), isSender));
 	alias Props = Properties!(Sender);
 	alias Value = Props.Value;
@@ -42,7 +42,7 @@ class SharedSender(Sender, Scheduler, ResetLogic resetLogic)
 		void add(Props.DG dg) @safe nothrow {
 			with (state.counter.lock(0, Flags.tick)) {
 				if (was(Flags.completed)) {
-					InternalValue value = state.inst.value.get;
+					InternalValue value = state.inst.value.match!((InternalValue v) => v, (typeof(null)) => assert(0, "not happening"));
 					release(Flags.tick); // release early
 					dg(value);
 				} else {
@@ -130,12 +130,13 @@ private struct Done {}
 private struct ValueRep {}
 
 private template Properties(Sender) {
+	import std.sumtype;
 	alias Value = Sender.Value;
 	static if (!is(Value == void))
 		alias ValueRep = Value;
 	else
 		alias ValueRep = .ValueRep;
-	alias InternalValue = Algebraic!(Throwable, ValueRep, Done);
+	alias InternalValue = SumType!(Throwable, ValueRep, Done);
 	alias DG = void delegate(InternalValue) nothrow @safe shared;
 }
 
@@ -167,6 +168,7 @@ struct SharedSenderOp(Sender, Scheduler, ResetLogic resetLogic, Receiver) {
 	}
 
 	void onValue(Props.InternalValue value) nothrow @safe shared {
+		import std.sumtype : match;
 		with (unshared) {
 			value.match!((Props.ValueRep v) {
 				try {
@@ -249,11 +251,12 @@ private template process(ResetLogic resetLogic) {
 		}
 
 		with (state.counter.lock(updateFlag)) {
+			import std.sumtype : match;
 			auto localState = state.inst;
-			InternalValue v = localState.value.get;
+			InternalValue v = localState.value.match!((typeof(null)) => assert(0, "not happening"), v => v);
 			release(oldState & (~0x3)); // release early and remove all ticks
 			if (localState.isStopRequested)
-				v = Done();
+				(() @trusted => v = Done())();
 			foreach (dg; localState.dgs[])
 				dg(v);
 		}
@@ -263,9 +266,10 @@ private template process(ResetLogic resetLogic) {
 private class SharedSenderInstState(Sender) : StopSource {
 	import concurrency.slist;
 	import std.traits : ReturnType;
+	import std.sumtype;
 	alias Props = Properties!(Sender);
 	shared SList!(Props.DG) dgs;
-	Nullable!(Props.InternalValue) value;
+	SumType!(typeof(null), Props.InternalValue) value;
 	this() {
 		this.dgs = new shared SList!(Props.DG);
 	}

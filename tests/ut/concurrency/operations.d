@@ -73,7 +73,8 @@ unittest {
 
 @("race.exception.single") @safe
 unittest {
-	race(ThrowingSender(), ValueSender!int(5)).syncWait.value.should == 5;
+	import std.sumtype : tryMatch;
+	race(ThrowingSender(), ValueSender!int(5)).syncWait.value.tryMatch!((int i) => i.should == 5);
 	race(ThrowingSender(), ThrowingSender()).syncWait.assumeOk.shouldThrow();
 }
 
@@ -96,7 +97,8 @@ unittest {
 			Thread.yield();
 		}
 	});
-	race(waiting, ValueSender!int(88)).syncWait.value.get.should == 88;
+	import std.sumtype : tryMatch;
+	race(waiting, ValueSender!int(88)).syncWait.value.tryMatch!((int i) => i.should == 88);
 }
 
 @("race.cancel") @safe
@@ -331,13 +333,13 @@ unittest {
 	}).retryWhen(Wait()).withScheduler(worker.getScheduler);
 
 	auto driver = just(worker).then((shared ManualTimeWorker worker) {
-		worker.timeUntilNextEvent().should == 3.msecs;
+		worker.timeUntilNextEvent().should == 3.msecs.nullable;
 		worker.advance(3.msecs);
-		worker.timeUntilNextEvent().should == 3.msecs;
+		worker.timeUntilNextEvent().should == 3.msecs.nullable;
 		worker.advance(3.msecs);
-		worker.timeUntilNextEvent().should == 3.msecs;
+		worker.timeUntilNextEvent().should == 3.msecs.nullable;
 		worker.advance(3.msecs);
-		worker.timeUntilNextEvent().should == null;
+		worker.timeUntilNextEvent().isNull.should == true;
 	});
 
 	whenAll(sender, driver).syncWait.value.should == 3;
@@ -401,8 +403,9 @@ unittest {
 			Thread.yield();
 		}
 	});
+	import std.sumtype : tryMatch;
 	raceAll(waiting, DoneSender()).syncWait.isCancelled.should == true;
-	raceAll(waiting, just(42)).syncWait.value.should == 42;
+	raceAll(waiting, just(42)).syncWait.value.tryMatch!(i => i.should == 42);
 	raceAll(waiting, ThrowingSender()).syncWait.isError.should == true;
 }
 
@@ -412,11 +415,11 @@ unittest {
 
 	auto worker = new shared ManualTimeWorker();
 	auto driver = just(worker).then((shared ManualTimeWorker worker) shared {
-		worker.timeUntilNextEvent().should == 10.msecs;
+		worker.timeUntilNextEvent().should == 10.msecs.nullable;
 		worker.advance(5.msecs);
-		worker.timeUntilNextEvent().should == 5.msecs;
+		worker.timeUntilNextEvent().should == 5.msecs.nullable;
 		worker.advance(5.msecs);
-		worker.timeUntilNextEvent().should == null;
+		worker.timeUntilNextEvent().isNull.should == true;
 	});
 	auto timer = DelaySender(10.msecs).withScheduler(worker.getScheduler);
 
@@ -430,9 +433,9 @@ unittest {
 	auto worker = new shared ManualTimeWorker();
 	auto source = new StopSource();
 	auto driver = just(source).then((StopSource source) shared {
-		worker.timeUntilNextEvent().should == 10.msecs;
+		worker.timeUntilNextEvent().should == 10.msecs.nullable;
 		source.stop();
-		worker.timeUntilNextEvent().should == null;
+		worker.timeUntilNextEvent().isNull.should == true;
 	});
 	auto timer = DelaySender(10.msecs).withScheduler(worker.getScheduler);
 
@@ -795,11 +798,11 @@ unittest {
 	                          .repeat();
 
 	auto driver = just(worker).then((shared ManualTimeWorker worker) {
-		worker.timeUntilNextEvent().should == 1.msecs;
+		worker.timeUntilNextEvent().should == 1.msecs.nullable;
 		worker.advance(1.msecs);
-		worker.timeUntilNextEvent().should == 1.msecs;
+		worker.timeUntilNextEvent().should == 1.msecs.nullable;
 		worker.advance(1.msecs);
-		worker.timeUntilNextEvent().should == 1.msecs;
+		worker.timeUntilNextEvent().should == 1.msecs.nullable;
 	});
 
 	race(base, driver).withScheduler(worker.getScheduler).syncWait().assumeOk;
