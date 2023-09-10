@@ -378,7 +378,6 @@ struct ThreadSender {
 		void run() @trusted {
 			import concurrency.receiver : setValueOrError;
 			import concurrency.error : clone;
-
 			try {
 				receiver.setValue();
 			} catch (Exception e) {

@@ -377,6 +377,13 @@ unittest {
 	oob.withStopSource(new StopSource()).syncWait.value.should == 45;
 }
 
+@("withStopSource.oob") @safe
+unittest {
+	auto oob = OutOfBandValueSender!int(45);
+	InPlaceStopSource stopSource;
+	oob.withStopSource(stopSource).syncWait.value.should == 45;
+}
+
 @("withStopSource.tuple") @safe
 unittest {
 	just(14, 53).withStopToken((StopToken s, Tuple!(int, int) t) => t[0] * t[1])

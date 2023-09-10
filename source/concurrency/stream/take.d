@@ -3,7 +3,7 @@ module concurrency.stream.take;
 import concurrency.stream.stream;
 import concurrency.sender : OpType;
 import concurrency.receiver : ForwardExtensionPoints;
-import concurrency.stoptoken : StopSource;
+import concurrency.stoptoken : InPlaceStopSource;
 import concepts;
 
 /// takes the first n values from a stream or until cancelled
@@ -17,7 +17,7 @@ auto take(Stream)(Stream stream, size_t n) if (models!(Stream, isStream)) {
 
 struct TakeReceiver(Receiver, Value) {
 	Receiver receiver;
-	StopSource stopSource;
+	InPlaceStopSource* stopSource;
 	static if (is(Value == void))
 		void setValue() @safe {
 			receiver.setValue();
@@ -49,14 +49,14 @@ struct TakeReceiver(Receiver, Value) {
 template TakeOp(Stream) {
 	alias Properties = StreamProperties!Stream;
 	struct TakeOp(Receiver) {
-		import concurrency.operations : withStopSource;
+		import concurrency.operations : withStopSource, SSSender;
 		import std.traits : ReturnType;
-		alias SS = ReturnType!(withStopSource!(Properties.Sender));
+		alias SS = SSSender!(Properties.Sender, InPlaceStopSource*);
 		alias Op =
 			OpType!(SS, TakeReceiver!(Receiver, Properties.Sender.Value));
 		size_t n;
 		Properties.DG dg;
-		StopSource stopSource;
+		InPlaceStopSource stopSource;
 		Op op;
 		@disable
 		this(ref return scope typeof(this) rhs);
@@ -64,14 +64,13 @@ template TakeOp(Stream) {
 		this(this);
 		this(return Stream stream, size_t n, Properties.DG dg,
 		     return Receiver receiver) @trusted scope {
-			stopSource = new StopSource();
 			this.dg = dg;
 			this.n = n;
 			op = stream.collect(cast(Properties.DG) &item)
 			           .withStopSource(stopSource).connect(TakeReceiver!(
 				           Receiver,
 				           Properties.Sender.Value
-			           )(receiver, stopSource));
+			           )(receiver, &stopSource));
 		}
 
 		static if (is(Properties.ElementType == void)) {
