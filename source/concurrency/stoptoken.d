@@ -3,14 +3,15 @@ module concurrency.stoptoken;
 // originally this code is from https://github.com/josuttis/jthread by Nicolai Josuttis
 // it is licensed under the Creative Commons Attribution 4.0 Internation License http://creativecommons.org/licenses/by/4.0
 
-class StopSource {
+struct InPlaceStopSource {
+	@disable this(ref return scope typeof(this) rhs);
 	private stop_state state;
 	bool stop() nothrow @safe {
 		return state.request_stop();
 	}
 
 	bool stop() nothrow @trusted shared {
-		return (cast(StopSource) this).state.request_stop();
+		return (cast(InPlaceStopSource) this).state.request_stop();
 	}
 
 	bool isStopRequested() nothrow @safe @nogc {
@@ -18,7 +19,7 @@ class StopSource {
 	}
 
 	bool isStopRequested() nothrow @trusted @nogc shared {
-		return (cast(StopSource) this).isStopRequested();
+		return (cast(InPlaceStopSource) this).isStopRequested();
 	}
 
 	/// resets the internal state, only do this if you are sure nothing else is looking at this...
@@ -27,20 +28,62 @@ class StopSource {
 	}
 }
 
-struct StopToken {
-	package(concurrency) StopSource source;
-	this(StopSource source) nothrow @safe @nogc {
-		this.source = source;
-		isStopPossible = source !is null;
+class StopSource {
+	private InPlaceStopSource source;
+
+	bool stop() nothrow @safe {
+		return source.stop();
 	}
 
-	this(shared StopSource source) nothrow @trusted @nogc {
-		this.source = cast() source;
-		isStopPossible = source !is null;
+	bool stop() nothrow @trusted shared {
+		return source.stop();
 	}
 
 	bool isStopRequested() nothrow @safe @nogc {
-		return isStopPossible && source.isStopRequested();
+		return source.isStopRequested;
+	}
+
+	bool isStopRequested() nothrow @trusted @nogc shared {
+		return source.isStopRequested;
+	}
+
+	/// resets the internal state, only do this if you are sure nothing else is looking at this...
+	void reset(this t)() @system @nogc {
+		return source.reset();
+	}
+}
+
+struct StopToken {
+	package(concurrency) stop_state* state;
+	this(StopSource source) nothrow @safe @nogc {
+		if (source !is null) {
+			this.state = &source.source.state;
+			isStopPossible = true;
+		}
+	}
+
+	this(shared StopSource source) nothrow @trusted @nogc {
+		this(cast()source);
+	}
+
+	this(ref stop_state state) nothrow @trusted @nogc {
+		isStopPossible = true;
+		this.state = &state;
+	}
+
+	this (ref InPlaceStopSource stopSource) nothrow @trusted @nogc {
+		this(stopSource.state);
+	}
+
+	this (InPlaceStopSource* stopSource) nothrow @trusted @nogc {
+		if (stopSource !is null) {
+			isStopPossible = true;
+			this.state = &stopSource.state;
+		}
+	}
+
+	bool isStopRequested() nothrow @safe @nogc {
+		return isStopPossible && state.is_stop_requested();
 	}
 
 	const bool isStopPossible;
@@ -71,7 +114,7 @@ StopCallback onStop(StopToken)(
 	void delegate() nothrow @safe shared callback
 ) nothrow @safe {
 	if (stopToken.isStopPossible) {
-		return stopToken.source.onStop(callback);
+		return (*stopToken.state).onStop(new StopCallback(callback));
 	}
 
 	return new StopCallback(callback);
@@ -89,15 +132,18 @@ StopCallback onStop(StopToken)(
 StopCallback onStop(StopToken)(StopToken stopToken,
                                StopCallback cb) nothrow @safe {
 	if (stopToken.isStopPossible) {
-		return stopToken.source.onStop(cb);
+		return stopToken.state.onStop(cb);
 	}
-
 	return cb;
 }
 
 StopCallback onStop(StopSource stopSource, StopCallback cb) nothrow @safe {
-	if (stopSource.state.try_add_callback(cb, true))
-		cb.source = stopSource;
+	return onStop(stopSource.source.state, cb);
+}
+
+StopCallback onStop(ref stop_state state, StopCallback cb) nothrow @trusted { // TODO: @safe
+	if (state.try_add_callback(cb, true))
+		cb.state = &state;
 	return cb;
 }
 
@@ -105,22 +151,22 @@ class StopCallback {
 	void dispose() nothrow @trusted @nogc {
 		import core.atomic : cas;
 
-		if (source is null)
+		if (state is null)
 			return;
-		auto local = source;
-		static if (__traits(compiles, cas(&source, local, null))) {
-			if (!cas(&source, local, null)) {
-				assert(source is null);
+		auto local = state;
+		static if (__traits(compiles, cas(&state, local, null))) {
+			if (!cas(&state, local, null)) {
+				assert(state is null);
 				return;
 			}
 		} else {
-			if (!cas(cast(shared) &source, cast(shared) local, null)) {
-				assert(source is null);
+			if (!cas(cast(shared) &state, cast(shared) local, null)) {
+				assert(state is null);
 				return;
 			}
 		}
 
-		local.state.remove_callback(this);
+		local.remove_callback(this);
 	}
 
 	void dispose() shared nothrow @trusted @nogc {
@@ -134,7 +180,7 @@ class StopCallback {
 private:
 
 	void delegate() nothrow shared @safe callback;
-	StopSource source;
+	stop_state* state;
 
 	StopCallback next_ = null;
 	StopCallback* prev_ = null;
@@ -144,17 +190,6 @@ private:
 	void execute() nothrow @safe {
 		callback();
 	}
-}
-
-deprecated("Use regular StopToken") alias StopTokenObject = StopToken;
-
-auto stopTokenObject(StopToken stopToken) {
-	return stopToken;
-}
-
-auto stopTokenObject(NeverStopToken stopToken) {
-	StopSource s = null;
-	return StopToken(s);
 }
 
 private void spin_yield() nothrow @trusted @nogc {

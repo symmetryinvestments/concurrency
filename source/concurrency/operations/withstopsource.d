@@ -9,18 +9,22 @@ import std.traits;
 
 template withStopSource(Sender) {
 	auto withStopSource(Sender sender, StopSource stopSource) {
-		return SSSender!(Sender)(sender, stopSource);
+		return SSSender!(Sender, StopSource)(sender, stopSource);
 	}
 
 	auto withStopSource(Sender sender, shared StopSource stopSource) @trusted {
-		return SSSender!(Sender)(sender, cast() stopSource);
+		return SSSender!(Sender, StopSource)(sender, cast() stopSource);
+	}
+
+	auto withStopSource(Sender sender, ref InPlaceStopSource stopSource) @trusted {
+		return SSSender!(Sender, InPlaceStopSource*)(sender, &stopSource);
 	}
 }
 
-private struct SSReceiver(Receiver, Value) {
+private struct SSReceiver(Receiver, Value, OuterStopSource) {
 	private {
 		Receiver receiver;
-		StopSource stopSource;
+		OuterStopSource stopSource;
 		StopSource combinedSource;
 		StopCallback[2] cbs;
 	}
@@ -82,13 +86,13 @@ private struct SSReceiver(Receiver, Value) {
 	}
 }
 
-struct SSSender(Sender) if (models!(Sender, isSender)) {
+struct SSSender(Sender, StopSource) if (models!(Sender, isSender)) {
 	static assert(models!(typeof(this), isSender));
 	alias Value = Sender.Value;
 	Sender sender;
 	StopSource stopSource;
 	auto connect(Receiver)(return Receiver receiver) @safe return scope {
-		alias R = SSReceiver!(Receiver, Sender.Value);
+		alias R = SSReceiver!(Receiver, Sender.Value, StopSource);
 		// ensure NRVO
 		auto op = sender.connect(R(receiver, stopSource));
 		return op;
