@@ -25,7 +25,6 @@ import core.thread;
 import core.memory;
 
 import ikod.containers.hashmap;
-import automem;
 import std.typecons : Nullable, nullable;
 
 version(twtesting) {
@@ -547,31 +546,6 @@ struct TimingWheels(T) {
 
 	auto totalTimers() pure @safe @nogc {
 		return ptrs.length();
-	}
-
-	auto allTimers() @safe @nogc {
-		struct AllTimers {
-			HashMap!(TimerIdType, T) _map;
-			auto timers() {
-				return _map.byValue;
-			}
-
-			auto length() {
-				return _map.length();
-			}
-
-			bool contains(TimerIdType id) {
-				return _map.contains(id);
-			}
-		}
-
-		alias AllResult = automem.RefCounted!(AllTimers, Mallocator);
-		AllTimers result;
-		foreach (p; ptrs.byPair) {
-			result._map[p.key] = p.value.timer;
-		}
-
-		return result;
 	}
 
 	//
