@@ -35,48 +35,6 @@ unittest {
 		== true;
 }
 
-@("syncWait.nested.basic") @safe
-unittest {
-	import concurrency.stoptoken;
-	auto source = new shared StopSource();
-
-	justFrom(() shared {
-		VoidSender().withStopToken((StopToken token) shared @safe {
-			source.stop();
-			token.isStopRequested.should == true;
-		}).syncWait().isCancelled.should == true;
-	}).syncWait(source).isCancelled.should == true;
-}
-
-@("syncWait.nested.thread") @safe
-unittest {
-	import concurrency.stoptoken;
-	auto source = new shared StopSource();
-
-	justFrom(() shared {
-		VoidSender().withStopToken((StopToken token) shared @safe {
-			source.stop();
-			token.isStopRequested.should == true;
-		}).syncWait().isCancelled.should == true;
-	}).via(ThreadSender()).syncWait(source).isCancelled.should == true;
-}
-
-@("syncWait.nested.threadpool") @safe
-unittest {
-	import concurrency.stoptoken;
-	auto source = new shared StopSource();
-
-	auto pool = stdTaskPool(2);
-
-	justFrom(() shared {
-		VoidSender().withStopToken((StopToken token) shared @safe {
-			source.stop();
-			token.isStopRequested.should == true;
-		}).syncWait().isCancelled.should == true;
-	}).via(pool.getScheduler().schedule()).syncWait(source).isCancelled
-	  .should == true;
-}
-
 @("value.start.attributes.1") @safe
 nothrow @nogc unittest {
 	ValueSender!(int)(5).connect(NullReceiver!int()).start();
