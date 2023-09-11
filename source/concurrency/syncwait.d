@@ -127,14 +127,6 @@ template match(Handlers...) {
 	}
 }
 
-void setTopLevelStopSource(shared StopSource stopSource) @trusted {
-	import std.exception : enforce;
-	enforce(parentStopSource is null);
-	parentStopSource = cast() stopSource;
-}
-
-package(concurrency) static StopSource parentStopSource;
-
 /// Start the Sender and waits until it completes, cancels, or has an error.
 auto syncWait(Sender, StopSource)(auto ref Sender sender,
                                   StopSource stopSource) {
@@ -144,10 +136,7 @@ auto syncWait(Sender, StopSource)(auto ref Sender sender,
 auto syncWait(Sender)(auto scope ref Sender sender) {
 	import concurrency.signal : globalStopSource;
 	auto childStopSource = new shared StopSource();
-	StopToken parentStopToken = parentStopSource
-		? StopToken(parentStopSource)
-		: StopToken(globalStopSource);
-
+	StopToken parentStopToken = StopToken(globalStopSource);
 	StopCallback cb = parentStopToken.onStop(() shared {
 		childStopSource.stop();
 	});
@@ -168,18 +157,12 @@ Result!(Sender.Value) syncWaitImpl(Sender)(auto scope ref Sender sender,
 	alias Value = Sender.Value;
 	alias Receiver = SyncWaitReceiver2!(Value);
 
-	/// TODO: not fiber safe
-	auto old = parentStopSource;
-	parentStopSource = stopSource;
-
 	auto state = Receiver.State(stopSource);
 	scope receiver = (() @trusted => Receiver(&state))();
 	auto op = sender.connect(receiver);
 	op.start();
 
 	state.worker.start();
-
-	parentStopSource = old;
 
 	if (state.canceled)
 		return Result!Value(Cancelled());
