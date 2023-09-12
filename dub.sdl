@@ -4,7 +4,7 @@ authors "skoppe"
 copyright "Copyright © 2021, skoppe"
 license "MIT"
 dependency "concepts" version="~>0.0.8"
-dependency "ikod-containers" version=">=0.0.22"
+dependency "automem" version="*"
 lflags "--export-dynamic-symbol=concurrency_getLocalThreadExecutor" "--export-dynamic-symbol=concurrency_globalStopSourcePointer" platform="posix"
 
 configuration "default" {

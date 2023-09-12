@@ -24,7 +24,7 @@ import std.experimental.allocator.mallocator : Mallocator;
 import core.thread;
 import core.memory;
 
-import ikod.containers.hashmap;
+import concurrency.data.hashmap.simple;
 import std.typecons : Nullable, nullable;
 
 private class Timer {

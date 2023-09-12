@@ -3,8 +3,7 @@
 	"versions": {
 		"automem": "0.6.4",
 		"concepts": "0.0.8",
-		"ikod-containers": "0.0.22",
-		"test_allocator": "0.3.3",
+		"test_allocator": "0.3.4",
 		"unit-threaded": "2.0.5"
 	}
 }
