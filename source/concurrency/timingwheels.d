@@ -27,31 +27,25 @@ import core.memory;
 import ikod.containers.hashmap;
 import std.typecons : Nullable, nullable;
 
-version(twtesting) {
-	import unit_threaded;
-}
+private class Timer {
+	static ulong _current_id;
+	private {
+		ulong _id;
+	}
 
-version(twtesting) {
-	private class Timer {
-		static ulong _current_id;
-		private {
-			ulong _id;
-		}
+	this() @safe @nogc {
+		_id = _current_id;
+		_current_id++;
+	}
 
-		this() @safe @nogc {
-			_id = _current_id;
-			_current_id++;
-		}
+	~this() @safe @nogc {}
 
-		~this() @safe @nogc {}
+	ulong id() @safe @nogc {
+		return _id;
+	}
 
-		ulong id() @safe @nogc {
-			return _id;
-		}
-
-		override string toString() {
-			return "%d".format(_id);
-		}
+	override string toString() {
+		return "%d".format(_id);
 	}
 }
 
@@ -90,33 +84,6 @@ class AdvanceWheelError : Exception {
 		super(msg, file, line);
 	}
 }
-
-debug(timingwheels)
-	@safe @nogc
-	nothrow {
-		package
-		void safe_tracef(A...)(string f, scope A args, string file = __FILE__,
-		                       int line = __LINE__) @safe @nogc nothrow {
-			bool osx, ldc;
-			version(OSX) {
-				osx = true;
-			}
-
-			version(LDC) {
-				ldc = true;
-			}
-
-			debug(timingwheels)
-				try {
-					// this can fail on pair ldc2/osx, see https://github.com/ldc-developers/ldc/issues/3240
-					if (!osx || !ldc) {
-						() @trusted @nogc {
-							tracef("%s:%d " ~ f, file, line, args);
-						}();
-					}
-				} catch (Exception e) {}
-		}
-	}
 
 pragma(inline)
 private void dl_insertFront(L)(L* le, L** head) {
@@ -168,8 +135,7 @@ private void dl_relink(L)(L* le, L** head_from, L** head_to)
 }
 
 @("dl")
-unittest {
-	globalLogLevel = LogLevel.info;
+@safe unittest {
 	struct LE {
 		int p;
 		LE* next;
@@ -353,11 +319,11 @@ struct TimingWheels(T) {
 		}
 	}
 
-	void init() {
+	void initialize() {
 		startedAt = Clock.currStdTime;
 	}
 
-	void init(ulong time) {
+	void initialize(ulong time) {
 		startedAt = time;
 	}
 
@@ -383,14 +349,14 @@ struct TimingWheels(T) {
 	///   when thicks == 0
 	///   or when timer already scheduled
 	///
-	void schedule(T)(T timer, const ulong ticks) {
+	bool schedule(T)(T timer, ulong ticks) {
 		if (ticks == 0) {
-			throw new ScheduleTimerError("ticks can't be 0");
+			ticks = 1;
 		}
 
 		auto timer_id = timer.id();
 		if (ptrs.contains(timer_id)) {
-			throw new ScheduleTimerError("Timer already scheduled");
+			return false;
 		}
 
 		size_t level_index = 0;
@@ -410,35 +376,21 @@ struct TimingWheels(T) {
 		size_t slot_index =
 			(level.now + (t >> shift) + ((t & mask) > 0 ? 1 : 0)) & MASK;
 		auto slot = &levels[level_index].slots[slot_index];
-		debug(timingwheels)
-			safe_tracef("use level/slot %d/%d, level now: %d", level_index,
-			            slot_index, level.now);
 		auto le = getOrCreate();
 		le.timer = timer;
 		le.position = ((level_index << 8) | slot_index) & 0xffff;
 		le.scheduled_at = levels[0].now + ticks;
 		dl_insertFront(le, &slot.head);
 		ptrs[timer_id] = le;
-		debug(timingwheels)
-			safe_tracef(
-				"scheduled timer id: %s, ticks: %s, now: %d, scheduled at: %s to level: %s, slot %s",
-				timer_id,
-				ticks,
-				levels[0].now,
-				le.scheduled_at,
-				level_index,
-				slot_index
-			);
+
+		return true;
 	}
 
 	/// Cancel timer
 	///Params:
 	/// timer = timer to cancel
 	///Returns:
-	/// void
-	///Throws:
-	/// CancelTimerError
-	///  if timer not in wheel
+	/// bool if timer was found and removed
 	bool cancel(T)(T timer) {
 		// get list element pointer
 		auto v = ptrs.fetch(timer.id());
@@ -493,9 +445,6 @@ struct TimingWheels(T) {
 		immutable target =
 			startedAt + (levels[0].now + n) * tick.split!"hnsecs".hnsecs;
 		auto delta = (target - realNow).hnsecs;
-		debug(timingwheels)
-			safe_tracef("ticksUntilNextEvent=%s, tick=%s, startedAt=%s", n,
-			            tick, SysTime(startedAt));
 		return nullable(delta);
 	}
 
@@ -504,20 +453,21 @@ struct TimingWheels(T) {
 	//
 	/// Params:
 	///   ticks = how many ticks to advance. Must be in range 0 <= 256
-	/// Returns: list of expired timers
+	/// Returns: amount of ticks actually advanced
 	///
 	import std.array : Appender;
-	void advance(this W)(ulong ticks, ref Appender!(T[]) app) {
-		if (ticks > l2t(0)) {
-			throw new AdvanceWheelError("You can't advance that much");
+	ulong advance(this W)(ulong ticks, ref Appender!(T[]) app) {
+		auto max = l2t(0);
+		if (ticks > max) {
+			ticks = max;
 		}
 
 		if (ticks == 0) {
-			throw new AdvanceWheelError("ticks must be > 0");
+			ticks = 1;
 		}
 
-		debug(timingwheels)
-			safe_tracef("advancing %d ticks", ticks);
+		auto advanced = ticks;
+
 		auto level = &levels[0];
 
 		while (ticks) {
@@ -529,9 +479,6 @@ struct TimingWheels(T) {
 			while (slot.head) {
 				auto le = slot.head;
 				auto timer = le.timer;
-				debug(timingwheels)
-					safe_tracef("return timer: %s, scheduled at %s", timer,
-					            le.scheduled_at);
 				app.put(timer);
 				dl_unlink(le, &slot.head);
 				returnToFreeList(le);
@@ -542,6 +489,7 @@ struct TimingWheels(T) {
 				advance_level(1);
 			}
 		}
+		return advanced;
 	}
 
 	auto totalTimers() pure @safe @nogc {
@@ -573,17 +521,11 @@ struct TimingWheels(T) {
 	}
 
 	private void advance_level(int level_index) in(level_index > 0) {
-		debug(timingwheels)
-			safe_tracef("running advance on level %d", level_index);
 		immutable now0 = levels[0].now;
 		auto level = &levels[level_index];
 		immutable now = ++level.now;
 		immutable slot_index = now & MASK;
-		debug(timingwheels)
-			safe_tracef("level %s, now=%s", level_index, now);
 		auto slot = &level.slots[slot_index];
-		debug(timingwheels)
-			safe_tracef("haldle l%s:s%s timers", level_index, slot_index);
 		while (slot.head) {
 			auto listElement = slot.head;
 
@@ -603,15 +545,6 @@ struct TimingWheels(T) {
 			auto mask = s - 1;
 			size_t lower_level_slot_index = (levels[lower_level_index].now
 				+ (t >> shift) + ((t & mask) > 0 ? 1 : 0)) & MASK;
-			debug(timingwheels)
-				safe_tracef(
-					"move timer id: %s, scheduledAt; %d to level %s, slot: %s (delta=%s)",
-					listElement.timer.id(),
-					listElement.scheduled_at,
-					lower_level_index,
-					lower_level_slot_index,
-					delta
-				);
 			listElement.position =
 				((lower_level_index << 8) | lower_level_slot_index) & 0xffff;
 			dl_relink(
@@ -629,14 +562,12 @@ struct TimingWheels(T) {
 	}
 }
 
-version(twtesting):
-
 @("TimingWheels")
-unittest {
+@safe unittest {
+	import unit_threaded;
 	import std.stdio;
-	globalLogLevel = LogLevel.info;
 	TimingWheels!Timer w;
-	w.init();
+	w.initialize();
 	assert(w.t2l(1) == 0);
 	assert(w.t2s(1, 0) == 1);
 	immutable t = 0x00_00_00_11_00_00_00_77;
@@ -645,260 +576,102 @@ unittest {
 	immutable slot = w.t2s(t, level);
 	assert(slot == 0x11);
 	auto timer = new Timer();
-	() @nogc @safe {
+	import std.array : Appender;
+	Appender!(Timer[]) timers;
+	() @safe {
 		w.schedule(timer, 2);
-		bool thrown;
-		// check that you can't schedule same timer twice
-		try {
-			w.schedule(timer, 5);
-		} catch (ScheduleTimerError e) {
-			thrown = true;
-		}
-
-		assert(thrown);
-		thrown = false;
-		try {
-			w.advance(1024);
-		} catch (AdvanceWheelError e) {
-			thrown = true;
-		}
-
-		assert(thrown);
-		thrown = false;
+		assert(!w.schedule(timer, 5));
+		assert(w.advance(1024, timers) == 256);
 		w.cancel(timer);
-		w.advance(1);
+		w.advance(1, timers);
 	}();
-	w = TimingWheels!Timer();
-	w.init();
+}
+
+@("TimingWheels.2")
+@safe unittest {
+	import unit_threaded;
+	import std.stdio;
+	TimingWheels!Timer w;
+	auto timer = new Timer();
+	import std.array : Appender;
+	Appender!(Timer[]) timers;
+	w.initialize();
 	w.schedule(timer, 1);
-	auto r = w.advance(1);
-	assert(r.timers.count == 1);
+	auto r = w.advance(1, timers);
+	assert(timers.data.length == 1);
+	timers.clear();
 	w.schedule(timer, 256);
-	r = w.advance(255);
-	assert(r.timers.count == 0);
-	r = w.advance(1);
-	assert(r.timers.count == 1);
+	r = w.advance(255, timers);
+	assert(timers.data.length == 0);
+	r = w.advance(1, timers);
+	assert(timers.data.length == 1);
+	timers.clear();
 	w.schedule(timer, 256 * 256);
 	int c;
 	for (int i = 0; i < 256; i++) {
-		r = w.advance(256);
-		c += r.timers.count;
+		r = w.advance(256, timers);
+		c += timers.data.length;
+		timers.clear();
 	}
 
 	assert(c == 1);
 }
 
-@("rt") @Tags("noauto")
-unittest {
-	globalLogLevel = LogLevel.info;
+@("rt")
+@safe unittest {
+	import unit_threaded;
 	TimingWheels!Timer w;
-	Duration Tick = 5.msecs;
-	w.init();
+	Duration tick = 5.msecs;
+	w.initialize();
 	ulong now = Clock.currStdTime;
-	assert(now - w.currStdTime(Tick) < 5 * 10_000);
-	Thread.sleep(2 * Tick);
+	assert(now - w.currStdTime(tick) < 5 * 10_000);
+	(() @trusted => Thread.sleep(2 * tick))();
 	now = Clock.currStdTime;
-	assert((now - w.currStdTime(Tick)) / 10_000 - (2 * Tick).split!"msecs".msecs
+	assert((now - w.currStdTime(tick)) / 10_000 - (2 * tick).split!"msecs".msecs
 		< 10);
-	auto toCatchUp = w.ticksToCatchUp(Tick, now);
+	auto toCatchUp = w.ticksToCatchUp(tick, now);
 	toCatchUp.shouldEqual(2);
-	auto t = w.advance(toCatchUp);
-	toCatchUp = w.ticksToCatchUp(Tick, now);
+	import std.array : Appender;
+	Appender!(Timer[]) timers;
+	auto t = w.advance(toCatchUp, timers);
+	toCatchUp = w.ticksToCatchUp(tick, now);
 	toCatchUp.shouldEqual(0);
 }
 
 @("cancel")
-unittest {
-	globalLogLevel = LogLevel.info;
+@safe unittest {
+	import unit_threaded;
 	TimingWheels!Timer w;
-	w.init();
+	w.initialize();
 	Timer timer0 = new Timer();
 	Timer timer1 = new Timer();
 	w.schedule(timer0, 256);
 	w.schedule(timer1, 256 + 128);
-	auto r = w.advance(255);
-	assert(r.timers.count == 0);
+	import std.array : Appender;
+	Appender!(Timer[]) timers;
+	auto r = w.advance(255, timers);
+	assert(timers.data.length == 0);
 	w.cancel(timer0);
-	r = w.advance(1);
-	assert(r.timers.count == 0);
-	assertThrown!CancelTimerError(w.cancel(timer0));
+	r = w.advance(1, timers);
+	assert(timers.data.length == 0);
 	w.cancel(timer1);
 }
 
 @("ticksUntilNextEvent")
-unittest {
-	globalLogLevel = LogLevel.info;
+@safe unittest {
+	import unit_threaded;
+	import std.array : Appender;
+	Appender!(Timer[]) timers;
 	TimingWheels!Timer w;
-	w.init();
+	w.initialize();
 	auto s = w.ticksUntilNextEvent;
 	assert(s == 256);
-	auto r = w.advance(s);
-	assert(r.timers.count == 0);
+	auto r = w.advance(s, timers);
+	assert(timers.data.length == 0);
 	Timer t = new Timer();
 	w.schedule(t, 50);
 	s = w.ticksUntilNextEvent;
 	assert(s == 50);
-	r = w.advance(s);
-	assert(r.timers.count == 1);
-}
-
-@("load") @Serial
-unittest {
-	import std.array : array;
-	globalLogLevel = LogLevel.info;
-	enum TIMERS = 100_000;
-	Timer._current_id = 1;
-	auto w = TimingWheels!Timer();
-	w.init();
-	for (int i = 1; i <= TIMERS; i++) {
-		auto t = new Timer();
-		w.schedule(t, i);
-	}
-
-	int counter;
-	for (int i = 1; i <= TIMERS; i++) {
-		auto r = w.advance(1);
-		auto timers = r.timers;
-		auto t = timers.array()[0];
-		assert(t.id == i, "expected t.id=%s, got %s".format(t.id, i));
-		assert(timers.count == 1);
-		counter++;
-	}
-
-	assert(counter == TIMERS, "expected 100 timers, got %d".format(counter));
-
-	for (int i = 1; i <= TIMERS; i++) {
-		auto t = new Timer();
-		w.schedule(t, i);
-	}
-
-	counter = 0;
-	for (int i = TIMERS + 1; i <= 2 * TIMERS; i++) {
-		auto r = w.advance(1);
-		auto timers = r.timers;
-		auto t = timers.array()[0];
-		assert(t.id == i, "expected t.id=%s, got %s".format(t.id, i));
-		assert(timers.count == 1);
-		counter++;
-	}
-
-	assert(counter == TIMERS, "expected 100 timers, got %d".format(counter));
-}
-
-// @("cornercase")
-// @Serial
-// unittest
-// {
-//     Timer._current_id = 1;
-//     auto w = TimingWheels!Timer();
-//     globalLogLevel = LogLevel.trace;
-//     w.advance(254);
-//     auto t = new Timer();
-//     w.schedule(t, 511);
-//     for(int i=0; i<511; i++)
-//     {
-//         w.advance(1);
-//     }
-// }
-
-///
-///
-///
-@("example") @Tags("noauto")
-@Values(1.msecs, 2.msecs, 3.msecs, 4.msecs, 5.msecs, 6.msecs, 7.msecs, 8.msecs,
-        9.msecs, 10.msecs) @Serial
-unittest {
-	import std;
-	globalLogLevel = LogLevel.info;
-	auto rnd = Random(142);
-	auto Tick = getValue!Duration();
-	/// track execution
-	int counter;
-	SysTime last;
-
-	/// this is our Timer
-	class Timer {
-		static ulong __id;
-		private ulong _id;
-		private string _name;
-		this(string name) {
-			_id = __id++;
-			_name = name;
-		}
-
-		/// must provide id() method
-		ulong id() {
-			return _id;
-		}
-	}
-
-	enum IOWakeUpInterval =
-		100; // to simulate random IO wakeups in interval 0 - 100.msecs
-
-	// each tick span 5 msecs - this is our link with time in reality
-	TimingWheels!Timer w;
-	w.init();
-	auto durationToTicks(Duration d) {
-		// we have to adjust w.now and realtime 'now' before scheduling timer
-		auto real_now = Clock.currStdTime;
-		auto tw_now = w.currStdTime(Tick);
-		auto delay = (real_now - tw_now).hnsecs;
-		return (d + delay) / Tick;
-	}
-
-	void process_timer(Timer t) {
-		switch (t._name) {
-			case "periodic":
-				if (last.stdTime == 0) {
-					// initialize tracking
-					last = Clock.currTime - 50.msecs;
-				}
-
-				auto delta = Clock.currTime - last;
-				assert(delta - 50.msecs <= max(Tick + Tick / 20, 5.msecs),
-				       "delta-50.msecs=%s".format(delta - 50.msecs));
-				writefln("@ %s - delta: %sms (should be 50ms)", t._name,
-				         (Clock.currTime - last).split!"msecs".msecs);
-				last = Clock.currTime;
-				counter++;
-				w.schedule(t, durationToTicks(50.msecs)); // rearm
-				break;
-			default:
-				writefln("@ %s", t._name);
-				break;
-		}
-	}
-
-	// emulate some random initial delay
-	auto randomInitialDelay = uniform(0, 500, rnd).msecs;
-	Thread.sleep(randomInitialDelay);
-	//
-	// start one arbitrary timer and one periodic timer
-	//
-	auto some_timer = new Timer("some");
-	auto periodic_timer = new Timer("periodic");
-	w.schedule(some_timer, durationToTicks(32.msecs));
-	w.schedule(periodic_timer, durationToTicks(50.msecs));
-
-	while (counter < 10) {
-		auto realNow = Clock.currStdTime;
-		auto randomIoInterval = uniform(0, IOWakeUpInterval, rnd).msecs;
-		auto nextTimerEvent = max(w.timeUntilNextEvent(Tick, realNow), 0.msecs);
-		// wait for what should happen earlier
-		auto time_to_sleep = min(randomIoInterval, nextTimerEvent);
-		writefln("* sleep until timer event or random I/O for %s",
-		         time_to_sleep);
-		Thread.sleep(time_to_sleep);
-		// make steps if required
-		int ticks = w.ticksToCatchUp(Tick, Clock.currStdTime);
-		if (ticks > 0) {
-			auto wr = w.advance(ticks);
-			foreach (t; wr.timers) {
-				process_timer(t);
-			}
-		}
-
-		// emulate some random processing time
-		Thread.sleep(uniform(0, 5, rnd).msecs);
-	}
+	r = w.advance(s, timers);
+	assert(timers.data.length == 1);
 }

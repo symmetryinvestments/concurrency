@@ -129,7 +129,7 @@ package struct LocalThreadWorker {
 		Appender!(Timer[]) expiredTimers;
 		auto ticks = 1.msecs; // represents the granularity
 		executor.wheels.reset();
-		executor.wheels.init();
+		executor.wheels.initialize();
 		bool running = true;
 		while (running) {
 			import std.meta : AliasSeq;

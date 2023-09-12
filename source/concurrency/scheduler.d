@@ -251,7 +251,7 @@ class ManualTimeWorker {
 
 	this() @trusted shared {
 		condition = cast(shared) new Condition(new Mutex());
-		(cast() wheels).init(time);
+		(cast() wheels).initialize(time);
 	}
 
 	ManualTimeScheduler getScheduler() @safe shared {
