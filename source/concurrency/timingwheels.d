@@ -625,8 +625,7 @@ struct TimingWheels(T) {
 	w.initialize();
 	ulong now = Clock.currStdTime;
 	assert(now - w.currStdTime(tick) < 5 * 10_000);
-	(() @trusted => Thread.sleep(2 * tick))();
-	now = Clock.currStdTime;
+	now += (tick * 2).total!"hnsecs";
 	assert((now - w.currStdTime(tick)) / 10_000 - (2 * tick).split!"msecs".msecs
 		< 10);
 	auto toCatchUp = w.ticksToCatchUp(tick, now);
