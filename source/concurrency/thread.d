@@ -36,12 +36,12 @@ LocalThreadExecutor getLocalThreadExecutor() @trusted {
 }
 
 private struct AddTimer {
-	Timer timer;
+	Timer* timer;
 	Duration dur;
 }
 
 private struct RemoveTimer {
-	Timer timer;
+	Timer* timer;
 }
 
 private struct Noop {}
@@ -76,7 +76,7 @@ class LocalThreadExecutor : Executor {
 	private {
 		ThreadID threadId;
 		WorkQueue queue;
-		TimingWheels!Timer wheels;
+		TimingWheels!TimerDelegate wheels;
 		shared ulong nextTimerId;
 	}
 
@@ -118,7 +118,7 @@ package struct LocalThreadWorker {
 
 	private bool removeTimer(RemoveTimer cmd) {
 		auto removed = executor.wheels.cancel(cmd.timer);
-		cmd.timer.dg(TimerTrigger.cancel);
+		cmd.timer.userdata(TimerTrigger.cancel);
 		return removed;
 	}
 
@@ -164,14 +164,13 @@ package struct LocalThreadWorker {
 				int advance =
 					executor.wheels.ticksToCatchUp(ticks, Clock.currStdTime);
 				if (advance > 0) {
-					import std.range : retro;
-					executor.wheels.advance(advance, expiredTimers);
-					// NOTE timingwheels keeps the timers in reverse order, so we iterate in reverse
-					foreach (t; expiredTimers.data.retro) {
-						t.dg(TimerTrigger.trigger);
+					Timer* t;
+					executor.wheels.advance(advance, t);
+					while (t !is null) {
+						auto next = t.next;
+						t.userdata(TimerTrigger.trigger);
+						t = next;
 					}
-
-					expiredTimers.shrinkTo(0);
 				}
 			}
 		}
@@ -192,25 +191,25 @@ package struct LocalThreadWorker {
 		executor.queue.push(new WorkNode(WorkItem(dg)));
 	}
 
-	Timer addTimer(TimerDelegate dg, Duration dur) @trusted {
-		import core.atomic : atomicOp;
-		ulong id = executor.nextTimerId.atomicOp!("+=")(1);
-		Timer timer = Timer(dg, id);
-		executor.queue.push(new WorkNode(WorkItem(AddTimer(timer, dur))));
-		return timer;
+	void addTimer(ref Timer timer, Duration dur) @trusted {
+		// import core.atomic : atomicOp;
+		// ulong id = executor.nextTimerId.atomicOp!("+=")(1);
+		// Timer timer = Timer(dg, id);
+		executor.queue.push(new WorkNode(WorkItem(AddTimer(&timer, dur))));
+		// return timer;
 	}
 
-	void cancelTimer(Timer timer) @trusted {
+	void cancelTimer(ref Timer timer) @trusted {
 		import std.algorithm : find;
 
-		auto cmd = RemoveTimer(timer);
+		auto cmd = RemoveTimer(&timer);
 		if (isInContext) {
 			if (removeTimer(cmd))
 				return;
 			// if the timer is still in the queue, rewrite the queue node to a Noop
 			auto nodes = executor.queue[].find!((node) {
 				return node.payload.match!((AddTimer t) {
-					return t.timer.id == timer.id;
+					return t.timer == &timer;
 				}, (x) => false);
 			});
 
@@ -218,7 +217,7 @@ package struct LocalThreadWorker {
 				nodes.front.payload = WorkItem(Noop());
 			}
 		} else
-			executor.queue.push(new WorkNode(WorkItem(RemoveTimer(timer))));
+			executor.queue.push(new WorkNode(WorkItem(cmd)));
 	}
 
 	void stop() nothrow @trusted {

@@ -52,13 +52,8 @@ enum TimerTrigger {
 
 alias TimerDelegate = void delegate(TimerTrigger) shared @safe;
 
-struct Timer {
-	TimerDelegate dg;
-	ulong id_;
-	ulong id() @safe nothrow @nogc {
-		return id_;
-	}
-}
+import concurrency.timingwheels : ListElement;
+alias Timer = ListElement!(TimerDelegate);
 
 auto localThreadScheduler() {
 	import concurrency.thread : LocalThreadWorker, getLocalThreadExecutor;
@@ -132,7 +127,7 @@ struct ScheduleAfterOp(Worker, Receiver) {
 		setup = 0x4,
 	}
 
-	alias Timer = ReturnType!(Worker.addTimer);
+	// alias Timer = ReturnType!(Worker.addTimer);
 	Worker worker;
 	Duration dur;
 	Receiver receiver;
@@ -154,8 +149,8 @@ struct ScheduleAfterOp(Worker, Receiver) {
 			        .onStop(cast(void delegate() nothrow @safe shared) &stop);
 
 		try {
-			timer = worker.addTimer(
-				cast(void delegate(TimerTrigger) @safe shared) &trigger, dur);
+			timer.userdata = cast(void delegate(TimerTrigger) @safe shared) &trigger;
+			worker.addTimer(timer, dur);
 		} catch (Exception e) {
 			receiver.setError(e);
 			return;
@@ -236,8 +231,7 @@ class ManualTimeWorker {
 	import core.time : msecs, hnsecs;
 	import std.array : Appender;
 	private {
-		TimingWheels!Timer wheels;
-		Appender!(Timer[]) expiredTimers;
+		TimingWheels!TimerDelegate wheels;
 		Condition condition;
 		size_t time = 1;
 		shared ulong nextTimerId;
@@ -258,17 +252,15 @@ class ManualTimeWorker {
 		return ManualTimeScheduler(this);
 	}
 
-	Timer addTimer(TimerDelegate dg, Duration dur) @trusted shared {
+	void addTimer(ref Timer timer, Duration dur) @trusted shared {
 		import core.atomic : atomicOp;
 		with (lock()) {
 			auto real_now = time;
 			auto tw_now = wheels.currStdTime(1.msecs);
 			auto delay = (real_now - tw_now).hnsecs;
 			auto at = (dur + delay) / 1.msecs;
-			auto timer = Timer(dg, nextTimerId.atomicOp!("+=")(1));
-			wheels.schedule(timer, at);
+			wheels.schedule(&timer, at);
 			condition.notifyAll();
-			return timer;
 		}
 	}
 
@@ -278,12 +270,12 @@ class ManualTimeWorker {
 		}
 	}
 
-	void cancelTimer(Timer timer) @trusted shared {
+	void cancelTimer(ref Timer timer) @trusted shared {
 		with (lock()) {
-			wheels.cancel(timer);
+			wheels.cancel(&timer);
 		}
 
-		timer.dg(TimerTrigger.cancel);
+		timer.userdata(TimerTrigger.cancel);
 	}
 
 	Nullable!Duration timeUntilNextEvent() @trusted shared {
@@ -299,13 +291,13 @@ class ManualTimeWorker {
 			time += dur.total!"hnsecs";
 			int incr = wheels.ticksToCatchUp(1.msecs, time);
 			if (incr > 0) {
-				wheels.advance(incr, expiredTimers);
-				// NOTE timingwheels keeps the timers in reverse order, so we iterate in reverse
-				foreach (t; expiredTimers.data.retro) {
-					t.dg(TimerTrigger.trigger);
+				Timer* t;
+				wheels.advance(incr, t);
+				while (t !is null) {
+					auto next = t.next;
+					t.userdata(TimerTrigger.trigger);
+					t = next;
 				}
-
-				expiredTimers.shrinkTo(0);
 			}
 		}
 	}
