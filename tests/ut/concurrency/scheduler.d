@@ -33,12 +33,14 @@ unittest {
 
 	shared int g, h;
 	auto worker = new shared ManualTimeWorker();
-	worker.addTimer((TimerTrigger trigger) shared {
+	auto t1 = Timer((TimerTrigger trigger) shared {
 		g.atomicOp!"+="(1);
-	}, 10.msecs);
-	worker.addTimer((TimerTrigger trigger) shared {
+	});
+	worker.addTimer(t1, 10.msecs);
+	auto t2 = Timer((TimerTrigger trigger) shared {
 		h.atomicOp!"+="(1);
-	}, 5.msecs);
+	});
+	worker.addTimer(t2, 5.msecs);
 
 	worker.timeUntilNextEvent().should == 5.msecs.nullable;
 	g.should == 0;
@@ -66,9 +68,10 @@ unittest {
 
 	shared int g;
 	auto worker = new shared ManualTimeWorker();
-	auto timer = worker.addTimer((TimerTrigger trigger) shared {
+	auto timer = Timer((TimerTrigger trigger) shared {
 		g.atomicOp!"+="(1 + (trigger == TimerTrigger.cancel));
-	}, 10.msecs);
+	});
+	worker.addTimer(timer, 10.msecs);
 	worker.timeUntilNextEvent().should == 10.msecs.nullable;
 	g.should == 0;
 

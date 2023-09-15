@@ -17,6 +17,5 @@ int main(string[] args) {
 		"ut.concurrency.waitable",
 		"ut.concurrency.asyncscope",
 		"concurrency.timingwheels",
-		"concurrency.data.hashmap.simple",
 	);
 }

@@ -18,72 +18,10 @@ import std.range;
 import std.algorithm;
 import std.experimental.logger;
 
-import std.experimental.allocator;
-import std.experimental.allocator.mallocator : Mallocator;
-
 import core.thread;
 import core.memory;
 
-import concurrency.data.hashmap.simple;
 import std.typecons : Nullable, nullable;
-
-private class Timer {
-	static ulong _current_id;
-	private {
-		ulong _id;
-	}
-
-	this() @safe @nogc {
-		_id = _current_id;
-		_current_id++;
-	}
-
-	~this() @safe @nogc {}
-
-	ulong id() @safe @nogc {
-		return _id;
-	}
-
-	override string toString() {
-		return "%d".format(_id);
-	}
-}
-
-///
-/// scheduling error occurs at schedule() when ticks == 0 or timer already scheduled.
-///
-///
-class ScheduleTimerError : Exception {
-	///
-	this(string msg, string file = __FILE__, size_t line = __LINE__) @nogc
-			@safe {
-		super(msg, file, line);
-	}
-}
-
-///
-/// Cancel timer error occurs if you try to cancel timer which is not scheduled.
-///
-class CancelTimerError : Exception {
-	///
-	this(string msg, string file = __FILE__, size_t line = __LINE__) @nogc
-			@safe {
-		super(msg, file, line);
-	}
-}
-
-///
-/// Advancing error occurs if number of ticks for advance not in range 0<t<=256
-///
-class AdvanceWheelError : Exception {
-	///
-	///
-	///
-	this(string msg, string file = __FILE__, size_t line = __LINE__) @nogc
-			@safe {
-		super(msg, file, line);
-	}
-}
 
 pragma(inline)
 private void dl_insertFront(L)(L* le, L** head) {
@@ -184,27 +122,22 @@ private void dl_relink(L)(L* le, L** head_from, L** head_to)
 /// )
 /// Each operation take O(1) time.
 ///
+
+struct ListElement(T) {
+	T userdata;
+	ulong scheduled_at;
+	ushort position = 0xffff;
+	ListElement!T* prev, next;
+}
+
 struct TimingWheels(T) {
 	import core.bitop : bsr;
 
-	private {
-		alias TimerIdType = ReturnType!(T.id);
-		alias allocator = Mallocator.instance;
-
+	package(concurrency) {
 		enum MASK = 0xff;
 		enum LEVELS = 8;
 		enum LEVEL_MAX = LEVELS - 1;
 		enum SLOTS = 256;
-		enum FreeListMaxLen = 100;
-
-		struct ListElement(T) {
-			private {
-				T timer;
-				ulong scheduled_at;
-				ushort position;
-				ListElement!T* prev, next;
-			}
-		}
 
 		struct Slot {
 			ListElement!T* head;
@@ -217,14 +150,8 @@ struct TimingWheels(T) {
 		}
 
 		Level[LEVELS] levels;
-		ListElement!T* freeList;
-		int freeListLen;
-		HashMap!(TimerIdType, ListElement!T*) ptrs;
+		ulong totalTimers;
 		long startedAt;
-	}
-
-	invariant {
-		assert(freeListLen >= 0);
 	}
 
 	alias Ticks = ulong; // ticks are 64 bit unsigned integers.
@@ -269,54 +196,17 @@ struct TimingWheels(T) {
 	}
 
 	~this() {
-		ptrs.clear;
+		// ptrs.clear;
 		for (int l = 0; l <= LEVEL_MAX; l++)
 			for (int s = 0; s < SLOTS; s++) {
 				while (levels[l].slots[s].head) {
 					auto le = levels[l].slots[s].head;
 					dl_unlink(le, &levels[l].slots[s].head);
-					() @trusted {
-						dispose(allocator, le);
-					}();
+					// () @trusted {
+					// 	dispose(allocator, le);
+					// }();
 				}
 			}
-
-		while (freeList) {
-			assert(freeListLen > 0);
-			auto n = freeList.next;
-			() @trusted {
-				dispose(allocator, freeList);
-			}();
-			freeListLen--;
-			freeList = n;
-		}
-	}
-
-	private ListElement!T* getOrCreate() {
-		ListElement!T* result;
-		if (freeList !is null) {
-			result = freeList;
-			freeList = freeList.next;
-			freeListLen--;
-			return result;
-		}
-
-		result = make!(ListElement!T)(allocator);
-		return result;
-	}
-
-	private void returnToFreeList(ListElement!T* le) {
-		if (freeListLen >= FreeListMaxLen) {
-			// this can be safely disposed as we do not leak ListElements outide this module
-			() @trusted {
-				dispose(allocator, le);
-			}();
-		} else {
-			le.position = 0xffff;
-			le.next = freeList;
-			freeList = le;
-			freeListLen++;
-		}
 	}
 
 	void initialize() {
@@ -349,15 +239,13 @@ struct TimingWheels(T) {
 	///   when thicks == 0
 	///   or when timer already scheduled
 	///
-	bool schedule(T)(T timer, ulong ticks) {
+	bool schedule(ListElement!(T)* timer, ulong ticks) {
 		if (ticks == 0) {
 			ticks = 1;
 		}
 
-		auto timer_id = timer.id();
-		if (ptrs.contains(timer_id)) {
-			return false;
-		}
+		if (timer.position != 0xffff)
+		    return false;
 
 		size_t level_index = 0;
 		long t = ticks;
@@ -376,13 +264,11 @@ struct TimingWheels(T) {
 		size_t slot_index =
 			(level.now + (t >> shift) + ((t & mask) > 0 ? 1 : 0)) & MASK;
 		auto slot = &levels[level_index].slots[slot_index];
-		auto le = getOrCreate();
-		le.timer = timer;
-		le.position = ((level_index << 8) | slot_index) & 0xffff;
-		le.scheduled_at = levels[0].now + ticks;
-		dl_insertFront(le, &slot.head);
-		ptrs[timer_id] = le;
+		timer.position = ((level_index << 8) | slot_index) & 0xffff;
+		timer.scheduled_at = levels[0].now + ticks;
+		dl_insertFront(timer, &slot.head);
 
+		totalTimers++;
 		return true;
 	}
 
@@ -391,22 +277,17 @@ struct TimingWheels(T) {
 	/// timer = timer to cancel
 	///Returns:
 	/// bool if timer was found and removed
-	bool cancel(T)(T timer) {
-		// get list element pointer
-		auto v = ptrs.fetch(timer.id());
-		if (!v.ok) {
-			return false;
-		}
+	bool cancel(ListElement!(T)* timer) {
+		if (timer.position == 0xffff)
+		    return false;
 
-		auto le = v.value;
-		immutable level_index = le.position >> 8;
-		immutable slot_index = le.position & 0xff;
-		assert(timer is le.timer);
+		immutable level_index = timer.position >> 8;
+		immutable slot_index = timer.position & 0xff;
 		debug(timingwheels)
 			safe_tracef("cancel timer, l:%d, s:%d", level_index, slot_index);
-		dl_unlink(le, &levels[level_index].slots[slot_index].head);
-		returnToFreeList(le);
-		ptrs.remove(timer.id());
+		dl_unlink(timer, &levels[level_index].slots[slot_index].head);
+		totalTimers--;
+
 		return true;
 	}
 
@@ -455,8 +336,7 @@ struct TimingWheels(T) {
 	///   ticks = how many ticks to advance. Must be in range 0 <= 256
 	/// Returns: amount of ticks actually advanced
 	///
-	import std.array : Appender;
-	ulong advance(this W)(ulong ticks, ref Appender!(T[]) app) {
+	ulong advance(this W)(ulong ticks, ref ListElement!T* head) {
 		auto max = l2t(0);
 		if (ticks > max) {
 			ticks = max;
@@ -469,20 +349,27 @@ struct TimingWheels(T) {
 		auto advanced = ticks;
 
 		auto level = &levels[0];
+		head = null;
 
 		while (ticks) {
 			ticks--;
 			immutable now = ++level.now;
 			immutable slot_index = now & MASK;
 			auto slot = &level.slots[slot_index];
-			//debug(timingwheels) safe_tracef("level 0, now=%s", now);
 			while (slot.head) {
+				totalTimers--;
 				auto le = slot.head;
-				auto timer = le.timer;
-				app.put(timer);
+				le.position = 0xffff;
 				dl_unlink(le, &slot.head);
-				returnToFreeList(le);
-				ptrs.remove(timer.id());
+				if (head is null) {
+					le.next = null;
+					le.prev = null;
+					head = le;
+				} else {
+					le.next = head;
+					head.prev = le;
+					head = le;
+				}
 			}
 
 			if (slot_index == 0) {
@@ -490,10 +377,6 @@ struct TimingWheels(T) {
 			}
 		}
 		return advanced;
-	}
-
-	auto totalTimers() pure @safe @nogc {
-		return ptrs.length();
 	}
 
 	//
@@ -565,8 +448,8 @@ struct TimingWheels(T) {
 @("TimingWheels")
 @safe unittest {
 	import unit_threaded;
-	import std.stdio;
-	TimingWheels!Timer w;
+	alias Timer = ListElement!ulong;
+	TimingWheels!ulong w;
 	w.initialize();
 	assert(w.t2l(1) == 0);
 	assert(w.t2s(1, 0) == 1);
@@ -575,43 +458,39 @@ struct TimingWheels(T) {
 	assert(level == 4);
 	immutable slot = w.t2s(t, level);
 	assert(slot == 0x11);
-	auto timer = new Timer();
-	import std.array : Appender;
-	Appender!(Timer[]) timers;
+	Timer timer;
 	() @safe {
-		w.schedule(timer, 2);
-		assert(!w.schedule(timer, 5));
-		assert(w.advance(1024, timers) == 256);
-		w.cancel(timer);
-		w.advance(1, timers);
+		w.schedule(&timer, 2);
+		assert(!w.schedule(&timer, 5));
+		Timer* ts;
+		assert(w.advance(1024, ts) == 256);
+		w.cancel(&timer);
+		w.advance(1, ts);
 	}();
 }
 
 @("TimingWheels.2")
-@safe unittest {
-	import unit_threaded;
-	import std.stdio;
-	TimingWheels!Timer w;
-	auto timer = new Timer();
-	import std.array : Appender;
-	Appender!(Timer[]) timers;
+@trusted unittest {
+	alias Timer = ListElement!ulong;
+	TimingWheels!ulong w;
+	Timer timer;
+	Timer* timers;
 	w.initialize();
-	w.schedule(timer, 1);
+	w.schedule(&timer, 1);
 	auto r = w.advance(1, timers);
-	assert(timers.data.length == 1);
-	timers.clear();
-	w.schedule(timer, 256);
+	assert(timers !is null);
+	assert(timers.next is null);
+	w.schedule(&timer, 256);
 	r = w.advance(255, timers);
-	assert(timers.data.length == 0);
+	assert(timers is null);
 	r = w.advance(1, timers);
-	assert(timers.data.length == 1);
-	timers.clear();
-	w.schedule(timer, 256 * 256);
+	assert(timers !is null);
+	assert(timer.next is null);
+	w.schedule(&timer, 256 * 256);
 	int c;
 	for (int i = 0; i < 256; i++) {
 		r = w.advance(256, timers);
-		c += timers.data.length;
-		timers.clear();
+		c += timers !is null;
 	}
 
 	assert(c == 1);
@@ -620,7 +499,8 @@ struct TimingWheels(T) {
 @("rt")
 @safe unittest {
 	import unit_threaded;
-	TimingWheels!Timer w;
+	alias Timer = ListElement!ulong;
+	TimingWheels!ulong w;
 	Duration tick = 5.msecs;
 	w.initialize();
 	ulong now = Clock.currStdTime;
@@ -630,47 +510,47 @@ struct TimingWheels(T) {
 		< 10);
 	auto toCatchUp = w.ticksToCatchUp(tick, now);
 	toCatchUp.shouldEqual(2);
-	import std.array : Appender;
-	Appender!(Timer[]) timers;
+	Timer* timers;
 	auto t = w.advance(toCatchUp, timers);
 	toCatchUp = w.ticksToCatchUp(tick, now);
 	toCatchUp.shouldEqual(0);
 }
 
 @("cancel")
-@safe unittest {
+@trusted unittest {
 	import unit_threaded;
-	TimingWheels!Timer w;
+	alias Timer = ListElement!ulong;
+	TimingWheels!ulong w;
 	w.initialize();
-	Timer timer0 = new Timer();
-	Timer timer1 = new Timer();
-	w.schedule(timer0, 256);
-	w.schedule(timer1, 256 + 128);
-	import std.array : Appender;
-	Appender!(Timer[]) timers;
+	Timer timer0;
+	Timer timer1;
+	w.schedule(&timer0, 256);
+	w.schedule(&timer1, 256 + 128);
+	Timer* timers;
 	auto r = w.advance(255, timers);
-	assert(timers.data.length == 0);
-	w.cancel(timer0);
+	assert(timers is null);
+	w.cancel(&timer0);
 	r = w.advance(1, timers);
-	assert(timers.data.length == 0);
-	w.cancel(timer1);
+	assert(timers is null);
+	w.cancel(&timer1);
 }
 
 @("ticksUntilNextEvent")
-@safe unittest {
+@trusted unittest {
 	import unit_threaded;
-	import std.array : Appender;
-	Appender!(Timer[]) timers;
-	TimingWheels!Timer w;
+	alias Timer = ListElement!ulong;
+	TimingWheels!ulong w;
 	w.initialize();
 	auto s = w.ticksUntilNextEvent;
 	assert(s == 256);
+	Timer* timers;
 	auto r = w.advance(s, timers);
-	assert(timers.data.length == 0);
-	Timer t = new Timer();
-	w.schedule(t, 50);
+	assert(timers is null);
+	Timer t;
+	w.schedule(&t, 50);
 	s = w.ticksUntilNextEvent;
 	assert(s == 50);
 	r = w.advance(s, timers);
-	assert(timers.data.length == 1);
+	assert(timers !is null);
+	assert(timers.next is null);
 }
