@@ -141,7 +141,7 @@ private struct TriggerReceiver(Receiver, Value) {
 
 	void setError(Throwable exception) @safe nothrow {
 		with (state.bitfield.lock(Flags.doneOrError_produced, Counter.tick)) {
-			bool last = isLast(newState);
+			bool last = isLast(oldState);
 			if (!isDoneOrErrorProduced(oldState)) {
 				state.exception = exception;
 				release(); // release before stop
@@ -167,10 +167,11 @@ private struct SourceReceiver(Receiver, Value) {
 
 	static if (!is(Value == void))
 		void setValue(Value value) @safe nothrow {
-			with (state.bitfield.update(Flags.value_produced | Flags.tick)) {
-				bool last = isLast(newState);
+			with (state.bitfield.lock(Flags.value_produced | Flags.tick)) {
+				bool last = isLast(oldState);
 				state.value = value;
-
+				
+				release();
 				if (!last)
 					state.stop();
 				else if (isDoneOrErrorProduced(oldState))
@@ -183,7 +184,7 @@ private struct SourceReceiver(Receiver, Value) {
 	else
 		void setValue() @safe nothrow {
 			with (state.bitfield.update(Flags.value_produced | Flags.tick)) {
-				bool last = isLast(newState);
+				bool last = isLast(oldState);
 				if (!last)
 					state.stop();
 				else if (isDoneOrErrorProduced(oldState))
@@ -195,7 +196,7 @@ private struct SourceReceiver(Receiver, Value) {
 
 	void setDone() @safe nothrow {
 		with (state.bitfield.update(Flags.doneOrError_produced | Flags.tick)) {
-			bool last = isLast(newState);
+			bool last = isLast(oldState);
 			if (!last)
 				state.stop();
 			else
@@ -205,7 +206,7 @@ private struct SourceReceiver(Receiver, Value) {
 
 	void setError(Throwable exception) @safe nothrow {
 		with (state.bitfield.lock(Flags.doneOrError_produced | Flags.tick)) {
-			bool last = isLast(newState);
+			bool last = isLast(oldState);
 			if (!isDoneOrErrorProduced(oldState)) {
 				state.exception = exception;
 			}
