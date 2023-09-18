@@ -648,7 +648,7 @@ unittest {
 
 		return 43;
 	});
-	auto trigger = delay(100.msecs);
+	auto trigger = delay(1.msecs);
 	waiting.stopWhen(trigger).syncWait().value.should == 43;
 }
 
@@ -661,7 +661,7 @@ unittest {
 
 		throw new Exception("Upside down");
 	});
-	auto trigger = delay(100.msecs);
+	auto trigger = delay(1.msecs);
 	waiting.stopWhen(trigger).syncWait().assumeOk
 	       .shouldThrowWithMessage("Upside down");
 }
@@ -673,7 +673,7 @@ unittest {
 			Thread.yield();
 		}
 	}).completeWithCancellation;
-	auto trigger = delay(100.msecs);
+	auto trigger = delay(1.msecs);
 	waiting.stopWhen(trigger).syncWait().isCancelled.should == true;
 }
 
@@ -701,7 +701,7 @@ unittest {
 
 		return 42;
 	});
-	auto trigger = delay(100.msecs).completeWithCancellation;
+	auto trigger = delay(1.msecs).completeWithCancellation;
 	waiting.stopWhen(trigger).syncWait().isCancelled.should == true;
 }
 
