@@ -570,18 +570,16 @@ class Promise(T) {
 		}
 
 		SharedBitField!Flags counter;
-		bool add(DG dg) @safe nothrow shared {
-			with (unshared) {
-				with (counter.lock()) {
-					if (was(Flags.completed)) {
-						auto val = value.match!((typeof(null)) => assert(0, "not happening"), v => v);
-						release(); // release early
-						dg(val);
-						return true;
-					} else {
-						dgs.pushBack(dg);
-						return false;
-					}
+		bool add(DG dg) @trusted nothrow shared {
+			with(counter.lock()) {
+				if (was(Flags.completed)) {
+					auto val = ((cast()this).value).match!((typeof(null)) => assert(0, "not happening"), v => v);
+					release(); // release early
+					dg(val);
+					return true;
+				} else {
+					dgs.pushBack(dg);
+					return false;
 				}
 			}
 		}
@@ -596,10 +594,6 @@ class Promise(T) {
 					return true;
 				}
 			}
-		}
-
-		private auto ref unshared() @trusted nothrow shared {
-			return cast() this;
 		}
 	}
 
