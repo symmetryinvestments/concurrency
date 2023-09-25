@@ -598,7 +598,7 @@ class Promise(T) {
 			}
 		}
 
-		private auto ref unshared() @trusted nothrow shared {
+		private auto unshared() @trusted nothrow shared {
 			return cast() this;
 		}
 	}
