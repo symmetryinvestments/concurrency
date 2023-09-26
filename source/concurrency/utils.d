@@ -44,9 +44,9 @@ auto closure(Fun, Args...)(Fun fun, Args args) @trusted
 	auto cl = cast(shared) new Closure!(Fun, Args)(fun, args);
 	/// need to cast to @safe because a @trusted delegate doesn't fit a @safe one...
 	static if (hasFunctionAttributes!(Fun, "nothrow"))
-		alias ResultType = void delegate() nothrow shared @safe;
+		alias ResultType = void delegate() nothrow @safe shared;
 	else
-		alias ResultType = void delegate() shared @safe;
+		alias ResultType = void delegate() @safe shared;
 	return cast(ResultType) &cl.apply;
 }
 
@@ -108,7 +108,7 @@ enum isThreadSafeCallable(alias Fun) =
 // are all pointing to the same instance.
 // We do this by exporting accessors functions which a dynamic library can
 // call to get access to the global.
-auto dynamicLoad(alias fun)() nothrow @trusted {
+auto dynamicLoad(alias fun)() nothrow @trusted @nogc {
 	alias Fn = typeof(&fun);
 	__gshared Fn fn;
 
@@ -126,7 +126,7 @@ auto dynamicLoad(alias fun)() nothrow @trusted {
 	return fn;
 }
 
-auto dynamicLoadRaw(alias fun)() nothrow @trusted {
+auto dynamicLoadRaw(alias fun)() nothrow @trusted @nogc {
 	alias Fn = typeof(&fun);
 	version(Windows) {
 		import core.sys.windows.windows;

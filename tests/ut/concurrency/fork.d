@@ -18,7 +18,7 @@ unittest {
 @("sync_wait.fork.exception") @trusted
 unittest {
 	import core.stdc.stdlib;
-	ForkSender(getLocalThreadExecutor(), () shared @trusted {
+	ForkSender(getLocalThreadExecutor(), () @trusted shared {
 		exit(1);
 	}).syncWait.assumeOk.shouldThrow();
 }

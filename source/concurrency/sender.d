@@ -68,8 +68,8 @@ void checkSender(T)() @safe {
 
 		void setError(Throwable e) @safe nothrow {}
 
-		StopToken getStopToken() @safe nothrow {
-			return StopToken.init;
+		shared(StopToken) getStopToken() @safe nothrow {
+			return shared(StopToken).init;
 		}
 
 		Scheduler getScheduler() @safe nothrow {
@@ -235,7 +235,7 @@ interface SenderObjectBase(T) {
 				receiver.setError(e);
 			}
 
-			StopToken getStopToken() nothrow {
+			shared(StopToken) getStopToken() nothrow {
 				return receiver.getStopToken();
 			}
 
@@ -449,9 +449,9 @@ struct PromiseSenderOp(T, Receiver) {
 	alias InternalValue = Sender.InternalValue;
 	shared Sender parent;
 	Receiver receiver;
-	StopCallback cb;
+	shared StopCallback cb;
 	shared SharedBitField!Flags bitfield;
-	@disable
+	@disable	
 	this(ref return scope typeof(this) rhs);
 	@disable
 	this(this);
@@ -480,8 +480,10 @@ struct PromiseSenderOp(T, Receiver) {
 
 		bool triggeredInline = parent.add(&(cast(shared) this).onValue);
 		// if triggeredInline there is no point in setting up the stop callback
-		if (!triggeredInline)
-			cb = receiver.getStopToken.onStop(&(cast(shared) this).onStop);
+		if (!triggeredInline) {
+			auto stopToken = receiver.getStopToken;
+			cb.register(stopToken, &(cast(shared) this).onStop);
+		}
 
 		with (bitfield.add(Flags.setup)) {
 			if (has(Flags.stop)) {
@@ -523,8 +525,7 @@ struct PromiseSenderOp(T, Receiver) {
 			// being executed.
 			// This means that when it completes we are the only one
 			// calling the receiver's termination functions.
-			if (cb)
-				cb.dispose();
+			cb.dispose();
 			value.match!((Sender.ValueRep v) {
 				try {
 					static if (is(Sender.Value == void))
@@ -639,7 +640,7 @@ class Promise(T) {
 		this.dgs = new shared SList!DG;
 	}
 
-	auto sender() shared @safe nothrow {
+	auto sender() @safe shared nothrow {
 		return shared PromiseSender!T(this);
 	}
 }

@@ -57,7 +57,7 @@ unittest {
 unittest {
 	race(ValueSender!int(4), ValueSender!int(5)).syncWait.value.should == 4;
 	auto fastThread = ThreadSender().then(() shared => 1);
-	auto slowThread = ThreadSender().then(() shared @trusted {
+	auto slowThread = ThreadSender().then(() @trusted shared {
 		Thread.sleep(50.msecs);
 		return 2;
 	});
@@ -80,7 +80,7 @@ unittest {
 
 @("race.exception.double") @safe
 unittest {
-	auto slow = ThreadSender().then(() shared @trusted {
+	auto slow = ThreadSender().then(() @trusted shared {
 		Thread.sleep(50.msecs);
 		throw new Exception("Slow");
 	});
@@ -92,7 +92,7 @@ unittest {
 
 @("race.cancel-other") @safe
 unittest {
-	auto waiting = ThreadSender().withStopToken((StopToken token) @trusted {
+	auto waiting = ThreadSender().withStopToken((shared StopToken token) @trusted {
 		while (!token.isStopRequested) {
 			Thread.yield();
 		}
@@ -103,7 +103,7 @@ unittest {
 
 @("race.cancel") @safe
 unittest {
-	auto waiting = ThreadSender().withStopToken((StopToken token) @trusted {
+	auto waiting = ThreadSender().withStopToken((shared StopToken token) @trusted {
 		while (!token.isStopRequested) {
 			Thread.yield();
 		}
@@ -189,7 +189,7 @@ unittest {
 
 @("whenAll.cancel") @safe
 unittest {
-	auto waiting = ThreadSender().withStopToken((StopToken token) @trusted {
+	auto waiting = ThreadSender().withStopToken((shared StopToken token) @trusted {
 		while (!token.isStopRequested) {
 			Thread.yield();
 		}
@@ -197,7 +197,7 @@ unittest {
 	whenAll(waiting, DoneSender()).syncWait.isCancelled.should == true;
 	whenAll(ThrowingSender(), waiting).syncWait.assumeOk.shouldThrow;
 	whenAll(waiting, ThrowingSender()).syncWait.assumeOk.shouldThrow;
-	auto waitingInt = ThreadSender().withStopToken((StopToken token) @trusted {
+	auto waitingInt = ThreadSender().withStopToken((shared StopToken token) @trusted {
 		while (!token.isStopRequested) {
 			Thread.yield();
 		}
@@ -211,14 +211,13 @@ unittest {
 
 @("whenAll.stop") @safe
 unittest {
-	auto waiting = ThreadSender().withStopToken((StopToken token) @trusted {
+	auto waiting = ThreadSender().withStopToken((shared StopToken token) @trusted {
 		while (!token.isStopRequested) {
 			Thread.yield();
 		}
 	});
-	auto source = new StopSource();
-	auto stopper =
-		just(source).then((StopSource source) shared => source.stop());
+	shared source = StopSource();
+	auto stopper = justFrom(() shared => source.stop());
 	whenAll(waiting, stopper).withStopSource(source).syncWait.isCancelled.should
 		== true;
 }
@@ -367,32 +366,26 @@ unittest {
 @("withStopToken.oob") @safe
 unittest {
 	auto oob = OutOfBandValueSender!int(44);
-	oob.withStopToken((StopToken stopToken, int t) => t).syncWait.value.should
+	oob.withStopToken((shared StopToken stopToken, int t) => t).syncWait.value.should
 		== 44;
 }
 
 @("withStopSource.oob") @safe
 unittest {
 	auto oob = OutOfBandValueSender!int(45);
-	oob.withStopSource(new StopSource()).syncWait.value.should == 45;
-}
-
-@("withStopSource.oob") @safe
-unittest {
-	auto oob = OutOfBandValueSender!int(45);
-	InPlaceStopSource stopSource;
-	oob.withStopSource(stopSource).syncWait.value.should == 45;
+	shared source = StopSource();
+	oob.withStopSource(source).syncWait.value.should == 45;
 }
 
 @("withStopSource.tuple") @safe
 unittest {
-	just(14, 53).withStopToken((StopToken s, Tuple!(int, int) t) => t[0] * t[1])
+	just(14, 53).withStopToken((shared StopToken s, Tuple!(int, int) t) => t[0] * t[1])
 	            .syncWait.value.should == 742;
 }
 
 @("value.withstoptoken.via.thread") @safe
 unittest {
-	ValueSender!int(4).withStopToken((StopToken s, int i) {
+	ValueSender!int(4).withStopToken((shared StopToken s, int i) {
 		throw new Exception("Badness");
 	}).via(ThreadSender()).syncWait.assumeOk.shouldThrowWithMessage("Badness");
 }
@@ -405,7 +398,7 @@ unittest {
 
 @("raceAll") @safe
 unittest {
-	auto waiting = ThreadSender().withStopToken((StopToken token) @trusted {
+	auto waiting = ThreadSender().withStopToken((shared StopToken token) @trusted {
 		while (!token.isStopRequested) {
 			Thread.yield();
 		}
@@ -438,8 +431,8 @@ unittest {
 	import concurrency.scheduler : ManualTimeWorker;
 
 	auto worker = new shared ManualTimeWorker();
-	auto source = new StopSource();
-	auto driver = just(source).then((StopSource source) shared {
+	shared StopSource source;
+	auto driver = justFrom(() shared {
 		worker.timeUntilNextEvent().should == 10.msecs.nullable;
 		source.stop();
 		worker.timeUntilNextEvent().isNull.should == true;
@@ -499,13 +492,13 @@ unittest {
 
 @("stopOn") @safe
 unittest {
-	auto sourceInner = new shared StopSource();
-	auto sourceOuter = new shared StopSource();
+	shared sourceInner = StopSource();
+	shared sourceOuter = StopSource();
 
 	shared bool b;
 	whenAll(
 		delay(5.msecs).then(() shared => b = true)
-		              .stopOn(StopToken(sourceInner)),
+		              .stopOn(sourceInner.token()),
 		just(() => sourceOuter.stop())
 	).syncWait(sourceOuter).assumeOk;
 	b.should == true;
@@ -513,7 +506,7 @@ unittest {
 	shared bool d;
 	whenAll(
 		delay(5.msecs).then(() shared => b = true)
-		              .stopOn(StopToken(sourceInner)),
+		              .stopOn(sourceInner.token()),
 		just(() => sourceInner.stop())
 	).syncWait(sourceOuter).assumeOk;
 	d.should == false;
@@ -527,41 +520,41 @@ unittest {
 		import core.sync.event : Event;
 		bool parentAfterChild;
 		Event childEvent, parentEvent;
-		this() shared @trusted {
+		this() @trusted shared {
 			(cast() childEvent).initialize(false, false);
 			(cast() parentEvent).initialize(false, false);
 		}
 
-		void signalChild() shared @trusted {
+		void signalChild() @trusted shared {
 			(cast() childEvent).set();
 		}
 
-		void waitChild() shared @trusted {
+		void waitChild() @trusted shared {
 			(cast() childEvent).wait();
 		}
 
-		void signalParent() shared @trusted {
+		void signalParent() @trusted shared {
 			(cast() parentEvent).set();
 		}
 
-		void waitParent() shared @trusted {
+		void waitParent() @trusted shared {
 			(cast() parentEvent).wait();
 		}
 	}
 
 	auto state = new shared State();
-	auto source = new shared StopSource;
+	shared source = StopSource();
 
 	import std.stdio;
 	auto child = just(state)
-		.withStopToken((StopToken token, shared State state) @trusted {
+		.withStopToken((shared StopToken token, shared State state) @trusted {
 			while (!token.isStopRequested) {}
 			state.signalParent();
 			state.waitChild();
 		}).via(ThreadSender());
 
 	auto parent =
-		just(state).withStopToken((StopToken token, shared State state) {
+		just(state).withStopToken((shared StopToken token, shared State state) {
 			state.waitParent();
 			state.parentAfterChild.atomicStore(token.isStopRequested == false);
 			state.signalChild();
@@ -569,7 +562,7 @@ unittest {
 
 	whenAll(
 		parent.withChild(child).withStopSource(source),
-		just(source).then((shared StopSource s) => s.stop())
+		justFrom(() shared => source.stop())
 	).syncWait.isCancelled.should == true;
 
 	state.parentAfterChild.atomicLoad.should == true;
@@ -641,7 +634,7 @@ unittest {
 
 @("stopWhen.source.value") @safe
 unittest {
-	auto waiting = ThreadSender().withStopToken((StopToken token) @trusted {
+	auto waiting = ThreadSender().withStopToken((shared StopToken token) @trusted {
 		while (!token.isStopRequested) {
 			Thread.yield();
 		}
@@ -654,7 +647,7 @@ unittest {
 
 @("stopWhen.source.error") @safe
 unittest {
-	auto waiting = ThreadSender().withStopToken((StopToken token) @trusted {
+	auto waiting = ThreadSender().withStopToken((shared StopToken token) @trusted {
 		while (!token.isStopRequested) {
 			Thread.yield();
 		}
@@ -668,7 +661,7 @@ unittest {
 
 @("stopWhen.source.cancelled") @safe
 unittest {
-	auto waiting = ThreadSender().withStopToken((StopToken token) @trusted {
+	auto waiting = ThreadSender().withStopToken((shared StopToken token) @trusted {
 		while (!token.isStopRequested) {
 			Thread.yield();
 		}
@@ -679,7 +672,7 @@ unittest {
 
 @("stopWhen.trigger.error") @safe
 unittest {
-	auto waiting = ThreadSender().withStopToken((StopToken token) @trusted {
+	auto waiting = ThreadSender().withStopToken((shared StopToken token) @trusted {
 		while (!token.isStopRequested) {
 			Thread.yield();
 		}
@@ -694,7 +687,7 @@ unittest {
 
 @("stopWhen.trigger.cancelled.value") @safe
 unittest {
-	auto waiting = ThreadSender().withStopToken((StopToken token) @trusted {
+	auto waiting = ThreadSender().withStopToken((shared StopToken token) @trusted {
 		while (!token.isStopRequested) {
 			Thread.yield();
 		}

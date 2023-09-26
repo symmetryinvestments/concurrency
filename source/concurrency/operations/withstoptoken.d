@@ -8,7 +8,7 @@ import concepts;
 import std.traits;
 import concurrency.utils : isThreadSafeFunction;
 
-deprecated("function passed is not shared @safe delegate or @safe function.")
+deprecated("function passed is not @safe shared delegate or @safe function.")
 auto withStopToken(Sender, Fun)(Sender sender, Fun fun)
 		if (!isThreadSafeFunction!Fun) {
 	return STSender!(Sender, Fun)(sender, fun);
@@ -41,7 +41,7 @@ private struct STReceiver(Receiver, Value, Fun) {
 	} else {
 		import std.typecons : isTuple;
 		enum isExpandable = isTuple!Value && __traits(compiles, {
-			fun(StopToken.init, Value.init.expand);
+			fun(shared(StopToken).init, Value.init.expand);
 		});
 		void setValue(Value value) @safe {
 			static if (is(ReturnType!Fun == void)) {

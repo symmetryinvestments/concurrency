@@ -22,7 +22,7 @@ unittest {
 @("scheduleAfter.stop-before-add") @safe
 unittest {
 	import concurrency.sender : delay, justFrom;
-	auto source = new shared StopSource();
+	shared source = StopSource();
 	whenAll(justFrom(() shared => source.stop), delay(10.msecs))
 		.syncWait(source);
 }

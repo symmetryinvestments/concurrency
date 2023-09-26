@@ -140,7 +140,7 @@ package struct LocalThreadWorker {
 		return removed;
 	}
 
-	void start() @trusted {
+	void start() @trusted scope {
 		assert(isInContext); // start can only be called on the thread
 		import std.datetime.systime : Clock;
 		import std.array : Appender;

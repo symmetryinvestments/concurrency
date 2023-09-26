@@ -24,7 +24,7 @@ struct WithChildSender(SenderParent, SenderChild)
 		import concurrency.operations.stopon;
 		// ensure NRVO
 		auto op =
-			whenAll(b.stopOn(receiver.getStopToken), a).stopOn(StopToken())
+			whenAll(b.stopOn(receiver.getStopToken), a).stopOn(shared StopToken())
 			                                           .connect(receiver);
 		return op;
 	}

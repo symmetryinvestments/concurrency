@@ -2,47 +2,28 @@ module concurrency.signal;
 
 import concurrency.stoptoken;
 
-shared(StopSource) globalStopSource() @trusted {
+ref shared(StopSource) globalStopSource() @trusted {
 	import core.atomic : atomicLoad, cas;
 
-	if (globalSource.atomicLoad is null) {
-		import concurrency.utils : dynamicLoad;
+	if (globalSourcePtr.atomicLoad is null) {
 		auto ptr = getGlobalStopSourcePointer();
 
-		if (auto source = (*ptr).atomicLoad) {
-			globalSource = source;
-			return globalSource;
-		}
-
-		auto tmp = new shared StopSource();
-		if (ptr.cas(cast(shared StopSource) null, tmp)) {
-			setupCtrlCHandler(tmp);
-			globalSource = tmp;
+		shared StopSource* empty = null;
+		if (ptr.cas(empty, &globalSource)) {
+			setupCtrlCHandler(globalSource);
+			globalSourcePtr = &globalSource;
 		} else
-			globalSource = (*ptr).atomicLoad;
+			globalSourcePtr = (*ptr).atomicLoad;
 	}
 
-	return globalSource;
-}
-
-/// Returns true if first to set (otherwise it is ignored)
-bool setGlobalStopSource(shared StopSource stopSource) @safe {
-	import core.atomic : cas;
-	auto ptr = getGlobalStopSourcePointer();
-	if (!ptr.cas(cast(shared StopSource) null, stopSource))
-		return false;
-	globalSource = stopSource;
-	return true;
+	return *globalSourcePtr;
 }
 
 /// Sets the stopSource to be called when receiving an interrupt
-void setupCtrlCHandler(shared StopSource stopSource) @trusted {
+void setupCtrlCHandler(ref shared StopSource stopSource) @trusted {
 	import core.atomic;
 
-	if (stopSource is null)
-		return;
-
-	auto old = atomicExchange(&SignalHandler.signalStopSource, stopSource);
+	auto old = atomicExchange(&SignalHandler.signalStopSource, &stopSource);
 	if (old !is null)
 		return;
 
@@ -71,14 +52,15 @@ void setupCtrlCHandler(shared StopSource stopSource) @trusted {
 	}
 }
 
+private static shared StopSource* globalSourcePtr;
 private static shared StopSource globalSource;
 
 // a mixin for OS-specific visibility
 private mixin template globalStopSourcePointerImpl() {
 	// should not be called directly by usercode, call `getGlobalStopSourcePointer` instead
 	pragma(inline, false)
-	extern(C) shared(StopSource*) concurrency_globalStopSourcePointer() @safe {
-		return &globalSource;
+	extern(C) shared(StopSource*)* concurrency_globalStopSourcePointer() @safe {
+		return &globalSourcePtr;
 	}
 }
 
@@ -91,7 +73,7 @@ version(Windows) {
 	// their own definition.
 	private mixin globalStopSourcePointerImpl;
 
-	private shared(StopSource*) getGlobalStopSourcePointer() @safe {
+	private shared(StopSource*)* getGlobalStopSourcePointer() @safe {
 		import concurrency.utils : dynamicLoad;
 		return dynamicLoad!concurrency_globalStopSourcePointer()();
 	}
@@ -175,7 +157,7 @@ struct SignalHandler {
 			SignalHandler.notify(ABORT);
 	}
 
-	private static shared StopSource signalStopSource;
+	private static shared StopSource* signalStopSource;
 	private static shared Thread handlerThread;
 	private static void launchHandlerThread() {
 		if (handlerThread.atomicLoad !is null)

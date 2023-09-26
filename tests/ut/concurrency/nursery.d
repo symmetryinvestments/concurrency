@@ -52,8 +52,8 @@ unittest {
 unittest {
 	auto nursery = new shared Nursery();
 	shared(int) global;
-	nursery.run(ThreadSender().then(() shared @safe {
-		nursery.run(ValueSender!(int)(5).then((int c) shared @safe {
+	nursery.run(ThreadSender().then(() @safe shared {
+		nursery.run(ValueSender!(int)(5).then((int c) @safe shared {
 			global = c;
 		}));
 	}));
@@ -66,17 +66,17 @@ unittest {
 @("run.thread.stop.internal") @safe
 unittest {
 	auto nursery = new shared Nursery();
-	nursery.run(ThreadSender().then(() shared @safe => nursery.stop()));
+	nursery.run(ThreadSender().then(() @safe shared => nursery.stop()));
 	nursery.syncWait.isCancelled.should == true;
 	nursery.getStopToken().isStopRequested().shouldBeTrue();
 }
 
-@("run.thread.stop.external") @trusted
+@("run.thread.stop.external") @safe
 unittest {
 	auto nursery = new shared Nursery();
-	auto stopSource = new shared StopSource();
-	nursery.run(ThreadSender().then(() shared @safe => stopSource.stop()));
-	nursery.syncWait(cast(StopSource) stopSource).isCancelled.should == true;
+	shared stopSource = StopSource(); 
+	nursery.run(ThreadSender().then(() @safe shared => stopSource.stop()));
+	nursery.syncWait(stopSource).isCancelled.should == true;
 	nursery.getStopToken().isStopRequested().shouldBeTrue();
 	stopSource.isStopRequested().shouldBeTrue();
 }
@@ -85,12 +85,12 @@ unittest {
 unittest {
 	import core.thread : Thread;
 	auto nursery = new shared Nursery();
-	auto thread1 = ThreadSender().then(() shared @trusted {
+	auto thread1 = ThreadSender().then(() @trusted shared {
 		auto token = nursery.getStopToken();
 		while (!token.isStopRequested())
 			Thread.yield();
 	});
-	auto thread2 = ThreadSender().then(() shared @safe => nursery.stop());
+	auto thread2 = ThreadSender().then(() @safe shared => nursery.stop());
 	nursery.run(thread1);
 	nursery.run(thread2);
 	nursery.syncWait.isCancelled.should == true;
@@ -115,17 +115,17 @@ unittest {
 unittest {
 	import core.thread : Thread;
 	auto nursery = new shared Nursery();
-	auto thread1 = ThreadSender().then(() shared @trusted {
+	auto thread1 = ThreadSender().then(() @trusted shared {
 		auto token = nursery.getStopToken();
 		while (!token.isStopRequested())
 			Thread.yield();
 	});
 	auto thread2 =
-		ThreadSender().withStopToken((StopToken token) shared @trusted {
+		ThreadSender().withStopToken((shared StopToken token) @trusted shared {
 			while (!token.isStopRequested())
 				Thread.yield();
 		});
-	auto thread3 = ThreadSender().then(() shared @safe {
+	auto thread3 = ThreadSender().then(() @safe shared {
 		throw new Exception("Error should stop everyone");
 	});
 	nursery.run(thread1);
@@ -139,18 +139,17 @@ unittest {
 @("withStopSource.1") @safe
 unittest {
 	import core.thread : Thread;
-	auto stopSource = new StopSource();
+	shared StopSource stopSource;
 	auto nursery = new shared Nursery();
 
 	auto thread1 =
-		ThreadSender().withStopToken((StopToken stopToken) shared @trusted {
+		ThreadSender().withStopToken((shared StopToken stopToken) @trusted shared {
 			while (!stopToken.isStopRequested)
 				Thread.yield();
 		}).withStopSource(stopSource);
 
 	// stop via the source
-	auto stopper = ValueSender!StopSource(stopSource)
-		.then((StopSource stopSource) shared => stopSource.stop());
+	auto stopper = justFrom(() shared => stopSource.stop());
 
 	nursery.run(thread1);
 	nursery.run(stopper);
@@ -161,18 +160,17 @@ unittest {
 @("withStopSource.2") @safe
 unittest {
 	import core.thread : Thread;
-	auto stopSource = new StopSource();
+	shared StopSource stopSource;
 	auto nursery = new shared Nursery();
 
 	auto thread1 =
-		ThreadSender().withStopToken((StopToken stopToken) shared @trusted {
+		ThreadSender().withStopToken((shared StopToken stopToken) @trusted shared {
 			while (!stopToken.isStopRequested)
 				Thread.yield();
 		}).withStopSource(stopSource);
 
 	// stop via the nursery
-	auto stopper = ValueSender!(shared Nursery)(nursery)
-		.then((shared Nursery nursery) shared => nursery.stop());
+	auto stopper = justFrom(() shared => nursery.stop());
 
 	nursery.run(thread1);
 	nursery.run(stopper);

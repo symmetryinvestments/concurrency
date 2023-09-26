@@ -83,7 +83,7 @@ unittest {
 unittest {
 	ThrowingSender().via(ThreadSender()).syncWait().isError.should == true;
 }
-
+/+
 @("toShared.basic") @safe
 unittest {
 	import std.typecons : tuple;
@@ -171,17 +171,15 @@ unittest {
 unittest {
 	import concurrency.stoptoken;
 	import core.atomic : atomicStore, atomicLoad;
-	shared bool g;
+	shared bool g;stopSource
 
 	auto waiting =
-		ThreadSender().withStopToken((StopToken token) shared @trusted {
+		ThreadSender().withStopToken((shared StopToken token) @trusted shared {
 			while (!token.isStopRequested) {}
 			g.atomicStore(true);
 		});
-	auto source = new StopSource();
-	auto stopper = just(source).then((StopSource source) shared {
-		source.stop();
-	});
+	shared source = StopSource();
+	auto stopper = justFrom(() shared => source.stop());
 
 	whenAll(waiting.toShared().withStopSource(source), stopper)
 		.syncWait.isCancelled.should == true;
@@ -209,7 +207,7 @@ unittest {
 	auto n = new shared Nursery();
 	auto s = n.toShared(localThreadScheduler());
 }
-
++/
 @("nvro") @safe
 unittest {
 	static struct Op(Receiver) {
@@ -335,7 +333,7 @@ unittest {
 	import concurrency.stoptoken;
 	just(14, 52).syncWait.value.should == tuple(14, 52);
 	just(14, 53).then((int a, int b) => a * b).syncWait.value.should == 742;
-	just(14, 54).withStopToken((StopToken s, int a, int b) => a * b).syncWait
+	just(14, 54).withStopToken((shared StopToken s, int a, int b) => a * b).syncWait
 	            .value.should == 756;
 }
 

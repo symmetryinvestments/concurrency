@@ -23,6 +23,33 @@ interface SchedulerObjectBase {
 	SenderObjectBase!void scheduleAfter(Duration d) @safe;
 }
 
+
+// We can pull the LocalThreadExecutor (and its schedule/scheduleAfter) out into a specialized context.
+// Just like we did with the iouring context
+
+// The interesting bit is that the syncWait algorithm then might be inferred as @nogc
+
+// The question remains how we would want to integrate these.
+// With iouring we created a runner that would take a sender and would inject the scheduler and allow itself to steal the current thread.
+
+// That last part is important, we don't want to spawn a thread just to run timers, we can do it perfectly fine on the current thread.
+// Same with iouring or other event loops.
+
+// That said, we can, if we want to, move the event loop to another thread.
+
+// The only thing we can't do is cross schedule timers from one thread to another.
+// Well, that is not true, we can create two context objects that expose a Scheduler 
+
+
+
+
+
+
+// Guess we just have to write it and see....
+
+// Dietmar Kuhl used a iocontext with a run function that allows running it on the current thread.
+// In rant I had the iocontext's runner return a sender so you could await that.
+
 class SchedulerObject(S) : SchedulerObjectBase {
 	import concurrency.sender : toSenderObject;
 	S scheduler;
@@ -50,7 +77,7 @@ enum TimerTrigger {
 	cancel
 }
 
-alias TimerDelegate = void delegate(TimerTrigger) shared @safe;
+alias TimerDelegate = void delegate(TimerTrigger) @safe shared;
 
 import concurrency.timingwheels : ListElement;
 alias Timer = ListElement!(TimerDelegate);
@@ -64,6 +91,7 @@ auto localThreadScheduler() {
 alias LocalThreadScheduler = typeof(localThreadScheduler());
 
 struct SchedulerAdapter(Worker) {
+	static assert(models!(typeof(this), isScheduler));
 	import concurrency.receiver : setValueOrError;
 	import concurrency.executor : VoidDelegate;
 	import core.time : Duration;
@@ -101,7 +129,7 @@ struct SchedulerAdapter(Worker) {
 		return ScheduleSender(worker);
 	}
 
-	auto schedule() shared @trusted {
+	auto schedule() @trusted shared {
 		return (cast() this).schedule();
 	}
 
@@ -109,7 +137,7 @@ struct SchedulerAdapter(Worker) {
 		return ScheduleAfterSender!(Worker)(worker, dur);
 	}
 
-	auto scheduleAfter(Duration dur) shared @trusted {
+	auto scheduleAfter(Duration dur) @trusted shared {
 		return (cast() this).scheduleAfter(dur);
 	}
 }
@@ -117,7 +145,7 @@ struct SchedulerAdapter(Worker) {
 struct ScheduleAfterOp(Worker, Receiver) {
 	import std.traits : ReturnType;
 	import concurrency.bitfield : SharedBitField;
-	import concurrency.stoptoken : StopCallback, onStop;
+	import concurrency.stoptoken : StopCallback;
 	import concurrency.receiver : setValueOrError;
 
 	enum Flags {
@@ -127,26 +155,25 @@ struct ScheduleAfterOp(Worker, Receiver) {
 		setup = 0x4,
 	}
 
-	// alias Timer = ReturnType!(Worker.addTimer);
 	Worker worker;
 	Duration dur;
 	Receiver receiver;
 	Timer timer;
-	StopCallback stopCb;
+	shared StopCallback stopCb;
 	shared SharedBitField!Flags flags;
 	@disable
 	this(ref return scope typeof(this) rhs);
 	@disable
 	this(this);
+	// ~this() @safe scope {}
 	void start() @trusted scope nothrow {
 		if (receiver.getStopToken().isStopRequested) {
 			receiver.setDone();
 			return;
 		}
 
-		stopCb =
-			receiver.getStopToken()
-			        .onStop(cast(void delegate() nothrow @safe shared) &stop);
+		auto token = receiver.getStopToken();
+		stopCb.register(token, cast(void delegate() nothrow @safe shared) &stop);
 
 		try {
 			timer.userdata = cast(void delegate(TimerTrigger) @safe shared) &trigger;
@@ -312,7 +339,8 @@ auto withBaseScheduler(T, P)(auto ref T t, auto ref P p) {
 		static assert(
 			false,
 			"Neither " ~ T.stringof ~ " nor " ~ P.stringof
-				~ " are full schedulers. Chain the sender with a .withScheduler and ensure the Scheduler passes the isScheduler check."
+				~ " are full schedulers. Chain the sender with a .withScheduler"
+				~ " and ensure the Scheduler passes the isScheduler check."
 		);
 }
 
