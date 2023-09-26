@@ -130,11 +130,11 @@ StopCallback onStop(StopToken)(
 	StopToken stopToken,
 	void delegate() nothrow @safe shared callback
 ) nothrow @safe {
-	auto cb = new StopCallback(callback);
+	if (stopToken.isStopPossible) {
+		return (*stopToken.state).onStop(new StopCallback(callback));
+	}
 
-	onStop(stopToken, cb);
-
-	return cb;
+	return new StopCallback(callback);
 }
 
 StopCallback onStop(StopToken)(
@@ -149,35 +149,22 @@ StopCallback onStop(StopToken)(
 StopCallback onStop(StopToken)(StopToken stopToken,
                                StopCallback cb) nothrow @safe {
 	if (stopToken.isStopPossible) {
-		stopToken.onStop(cb.callback);
+		return stopToken.state.onStop(cb);
 	}
 	return cb;
-}
-
-void onStop(StopToken)(StopToken stopToken,
-                       ref InPlaceStopCallback cb) nothrow @safe {
-	if (stopToken.isStopPossible) {
-		(*stopToken.state).onStop(cb);
-	}
 }
 
 StopCallback onStop(StopSource stopSource, StopCallback cb) nothrow @safe {
-	onStop(stopSource.source.state, cb.callback);
+	return onStop(stopSource.source.state, cb);
+}
+
+StopCallback onStop(ref stop_state state, StopCallback cb) nothrow @trusted { // TODO: @safe
+	if (state.try_add_callback(cb, true))
+		cb.state = &state;
 	return cb;
 }
 
-void onStop(StopSource stopSource, ref InPlaceStopCallback cb) nothrow @safe {
-	onStop(stopSource.source.state, cb);
-}
-
-void onStop(ref stop_state state, ref InPlaceStopCallback cb) nothrow @trusted { // TODO: @safe
-	if (state.try_add_callback(cb, true))
-		cb.state = &state;
-}
-
-struct InPlaceStopCallback {
-	@disable this(ref return scope typeof(this) rhs);
-
+class StopCallback {
 	void dispose() nothrow @trusted @nogc {
 		import core.atomic : cas;
 
@@ -212,31 +199,14 @@ private:
 	void delegate() nothrow shared @safe callback;
 	stop_state* state;
 
-	InPlaceStopCallback* next_ = null;
-	InPlaceStopCallback** prev_ = null;
+	StopCallback next_ = null;
+	StopCallback* prev_ = null;
 	bool* isRemoved_ = null;
 	shared bool callbackFinishedExecuting = false;
 
 	void execute() nothrow @safe {
 		callback();
 	}
-}
-
-class StopCallback {
-	this(void delegate() nothrow shared @safe callback) nothrow @safe @nogc {
-		this.callback = InPlaceStopCallback(callback);
-	}
-
-	void dispose() nothrow @trusted @nogc {
-		callback.dispose();
-	}
-
-	void dispose() shared nothrow @trusted @nogc {
-		callback.dispose();
-	}
-private:
-
-	InPlaceStopCallback callback;
 }
 
 private void spin_yield() nothrow @trusted @nogc {
@@ -360,8 +330,8 @@ public:
 		return is_stop_requestable(state_.atomicLoad!(MemoryOrder.acq));
 	}
 
-	bool try_add_callback(ref InPlaceStopCallback cb,
-	                      bool incrementRefCountIfSuccessful) nothrow @trusted {
+	bool try_add_callback(StopCallback cb,
+	                      bool incrementRefCountIfSuccessful) nothrow @safe {
 		ulong oldState;
 		do {
 			goto load_state;
@@ -389,7 +359,7 @@ public:
 		() @trusted {
 			cb.prev_ = &head_;
 		}();
-		head_ = &cb;
+		head_ = cb;
 
 		if (incrementRefCountIfSuccessful) {
 			unlock_and_increment_token_ref_count();
@@ -401,7 +371,7 @@ public:
 		return true;
 	}
 
-	void remove_callback(ref InPlaceStopCallback cb) nothrow @safe @nogc {
+	void remove_callback(StopCallback cb) nothrow @safe @nogc {
 		lock();
 
 		if (cb.prev_ !is null) {
@@ -517,6 +487,6 @@ private:
 	// bits 2-32 - token ref count (31 bits)
 	// bits 33-63 - source ref count (31 bits)
 	shared ulong state_ = source_ref_increment;
-	InPlaceStopCallback* head_ = null;
+	StopCallback head_ = null;
 	Thread signallingThread_;
 }

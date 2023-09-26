@@ -136,11 +136,10 @@ auto syncWait(Sender, StopSource)(auto ref Sender sender,
 auto syncWait(Sender)(auto scope ref Sender sender) {
 	import concurrency.signal : globalStopSource;
 	auto childStopSource = new shared StopSource();
-	auto cb = InPlaceStopCallback(() shared {
+	StopToken parentStopToken = StopToken(globalStopSource);
+	StopCallback cb = parentStopToken.onStop(() shared {
 		childStopSource.stop();
 	});
-	StopToken parentStopToken = StopToken(globalStopSource);
-	parentStopToken.onStop(cb);
 	auto result =
 		syncWaitImpl(sender, (() @trusted => cast() childStopSource)());
 
