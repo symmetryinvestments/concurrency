@@ -17,5 +17,7 @@ int main(string[] args) {
 		"ut.concurrency.waitable",
 		"ut.concurrency.asyncscope",
 		"concurrency.timingwheels",
+		"concurrency.stoptoken",
+		"ut.concurrency.stoptoken",
 	);
 }

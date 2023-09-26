@@ -63,7 +63,8 @@ version(Posix)
 
 					if (afterFork)
 						afterFork(pid);
-					auto cb = token.onStop(() @trusted shared nothrow =>
+					shared StopCallback cb;
+					cb.register(token, () @trusted shared nothrow =>
 						cast(void) kill(pid, SIGINT));
 					int status;
 					auto ret = waitpid(pid, &status, 0);
@@ -102,7 +103,7 @@ version(Posix)
 				import concurrency.utils : closure;
 
 				executeInNewThread(
-					cast(void delegate() shared @safe) &this.run);
+					cast(void delegate() @safe shared) &this.run);
 			}
 		}
 

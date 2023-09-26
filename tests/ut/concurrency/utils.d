@@ -25,7 +25,7 @@ unittest {
 	auto systemSharedClosure = (int i) shared => i * system() * k;
 	static assert(!isThreadSafeFunction!systemSharedClosure);
 
-	auto trustedSharedClosure = (int i) shared @trusted => i * system() * k;
+	auto trustedSharedClosure = (int i) @trusted shared => i * system() * k;
 	static assert(isThreadSafeFunction!trustedSharedClosure);
 }
 

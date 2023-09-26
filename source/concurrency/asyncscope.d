@@ -10,8 +10,9 @@ private enum Flag {
 }
 
 auto asyncScope() @safe {
+	import concurrency.sender : Promise;
 	// ensure NRVO
-	auto as = shared AsyncScope(new shared StopSource());
+	auto as = shared AsyncScope(new shared Promise!void);
 	return as;
 }
 
@@ -66,9 +67,8 @@ public:
 			cleanup.syncWait();
 	}
 
-	this(shared StopSource stopSource) @safe shared {
-		completion = new shared Promise!void;
-		this.stopSource = stopSource;
+	this(shared Promise!void completion) @safe shared {
+		this.completion = completion;
 	}
 
 	auto cleanup() @safe shared {
@@ -93,7 +93,7 @@ public:
 		return stopSource.stop();
 	}
 
-	bool spawn(Sender)(Sender s) shared @trusted {
+	bool spawn(Sender)(Sender s) @trusted shared {
 		import concurrency.sender : connectHeap;
 		with (flag.update(0, Flag.tick)) {
 			if ((oldState & Flag.stopped) == 1) {
@@ -133,7 +133,7 @@ struct AsyncScopeReceiver {
 
 	auto getStopToken() nothrow @safe {
 		import concurrency.stoptoken : StopToken;
-		return StopToken(s.stopSource);
+		return s.stopSource.token();
 	}
 
 	auto getScheduler() nothrow @safe {

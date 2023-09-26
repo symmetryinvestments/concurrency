@@ -3,7 +3,7 @@ module concurrency.stream.take;
 import concurrency.stream.stream;
 import concurrency.sender : OpType;
 import concurrency.receiver : ForwardExtensionPoints;
-import concurrency.stoptoken : InPlaceStopSource;
+import concurrency.stoptoken : StopSource;
 import concepts;
 
 /// takes the first n values from a stream or until cancelled
@@ -17,7 +17,7 @@ auto take(Stream)(Stream stream, size_t n) if (models!(Stream, isStream)) {
 
 struct TakeReceiver(Receiver, Value) {
 	Receiver receiver;
-	InPlaceStopSource* stopSource;
+	shared StopSource* stopSource;
 	static if (is(Value == void))
 		void setValue() @safe {
 			receiver.setValue();
@@ -51,12 +51,12 @@ template TakeOp(Stream) {
 	struct TakeOp(Receiver) {
 		import concurrency.operations : withStopSource, SSSender;
 		import std.traits : ReturnType;
-		alias SS = SSSender!(Properties.Sender, InPlaceStopSource*);
+		alias SS = SSSender!(Properties.Sender);
 		alias Op =
 			OpType!(SS, TakeReceiver!(Receiver, Properties.Sender.Value));
 		size_t n;
 		Properties.DG dg;
-		InPlaceStopSource stopSource;
+		shared StopSource stopSource;
 		Op op;
 		@disable
 		this(ref return scope typeof(this) rhs);

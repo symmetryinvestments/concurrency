@@ -66,32 +66,32 @@ private struct RaceOp(Receiver, Senders...) {
 	this(ref return scope typeof(this) rhs);
 	this(Receiver receiver, return Senders senders,
 	     bool noDropouts) @trusted scope {
+		state = State!R(noDropouts);
 		this.receiver = receiver;
-		state = new State!(R)(noDropouts);
 		static if (Senders.length > 1) {
 			foreach (i, Sender; Senders) {
 				ops[i] = senders[i].connect(
-					ElementReceiver!(Sender)(receiver, state, Senders.length));
+					ElementReceiver!(Sender)(receiver, &state, Senders.length));
 			}
 		} else {
 			ops.length = senders[0].length;
 			foreach (i; 0 .. senders[0].length) {
 				ops[i] = senders[0][i].connect(
-					ElementReceiver(receiver, state, senders[0].length));
+					ElementReceiver(receiver, &state, senders[0].length));
 			}
 		}
 	}
 
 	void start() @trusted nothrow scope {
-		import concurrency.stoptoken : StopSource;
 		if (receiver.getStopToken().isStopRequested) {
 			receiver.setDone();
 			return;
 		}
 
-		state.cb = receiver.getStopToken().onStop(
-			cast(void delegate() nothrow @safe shared) &state.stop
-		); // butt ugly cast, but it won't take the second overload
+		auto token = receiver.getStopToken();
+		// butt ugly cast, but it won't take the second overload
+		state.cb.register(token, cast(void delegate() nothrow @safe shared) &state.stopSource.stop);
+			
 		static if (Senders.length > 1) {
 			foreach (i, _; Senders) {
 				ops[i].start();
@@ -121,9 +121,10 @@ struct RaceSender(Senders...)
 	}
 }
 
-private class State(Value) : StopSource {
+private struct State(Value) {
 	import concurrency.bitfield;
-	StopCallback cb;
+	shared StopSource stopSource;
+	shared StopCallback cb;
 	shared SharedBitField!Flags bitfield;
 	static if (!is(Value == void))
 		Value value;
@@ -148,10 +149,10 @@ private enum Counter : size_t {
 private struct RaceReceiver(Receiver, InnerValue, Value) {
 	import core.atomic : atomicOp, atomicLoad, MemoryOrder;
 	Receiver receiver;
-	State!(Value) state;
+	State!(Value)* state;
 	size_t senderCount;
 	auto getStopToken() {
-		return StopToken(state);
+		return state.stopSource.token();
 	}
 
 	private bool isValueProduced(size_t state) {
@@ -176,7 +177,7 @@ private struct RaceReceiver(Receiver, InnerValue, Value) {
 					else
 						state.value = Value(value);
 					release(); // must release before calling .stop
-					state.stop();
+					state.stopSource.stop();
 				} else
 					release();
 
@@ -190,7 +191,7 @@ private struct RaceReceiver(Receiver, InnerValue, Value) {
 			with (state.bitfield.update(Flags.value_produced, Counter.tick)) {
 				bool last = isLast(newState);
 				if (!isValueProduced(oldState)) {
-					state.stop();
+					state.stopSource.stop();
 				}
 
 				if (last)
@@ -202,7 +203,7 @@ private struct RaceReceiver(Receiver, InnerValue, Value) {
 		with (state.bitfield.update(Flags.doneOrError_produced, Counter.tick)) {
 			bool last = isLast(newState);
 			if (state.noDropouts && !isDoneOrErrorProduced(oldState)) {
-				state.stop();
+				state.stopSource.stop();
 			}
 
 			if (last)
@@ -217,7 +218,7 @@ private struct RaceReceiver(Receiver, InnerValue, Value) {
 				state.exception = exception;
 				if (state.noDropouts) {
 					release(); // release before stop
-					state.stop();
+					state.stopSource.stop();
 				}
 			}
 

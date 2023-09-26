@@ -21,13 +21,10 @@ enum ThrottleEmitLogic : uint {
 	last // emit the last item in the window
 }
 
-;
 enum ThrottleTimerLogic : uint {
 	noop, // don't reset the timer on new items
 	rearm // reset the timer on new items
 }
-
-;
 
 /// throttleFirst forwards one item and then enters a cooldown period during which it ignores items
 auto throttleFirst(Stream)(Stream s, Duration d) {
@@ -78,9 +75,9 @@ template ThrottleStreamOp(Stream, ThrottleEmitLogic emitLogic,
 		alias InnerReceiver =
 			TimerReceiver!(typeof(this), Properties.ElementType, emitLogic,
 			               timerLogic);
-		StopSource stopSource;
-		StopSource timerStopSource;
-		StopCallback cb;
+		shared StopSource stopSource;
+		shared StopSource timerStopSource;
+		shared StopCallback cb;
 		Throwable throwable;
 		alias Op = OpType!(Properties.Sender,
 		                   SenderReceiver!(typeof(this), Properties.Value));
@@ -97,8 +94,6 @@ template ThrottleStreamOp(Stream, ThrottleEmitLogic emitLogic,
 			this.dur = dur;
 			this.dg = dg;
 			this.receiver = receiver;
-			stopSource = new StopSource();
-			timerStopSource = new StopSource();
 			op = stream.collect(cast(Properties.DG) &onItem).connect(
 				SenderReceiver!(typeof(this), Properties.Value)(&this));
 		}
@@ -266,9 +261,9 @@ template ThrottleStreamOp(Stream, ThrottleEmitLogic emitLogic,
 		}
 
 		void start() @trusted nothrow scope {
-			cb = receiver.getStopToken().onStop(
-				cast(void delegate() nothrow @safe shared) &this.stop
-			); // butt ugly cast, but it won't take the second overload
+			auto stopToken = receiver.getStopToken();
+			// butt ugly cast, but it won't take the second overload
+			cb.register(stopToken, cast(void delegate() nothrow @safe shared) &this.stop);
 			op.start();
 		}
 	}
@@ -315,7 +310,7 @@ struct TimerReceiver(Op, ElementType, ThrottleEmitLogic emitLogic,
 	}
 
 	auto getStopToken() {
-		return StopToken(state.timerStopSource);
+		return state.timerStopSource.token();
 	}
 
 	auto getScheduler() {
@@ -355,7 +350,7 @@ struct SenderReceiver(Op, Value) {
 	}
 
 	auto getStopToken() {
-		return StopToken(state.stopSource);
+		return state.stopSource.token();
 	}
 
 	auto getScheduler() {

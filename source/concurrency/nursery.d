@@ -1,8 +1,8 @@
 module concurrency.nursery;
 
-import concurrency.stoptoken : StopSource, StopToken, StopCallback, onStop;
+import concurrency.stoptoken : StopSource, StopToken, StopCallback;
 import concurrency.thread : LocalThreadExecutor;
-import concurrency.receiver : getStopToken;
+// import concurrency.receiver : getStopToken;
 import concurrency.scheduler : SchedulerObjectBase;
 import std.typecons : Nullable;
 
@@ -14,7 +14,7 @@ import std.typecons : Nullable;
 /// When cancellation happens all Senders are waited on for completion.
 /// Senders can be added to the Nursery at any time.
 /// Senders are only started when the Nursery itself is being awaited on.
-class Nursery : StopSource {
+class Nursery {
 	import concurrency.sender : isSender, OperationalStateBase;
 	import core.sync.mutex : Mutex;
 	import concepts;
@@ -22,6 +22,7 @@ class Nursery : StopSource {
 
 	alias Value = void;
 	private {
+		shared StopSource stopSource;
 		Node[] operations;
 		struct Node {
 			OperationalStateBase state;
@@ -38,7 +39,7 @@ class Nursery : StopSource {
 		shared size_t counter = 0;
 		Throwable throwable; // first throwable from sender, if any
 		ReceiverObject receiver;
-		StopCallback stopCallback;
+		shared StopCallback stopCallback;
 		Nursery assumeThreadSafe() @trusted shared nothrow {
 			return cast(Nursery) this;
 		}
@@ -50,8 +51,8 @@ class Nursery : StopSource {
 		with (assumeThreadSafe) mutex = new Mutex();
 	}
 
-	override bool stop() nothrow @trusted {
-		auto result = super.stop();
+	bool stop() nothrow @trusted {
+		auto result = stopSource.stop();
 
 		if (result)
 			(cast(shared) this).done(-1);
@@ -59,12 +60,13 @@ class Nursery : StopSource {
 		return result;
 	}
 
-	override bool stop() nothrow @trusted shared {
+	bool stop() nothrow @trusted shared {
 		return (cast(Nursery) this).stop();
 	}
 
-	StopToken getStopToken() nothrow @trusted shared {
-		return StopToken(cast(Nursery) this);
+	shared(StopToken) getStopToken() nothrow @safe shared {
+		return stopSource.token();
+		// return shared StopToken(stopSource);
 	}
 
 	private auto getScheduler() nothrow @trusted shared {
@@ -94,9 +96,9 @@ class Nursery : StopSource {
 			if (isDone) {
 				throwable = null;
 				receiver = null;
-				if (stopCallback)
-					stopCallback.dispose();
-				stopCallback = null;
+				// if (stopCallback)
+				stopCallback.dispose();
+				// stopCallback = null;
 			}
 
 			mutex.unlock_nothrow();
@@ -104,7 +106,7 @@ class Nursery : StopSource {
 			if (isDone && localReceiver !is null) {
 				if (localThrowable !is null) {
 					localReceiver.setError(localThrowable);
-				} else if (isStopRequested()) {
+				} else if (stopSource.isStopRequested()) {
 					localReceiver.setDone();
 				} else {
 					try {
@@ -122,7 +124,7 @@ class Nursery : StopSource {
 			run(sender.get());
 	}
 
-	void run(Sender)(Sender sender) shared @trusted {
+	void run(Sender)(Sender sender) @trusted shared {
 		import concepts;
 		static assert(models!(Sender, isSender));
 		import std.typecons : Nullable;
@@ -161,7 +163,7 @@ class Nursery : StopSource {
 
 	auto connect(Receiver)(
 		return Receiver receiver
-	) shared @trusted return scope {
+	) @trusted shared return scope {
 		final class ReceiverImpl : ReceiverObject {
 			Receiver receiver;
 			SchedulerObjectBase scheduler;
@@ -187,21 +189,24 @@ class Nursery : StopSource {
 					scheduler = receiver.getScheduler().toSchedulerObject();
 				return scheduler;
 			}
+
+			shared(StopToken) getStopToken() nothrow @safe {
+				return receiver.getStopToken();
+			}
 		}
 
-		auto stopToken = receiver.getStopToken();
-		auto cb = (() @trusted => stopToken
-			.onStop(() shared nothrow @trusted => cast(void) this.stop()))();
-		return NurseryOp(this, cb, new ReceiverImpl(receiver));
+		return NurseryOp(this, new ReceiverImpl(receiver));
 	}
 
 	private
-	void setReceiver(ReceiverObject r, StopCallback cb) nothrow @safe shared {
+	void setReceiver(ReceiverObject r) nothrow @trusted shared {
 		with (assumeThreadSafe) {
 			mutex.lock_nothrow();
 			assert(this.receiver is null, "Cannot await a nursery twice.");
 			receiver = r;
-			stopCallback = cb;
+			auto dg = () nothrow @safe shared => cast(void) this.stop();
+			auto stopToken = r.getStopToken;
+			stopCallback.register(stopToken, dg);
 			auto ops = operations.dup();
 			mutex.unlock_nothrow();
 
@@ -217,6 +222,7 @@ private interface ReceiverObject {
 	void setDone() nothrow @safe;
 	void setError(Throwable e) nothrow @safe;
 	SchedulerObjectBase getScheduler() nothrow @safe;
+	shared(StopToken) getStopToken() nothrow @safe;
 }
 
 private struct NurseryReceiver(Value) {
@@ -228,7 +234,7 @@ private struct NurseryReceiver(Value) {
 	}
 
 	static if (is(Value == void)) {
-		void setValue() shared @safe {
+		void setValue() @safe shared {
 			(cast() this).setDone();
 		}
 
@@ -236,7 +242,7 @@ private struct NurseryReceiver(Value) {
 			(cast() this).setDone();
 		}
 	} else {
-		void setValue(Value val) shared @trusted {
+		void setValue(Value val) @trusted shared {
 			(cast() this).setDone();
 		}
 
@@ -264,24 +270,24 @@ private struct NurseryReceiver(Value) {
 
 private struct NurseryOp {
 	shared Nursery nursery;
-	StopCallback cb;
 	ReceiverObject receiver;
 	@disable
 	this(ref return scope typeof(this) rhs);
 	@disable
 	this(this);
-	this(return shared Nursery n, StopCallback cb,
-	     ReceiverObject r) @safe return scope {
+	this(shared Nursery n,
+	     ReceiverObject r) @safe {
 		nursery = n;
-		this.cb = cb;
+		// this.cb = cb;
 		receiver = r;
 	}
 
 	void start() nothrow scope @trusted {
 		import core.atomic : atomicLoad;
-		if (nursery.busy.atomicLoad == 0)
+		if (nursery.busy.atomicLoad == 0) {
+			// cb.dispose();
 			receiver.setDone();
-		else
-			nursery.setReceiver(receiver, cb);
+		} else
+			nursery.setReceiver(receiver);//, cb);
 	}
 }

@@ -3,7 +3,7 @@ module concurrency.stream.flatmapbase;
 import concurrency.stream.stream;
 import concurrency.sender : OpType, isSender;
 import concurrency.receiver : ForwardExtensionPoints;
-import concurrency.stoptoken : StopSource, StopToken;
+import concurrency.stoptoken : StopToken;
 import std.traits : ReturnType;
 import concurrency.utils : isThreadSafeFunction;
 import concepts;
@@ -42,7 +42,7 @@ template FlatMapBaseStreamOp(Stream, Fun, OnOverlap overlap) {
 
 		static if (is(Properties.ElementType == void))
 			void item() {
-				if (state.isStopRequested)
+				if (state.stopSource.isStopRequested)
 					return;
 				state.onItem();
 				with (state.bitfield.lock()) {
@@ -58,7 +58,7 @@ template FlatMapBaseStreamOp(Stream, Fun, OnOverlap overlap) {
 
 		else
 			void item(Properties.ElementType t) {
-				if (state.isStopRequested)
+				if (state.stopSource.isStopRequested)
 					return;
 				state.onItem();
 				with (state.bitfield.lock()) {
@@ -104,7 +104,7 @@ private bool isDoneOrErrorProduced(size_t state) @safe @nogc nothrow pure {
 }
 
 final class State(TStreamSenderValue, TSenderValue, Receiver,
-                  OnOverlap overlap) : StopSource {
+                  OnOverlap overlap) {
 	import concurrency.bitfield;
 	import concurrency.stoptoken;
 	import std.exception : assumeWontThrow;
@@ -118,32 +118,31 @@ final class State(TStreamSenderValue, TSenderValue, Receiver,
 		StreamSenderValue value;
 	Throwable throwable;
 	Semaphore semaphore;
-	StopCallback cb;
+	shared StopSource stopSource;
+	shared StopCallback cb;
 	static if (overlap == OnOverlap.latest)
-		StopSource innerStopSource;
+		shared StopSource innerStopSource;
 	shared SharedBitField!Flags bitfield;
 	this(DG dg, Receiver receiver) {
 		this.dg = dg;
 		this.receiver = receiver;
 		semaphore = new Semaphore(1);
-		static if (overlap == OnOverlap.latest)
-			innerStopSource = new StopSource();
 		bitfield = SharedBitField!Flags(Counter.tick);
-		cb = receiver.getStopToken
-		             .onStop(cast(void delegate() nothrow @safe shared) &stop);
+		auto stopToken = receiver.getStopToken;
+		cb.register(stopToken, cast(void delegate() nothrow @safe shared) &stop);
 	}
 
-	override bool stop() nothrow @trusted {
+	bool stop() nothrow @trusted {
 		return (cast(shared) this).stop();
 	}
 
-	override bool stop() nothrow @trusted shared {
+	bool stop() nothrow @trusted shared {
 		static if (overlap == OnOverlap.latest) {
-			auto r = super.stop();
+			auto r = stopSource.stop();
 			innerStopSource.stop();
 			return r;
 		} else {
-			return super.stop();
+			return stopSource.stop();
 		}
 	}
 
@@ -176,11 +175,11 @@ final class State(TStreamSenderValue, TSenderValue, Receiver,
 		}
 	}
 
-	private StopToken getSenderStopToken() @safe nothrow {
+	private shared(StopToken) getSenderStopToken() @safe nothrow {
 		static if (overlap == OnOverlap.latest) {
-			return StopToken(innerStopSource);
+			return innerStopSource.token();
 		} else {
-			return StopToken(this);
+			return stopSource.token();
 		}
 	}
 }
@@ -212,7 +211,7 @@ struct StreamReceiver(State) {
 			if (!isDoneOrErrorProduced(oldState)) {
 				state.throwable = t;
 				release(); // must release before calling .stop
-				state.stop();
+				state.stopSource.stop();
 			} else
 				release();
 			if (last)
@@ -224,14 +223,14 @@ struct StreamReceiver(State) {
 		with (state.bitfield.update(Flags.doneOrError_produced, Counter.tick)) {
 			bool last = isLast(newState);
 			if (!isDoneOrErrorProduced(oldState))
-				state.stop();
+				state.stopSource.stop();
 			if (last)
 				state.process(newState);
 		}
 	}
 
-	StopToken getStopToken() @safe nothrow {
-		return StopToken(state);
+	shared(StopToken) getStopToken() @safe nothrow {
+		return state.stopSource.token();
 	}
 
 	private auto receiver() {
@@ -261,7 +260,7 @@ struct InnerSenderReceiver(State) {
 			if (!isDoneOrErrorProduced(oldState)) {
 				state.throwable = t;
 				release(); // must release before calling .stop
-				state.stop();
+				state.stopSource.stop();
 			} else
 				release();
 			if (last)
@@ -273,7 +272,7 @@ struct InnerSenderReceiver(State) {
 
 	void setDone() @safe nothrow {
 		static if (State.onOverlap == OnOverlap.latest) {
-			if (!state.isStopRequested) {
+			if (!state.stopSource.isStopRequested) {
 				state.bitfield.add(Counter.tick);
 				notify();
 				return;
@@ -283,7 +282,7 @@ struct InnerSenderReceiver(State) {
 		with (state.bitfield.update(Flags.doneOrError_produced, Counter.tick)) {
 			bool last = isLast(newState);
 			if (!isDoneOrErrorProduced(oldState))
-				state.stop();
+				state.stopSource.stop();
 			if (last)
 				state.process(newState);
 			else

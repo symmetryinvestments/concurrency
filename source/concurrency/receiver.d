@@ -17,11 +17,6 @@ void checkReceiver(T)() {
 
 enum isReceiver(T) = is(typeof(checkReceiver!T));
 
-auto getStopToken(Receiver)(Receiver r) nothrow @safe if (isReceiver!Receiver) {
-	import concurrency.stoptoken : NeverStopToken;
-	return NeverStopToken();
-}
-
 mixin template ForwardExtensionPoints(alias receiver) {
 	auto getStopToken() nothrow @safe {
 		return receiver.getStopToken();
@@ -43,7 +38,7 @@ interface ReceiverObjectBase(T) {
 		void setValue(T value = T.init) @safe;
 	void setDone() nothrow @safe;
 	void setError(Throwable e) nothrow @safe;
-	StopToken getStopToken() nothrow @safe;
+	shared(StopToken) getStopToken() nothrow @safe;
 	SchedulerObjectBase getScheduler() scope nothrow @safe;
 }
 

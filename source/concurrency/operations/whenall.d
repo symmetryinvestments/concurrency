@@ -117,12 +117,11 @@ private struct WhenAllOp(Receiver, Senders...) {
 	this(return Receiver receiver,
 	     return Senders senders) @trusted scope return {
 		this.receiver = receiver;
-		state = new WhenAllState!R();
 		static if (Senders.length > 1) {
 			foreach (i, Sender; Senders) {
 				ops[i] = senders[i].connect(
 					WhenAllReceiver!(Receiver, Sender.Value,
-					                 R)(receiver, state, i, Senders.length));
+					                 R)(receiver, &state, i, Senders.length));
 			}
 		} else {
 			static if (!is(ArrayElement!(Senders).Value : void))
@@ -131,21 +130,21 @@ private struct WhenAllOp(Receiver, Senders...) {
 			foreach (i; 0 .. senders[0].length) {
 				ops[i] = senders[0][i].connect(
 					WhenAllReceiver!(Receiver, ArrayElement!(Senders).Value,
-					                 R)(receiver, state, i, senders[0].length));
+					                 R)(receiver, &state, i, senders[0].length));
 			}
 		}
 	}
 
 	void start() @trusted nothrow scope {
-		import concurrency.stoptoken : StopSource;
 		if (receiver.getStopToken().isStopRequested) {
 			receiver.setDone();
 			return;
 		}
 
-		state.cb = receiver.getStopToken().onStop(
-			cast(void delegate() nothrow @safe shared) &state.stop
-		); // butt ugly cast, but it won't take the second overload
+		auto token = receiver.getStopToken();
+		// butt ugly cast, but it won't take the second overload
+		state.cb.register(token, cast(void delegate() nothrow @safe shared) &state.stopSource.stop);
+
 		static if (Senders.length > 1) {
 			foreach (i, _; Senders) {
 				ops[i].start();
@@ -177,9 +176,10 @@ struct WhenAllSender(Senders...)
 	}
 }
 
-private class WhenAllState(Value) : StopSource {
+private struct WhenAllState(Value) {
 	import concurrency.bitfield;
-	StopCallback cb;
+	shared StopSource stopSource;
+	shared StopCallback cb;
 	static if (is(typeof(Value.values)))
 		Value value;
 	Throwable exception;
@@ -189,11 +189,11 @@ private class WhenAllState(Value) : StopSource {
 private struct WhenAllReceiver(Receiver, InnerValue, Value) {
 	import core.atomic : atomicOp, atomicLoad, MemoryOrder;
 	Receiver receiver;
-	WhenAllState!(Value) state;
+	WhenAllState!(Value)* state;
 	size_t senderIndex;
 	size_t senderCount;
 	auto getStopToken() {
-		return StopToken(state);
+		return state.stopSource.token();
 	}
 
 	private bool isValueProduced(size_t state) {
@@ -232,7 +232,7 @@ private struct WhenAllReceiver(Receiver, InnerValue, Value) {
 		with (state.bitfield.update(Flags.doneOrError_produced, Counter.tick)) {
 			bool last = isLast(newState);
 			if (!isDoneOrErrorProduced(oldState))
-				state.stop();
+				state.stopSource.stop();
 			if (last)
 				process(newState);
 		}
@@ -244,7 +244,7 @@ private struct WhenAllReceiver(Receiver, InnerValue, Value) {
 			if (!isDoneOrErrorProduced(oldState)) {
 				state.exception = exception;
 				release(); // must release before calling .stop
-				state.stop();
+				state.stopSource.stop();
 			} else
 				release();
 			if (last)
