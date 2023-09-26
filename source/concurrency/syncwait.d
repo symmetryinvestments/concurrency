@@ -140,9 +140,11 @@ auto syncWait(Sender)(auto scope ref Sender sender) {
 		childStopSource.stop();
 	});
 	StopToken parentStopToken = StopToken(globalStopSource);
-	// parentStopToken.onStop(cb);
+	parentStopToken.onStop(cb);
 	auto result =
 		syncWaitImpl(sender, (() @trusted => cast() childStopSource)());
+
+	childStopSource.assertNoCallbacks;
 	// detach stopSource
 	cb.dispose();
 	return result;

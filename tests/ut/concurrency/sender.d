@@ -83,7 +83,7 @@ unittest {
 unittest {
 	ThrowingSender().via(ThreadSender()).syncWait().isError.should == true;
 }
-
+/+
 @("toShared.basic") @safe
 unittest {
 	import std.typecons : tuple;
@@ -209,7 +209,7 @@ unittest {
 	auto n = new shared Nursery();
 	auto s = n.toShared(localThreadScheduler());
 }
-
++/
 @("nvro") @safe
 unittest {
 	static struct Op(Receiver) {

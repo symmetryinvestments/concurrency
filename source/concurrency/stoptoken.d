@@ -34,6 +34,11 @@ struct InPlaceStopSource {
 	private ref assumeThreadSafe() @trusted @nogc nothrow shared {
 		return cast()this;
 	}
+
+	void assertNoCallbacks() @safe shared {
+		with (assumeThreadSafe)
+			state.assertNoCallbacks();
+	}
 }
 
 class StopSource {
@@ -58,6 +63,10 @@ class StopSource {
 	/// resets the internal state, only do this if you are sure nothing else is looking at this...
 	void reset(this t)() @system @nogc {
 		return source.reset();
+	}
+
+	void assertNoCallbacks() @safe shared {
+		source.assertNoCallbacks();
 	}
 }
 
@@ -434,6 +443,13 @@ public:
 	}
 
 private:
+	void assertNoCallbacks() @safe {
+		lock();
+		auto empty = head_ is null;
+		unlock();
+		assert(empty, "StopSource has lingering callbacks");
+	}
+
 	static bool is_locked(ulong state) nothrow @safe @nogc {
 		return (state & locked_flag) != 0;
 	}

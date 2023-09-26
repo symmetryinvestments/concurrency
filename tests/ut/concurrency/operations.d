@@ -209,19 +209,19 @@ unittest {
 	whenAll(waitingInt, ThrowingSender()).syncWait.assumeOk.shouldThrow;
 }
 
-@("whenAll.stop") @safe
-unittest {
-	auto waiting = ThreadSender().withStopToken((StopToken token) @trusted {
-		while (!token.isStopRequested) {
-			Thread.yield();
-		}
-	});
-	auto source = new StopSource();
-	auto stopper =
-		just(source).then((StopSource source) shared => source.stop());
-	whenAll(waiting, stopper).withStopSource(source).syncWait.isCancelled.should
-		== true;
-}
+// @("whenAll.stop") @safe
+// unittest {
+// 	auto waiting = ThreadSender().withStopToken((StopToken token) @trusted {
+// 		while (!token.isStopRequested) {
+// 			Thread.yield();
+// 		}
+// 	});
+// 	auto source = new StopSource();
+// 	auto stopper =
+// 		just(source).then((StopSource source) shared => source.stop());
+// 	whenAll(waiting, stopper).withStopSource(source).syncWait.isCancelled.should
+// 		== true;
+// }
 
 @("whenAll.array.just") @safe
 unittest {

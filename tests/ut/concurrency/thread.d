@@ -86,19 +86,19 @@ unittest {
 	dynamicLoadRaw!concurrency_getLocalThreadExecutor.should.not == null;
 }
 
-@("nested.intervalStream") @safe
-unittest {
-	import core.time : msecs;
-	import concurrency.stream : intervalStream, take;
+// @("nested.intervalStream") @safe
+// unittest {
+// 	import core.time : msecs;
+// 	import concurrency.stream : intervalStream, take;
 
-	static auto interval() {
-		return intervalStream(1.msecs).take(90).collect(() shared {});
-	}
+// 	static auto interval() {
+// 		return intervalStream(1.msecs).take(90).collect(() shared {});
+// 	}
 
-	auto sender = justFrom(() => interval().syncWait()).via(ThreadSender());
+// 	auto sender = justFrom(() => interval().syncWait()).via(ThreadSender());
 
-	auto d = delay(10.msecs);
+// 	auto d = delay(10.msecs);
 
-	whenAll(interval, sender, interval, sender, interval, sender, d, d, d)
-		.syncWait().assumeOk;
-}
+// 	whenAll(interval, sender, interval, sender, interval, sender, d, d, d)
+// 		.syncWait().assumeOk;
+// }

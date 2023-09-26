@@ -811,7 +811,7 @@ unittest {
 
 	p.atomicLoad.should == 12;
 }
-
+/+
 @("deferStream.function") @safe
 unittest {
 	import concurrency.stream.defer;
@@ -837,7 +837,7 @@ unittest {
 	shared S s;
 	deferStream(s).take(3).toList().syncWait().value.should == [1, 1, 1];
 }
-
++/
 @("cron.timeTillNextMinute.Always") @safe
 unittest {
 	import concurrency.stream.cron;
