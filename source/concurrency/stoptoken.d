@@ -5,39 +5,43 @@ module concurrency.stoptoken;
 
 struct InPlaceStopSource {
 	@disable this(ref return scope typeof(this) rhs);
-	private stop_state state;
-	bool stop() nothrow @safe {
+	private shared stop_state state;
+	bool stop() nothrow @safe shared {
 		return state.request_stop();
 	}
 
-	bool stop() nothrow @safe shared {
-		with (assumeThreadSafe) {
+	bool stop() nothrow @safe {
+		with (assumeSafeShared) {
 			return stop();
 		}
 	}
 
-	bool isStopRequested() nothrow @safe @nogc {
+	bool isStopRequested() nothrow @safe @nogc shared {
 		return state.is_stop_requested();
 	}
 
-	bool isStopRequested() nothrow @safe @nogc shared {
-		with (assumeThreadSafe) {
+	bool isStopRequested() nothrow @safe @nogc {
+		with (assumeSafeShared) {
 			return isStopRequested();
 		}
 	}
 
 	/// resets the internal state, only do this if you are sure nothing else is looking at this...
-	void reset(this t)() @system @nogc {
+	void reset(this t)() @system @nogc shared {
 		this.state = stop_state();
 	}
 
-	private ref assumeThreadSafe() @trusted @nogc nothrow shared {
-		return cast()this;
+	private ref assumeSafeShared() @trusted @nogc nothrow {
+		return cast(shared)this;
 	}
 
 	void assertNoCallbacks() @safe shared {
-		with (assumeThreadSafe)
-			state.assertNoCallbacks();
+		state.assertNoCallbacks();
+	}
+
+	void assertNoCallbacks() @safe {
+		with (assumeSafeShared)
+			assertNoCallbacks();
 	}
 }
 
@@ -62,7 +66,7 @@ class StopSource {
 
 	/// resets the internal state, only do this if you are sure nothing else is looking at this...
 	void reset(this t)() @system @nogc {
-		return source.reset();
+		return (cast(shared)source).reset();
 	}
 
 	void assertNoCallbacks() @safe shared {
@@ -71,7 +75,7 @@ class StopSource {
 }
 
 struct StopToken {
-	package(concurrency) stop_state* state;
+	package(concurrency) shared stop_state* state;
 	this(StopSource source) nothrow @safe @nogc {
 		if (source !is null) {
 			this.state = &source.source.state;
@@ -83,16 +87,16 @@ struct StopToken {
 		this(cast()source);
 	}
 
-	this(ref stop_state state) nothrow @trusted @nogc {
+	this(ref shared stop_state state) nothrow @trusted @nogc {
 		isStopPossible = true;
 		this.state = &state;
 	}
 
-	this (ref InPlaceStopSource stopSource) nothrow @trusted @nogc {
+	this (ref shared InPlaceStopSource stopSource) nothrow @trusted @nogc {
 		this(stopSource.state);
 	}
 
-	this (InPlaceStopSource* stopSource) nothrow @trusted @nogc {
+	this (shared InPlaceStopSource* stopSource) nothrow @trusted @nogc {
 		if (stopSource !is null) {
 			isStopPossible = true;
 			this.state = &stopSource.state;
@@ -124,6 +128,13 @@ StopCallback onStop(StopSource stopSource,
 	import std.functional : toDelegate;
 	return stopSource
 		.onStop(cast(void delegate() nothrow @safe shared) callback.toDelegate);
+}
+
+StopCallback onStop(
+	ref InPlaceStopSource stopSource,
+	void delegate() nothrow @safe shared callback
+) nothrow @safe {
+	return stopSource.state.onStop(new StopCallback(callback));
 }
 
 StopCallback onStop(StopToken)(
@@ -158,8 +169,9 @@ StopCallback onStop(StopSource stopSource, StopCallback cb) nothrow @safe {
 	return onStop(stopSource.source.state, cb);
 }
 
-StopCallback onStop(ref stop_state state, StopCallback cb) nothrow @trusted { // TODO: @safe
-	if (state.try_add_callback(cb, true))
+StopCallback onStop(ref shared stop_state state, StopCallback cb) nothrow @trusted { // TODO: @safe
+	// TODO: shared
+	if (state.try_add_callback(cast(shared)cb, true))
 		cb.state = &state;
 	return cb;
 }
@@ -197,14 +209,14 @@ class StopCallback {
 private:
 
 	void delegate() nothrow shared @safe callback;
-	stop_state* state;
+	shared stop_state* state;
 
-	StopCallback next_ = null;
-	StopCallback* prev_ = null;
-	bool* isRemoved_ = null;
+	shared StopCallback next_ = null;
+	shared StopCallback* prev_ = null;
+	shared bool* isRemoved_ = null;
 	shared bool callbackFinishedExecuting = false;
 
-	void execute() nothrow @safe {
+	void execute() nothrow @safe shared {
 		callback();
 	}
 }
@@ -244,23 +256,23 @@ private struct stop_state {
 		}
 
 public:
-	void add_token_reference() nothrow @safe @nogc {
+	void add_token_reference() nothrow @safe @nogc shared {
 		state_.atomicFetchAdd!(MemoryOrder.raw)(token_ref_increment);
 	}
 
-	void remove_token_reference() nothrow @safe @nogc {
+	void remove_token_reference() nothrow @safe @nogc shared {
 		state_.atomicFetchSub!(MemoryOrder.acq_rel)(token_ref_increment);
 	}
 
-	void add_source_reference() nothrow @safe @nogc {
+	void add_source_reference() nothrow @safe @nogc shared {
 		state_.atomicFetchAdd!(MemoryOrder.raw)(source_ref_increment);
 	}
 
-	void remove_source_reference() nothrow @safe @nogc {
+	void remove_source_reference() nothrow @safe @nogc shared {
 		state_.atomicFetchSub!(MemoryOrder.acq_rel)(source_ref_increment);
 	}
 
-	bool request_stop() nothrow @safe {
+	bool request_stop() nothrow @safe shared {
 		if (!try_lock_and_signal_until_signalled()) {
 			// Stop has already been requested.
 			return false;
@@ -268,7 +280,7 @@ public:
 
 		// Set the 'stop_requested' signal and acquired the lock.
 
-		signallingThread_ = Thread.getThis();
+		assumeThreadSafe.signallingThread_ = Thread.getThis();
 
 		while (head_ !is null) {
 			// Dequeue the head of the queue
@@ -294,7 +306,7 @@ public:
 			// If the destructor runs on some other thread then the other
 			// thread will block waiting for this thread to signal that the
 			// callback has finished executing.
-			bool isRemoved = false;
+			shared bool isRemoved = false;
 			(() @trusted => cb.isRemoved_ =
 				&isRemoved)(); // the pointer to the stack here is removed 3 lines down.
 
@@ -322,16 +334,16 @@ public:
 		return true;
 	}
 
-	bool is_stop_requested() nothrow @safe @nogc {
+	bool is_stop_requested() nothrow @safe @nogc shared {
 		return is_stop_requested(state_.atomicLoad!(MemoryOrder.acq));
 	}
 
-	bool is_stop_requestable() nothrow @safe @nogc {
+	bool is_stop_requestable() nothrow @safe @nogc shared {
 		return is_stop_requestable(state_.atomicLoad!(MemoryOrder.acq));
 	}
 
-	bool try_add_callback(StopCallback cb,
-	                      bool incrementRefCountIfSuccessful) nothrow @safe {
+	bool try_add_callback(shared StopCallback cb,
+	                      bool incrementRefCountIfSuccessful) nothrow @safe shared {
 		ulong oldState;
 		do {
 			goto load_state;
@@ -371,7 +383,7 @@ public:
 		return true;
 	}
 
-	void remove_callback(StopCallback cb) nothrow @safe @nogc {
+	void remove_callback(StopCallback cb) nothrow @safe @nogc shared {
 		lock();
 
 		if (cb.prev_ !is null) {
@@ -392,7 +404,7 @@ public:
 		// Callback has either already executed or is executing
 		// concurrently on another thread.
 
-		if (signallingThread_ is Thread.getThis()) {
+		if (assumeThreadSafe.signallingThread_ is Thread.getThis()) {
 			// Callback executed on this thread or is still currently executing
 			// and is deregistering itself from within the callback.
 			if (cb.isRemoved_ !is null) {
@@ -413,7 +425,7 @@ public:
 	}
 
 private:
-	void assertNoCallbacks() @safe {
+	void assertNoCallbacks() @safe shared {
 		lock();
 		auto empty = head_ is null;
 		unlock();
@@ -434,7 +446,7 @@ private:
 		return is_stop_requested(state) || (state >= source_ref_increment);
 	}
 
-	bool try_lock_and_signal_until_signalled() nothrow @safe @nogc {
+	bool try_lock_and_signal_until_signalled() nothrow @safe @nogc shared {
 		ulong oldState;
 		do {
 			oldState = state_.atomicLoad!(MemoryOrder.acq);
@@ -453,7 +465,7 @@ private:
 		return true;
 	}
 
-	void lock() nothrow @safe @nogc {
+	void lock() nothrow @safe @nogc shared {
 		ulong oldState;
 		do {
 			oldState = state_.atomicLoad!(MemoryOrder.raw);
@@ -465,15 +477,15 @@ private:
 			         (&state_), oldState, oldState | locked_flag));
 	}
 
-	void unlock() nothrow @safe @nogc {
+	void unlock() nothrow @safe @nogc shared {
 		state_.atomicFetchSub!(MemoryOrder.rel)(locked_flag);
 	}
 
-	void unlock_and_increment_token_ref_count() nothrow @safe @nogc {
+	void unlock_and_increment_token_ref_count() nothrow @safe @nogc shared {
 		state_.atomicFetchSub!(MemoryOrder.rel)(locked_flag - token_ref_increment);
 	}
 
-	void unlock_and_decrement_token_ref_count() nothrow @safe @nogc {
+	void unlock_and_decrement_token_ref_count() nothrow @safe @nogc shared {
 		state_.atomicFetchSub!(MemoryOrder.acq_rel)(locked_flag + token_ref_increment);
 	}
 
@@ -489,4 +501,8 @@ private:
 	shared ulong state_ = source_ref_increment;
 	StopCallback head_ = null;
 	Thread signallingThread_;
+
+	private ref assumeThreadSafe() @trusted nothrow @nogc shared {
+		return cast()this;
+	}
 }
