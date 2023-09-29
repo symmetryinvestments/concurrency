@@ -279,9 +279,10 @@ private struct NurseryOp {
 
 	void start() nothrow scope @trusted {
 		import core.atomic : atomicLoad;
-		if (nursery.busy.atomicLoad == 0)
+		if (nursery.busy.atomicLoad == 0) {
+			cb.dispose();
 			receiver.setDone();
-		else
+		} else
 			nursery.setReceiver(receiver, cb);
 	}
 }

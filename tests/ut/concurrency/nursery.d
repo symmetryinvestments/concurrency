@@ -8,12 +8,12 @@ import concurrency.nursery;
 import concurrency.stoptoken;
 import unit_threaded;
 
-// @("run.stopped") @safe
-// unittest {
-// 	auto nursery = new shared Nursery();
-// 	nursery.stop();
-// 	nursery.syncWait().isCancelled.should == true;
-// }
+@("run.stopped") @safe
+unittest {
+	auto nursery = new shared Nursery();
+	nursery.stop();
+	nursery.syncWait().isCancelled.should == true;
+}
 
 @("run.empty") @safe
 unittest {
