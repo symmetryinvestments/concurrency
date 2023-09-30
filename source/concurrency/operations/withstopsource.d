@@ -16,8 +16,8 @@ template withStopSource(Sender) {
 		return SSSender!(Sender, StopSource)(sender, cast() stopSource);
 	}
 
-	auto withStopSource(Sender sender, ref InPlaceStopSource stopSource) @trusted {
-		return SSSender!(Sender, InPlaceStopSource*)(sender, &stopSource);
+	auto withStopSource(Sender sender, ref shared InPlaceStopSource stopSource) @trusted {
+		return SSSender!(Sender, shared InPlaceStopSource*)(sender, &stopSource);
 	}
 }
 
@@ -78,7 +78,7 @@ struct SSOp(Receiver, OuterStopSource, Sender) {
 	this(this);
 	this(Receiver receiver, OuterStopSource outerStopSource, Sender sender) @trusted {
 		state.cbs[0] = receiver.getStopToken().onStop(cast(void delegate() shared @safe nothrow)&state.combinedStopSource.stop);
-		static if (is(OuterStopSource == InPlaceStopSource*)) {
+		static if (is(OuterStopSource == shared InPlaceStopSource*)) {
 			state.cbs[1] = onStop(*outerStopSource, cast(void delegate() shared @safe nothrow)&state.combinedStopSource.stop);
 		} else {
 			state.cbs[1] = outerStopSource.onStop(cast(void delegate() shared @safe nothrow)&state.combinedStopSource.stop);

@@ -216,9 +216,8 @@ unittest {
 			Thread.yield();
 		}
 	});
-	auto source = new StopSource();
-	auto stopper =
-		just(source).then((StopSource source) shared => source.stop());
+	shared source = InPlaceStopSource();
+	auto stopper = justFrom(() shared => source.stop());
 	whenAll(waiting, stopper).withStopSource(source).syncWait.isCancelled.should
 		== true;
 }
@@ -374,14 +373,8 @@ unittest {
 @("withStopSource.oob") @safe
 unittest {
 	auto oob = OutOfBandValueSender!int(45);
-	oob.withStopSource(new StopSource()).syncWait.value.should == 45;
-}
-
-@("withStopSource.oob") @safe
-unittest {
-	auto oob = OutOfBandValueSender!int(45);
-	InPlaceStopSource stopSource;
-	oob.withStopSource(stopSource).syncWait.value.should == 45;
+	shared source = InPlaceStopSource();
+	oob.withStopSource(source).syncWait.value.should == 45;
 }
 
 @("withStopSource.tuple") @safe
@@ -438,8 +431,8 @@ unittest {
 	import concurrency.scheduler : ManualTimeWorker;
 
 	auto worker = new shared ManualTimeWorker();
-	auto source = new StopSource();
-	auto driver = just(source).then((StopSource source) shared {
+	shared InPlaceStopSource source;
+	auto driver = justFrom(() shared {
 		worker.timeUntilNextEvent().should == 10.msecs.nullable;
 		source.stop();
 		worker.timeUntilNextEvent().isNull.should == true;
@@ -499,8 +492,8 @@ unittest {
 
 @("stopOn") @safe
 unittest {
-	auto sourceInner = new shared StopSource();
-	auto sourceOuter = new shared StopSource();
+	shared sourceInner = InPlaceStopSource();
+	shared sourceOuter = InPlaceStopSource();
 
 	shared bool b;
 	whenAll(
@@ -550,7 +543,7 @@ unittest {
 	}
 
 	auto state = new shared State();
-	auto source = new shared StopSource;
+	shared source = InPlaceStopSource();
 
 	import std.stdio;
 	auto child = just(state)
@@ -569,7 +562,7 @@ unittest {
 
 	whenAll(
 		parent.withChild(child).withStopSource(source),
-		just(source).then((shared StopSource s) => s.stop())
+		justFrom(() shared => source.stop())
 	).syncWait.isCancelled.should == true;
 
 	state.parentAfterChild.atomicLoad.should == true;

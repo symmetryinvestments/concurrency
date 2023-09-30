@@ -120,14 +120,12 @@ final class State(TStreamSenderValue, TSenderValue, Receiver,
 	Semaphore semaphore;
 	StopCallback cb;
 	static if (overlap == OnOverlap.latest)
-		StopSource innerStopSource;
+		shared InPlaceStopSource innerStopSource;
 	shared SharedBitField!Flags bitfield;
 	this(DG dg, Receiver receiver) {
 		this.dg = dg;
 		this.receiver = receiver;
 		semaphore = new Semaphore(1);
-		static if (overlap == OnOverlap.latest)
-			innerStopSource = new StopSource();
 		bitfield = SharedBitField!Flags(Counter.tick);
 		cb = receiver.getStopToken
 		             .onStop(cast(void delegate() nothrow @safe shared) &stop);

@@ -18,15 +18,14 @@ package struct SyncWaitReceiver2(Value) {
 		static if (!is(Value == void))
 			Value result;
 		Throwable throwable;
-		StopSource stopSource;
 
-		this(StopSource stopSource) {
-			this.stopSource = stopSource;
-			worker = LocalThreadWorker(getLocalThreadExecutor());
+		static auto init() {
+			return State(LocalThreadWorker(getLocalThreadExecutor()));
 		}
 	}
 
 	State* state;
+	shared InPlaceStopSource* stopSource;
 	void setDone() nothrow @safe {
 		state.canceled = true;
 		state.worker.stop();
@@ -49,7 +48,7 @@ package struct SyncWaitReceiver2(Value) {
 		}
 
 	auto getStopToken() nothrow @safe @nogc {
-		return StopToken(state.stopSource);
+		return StopToken(*stopSource);
 	}
 
 	auto getScheduler() nothrow @safe {
@@ -128,31 +127,36 @@ template match(Handlers...) {
 }
 
 /// Start the Sender and waits until it completes, cancels, or has an error.
-auto syncWait(Sender, StopSource)(auto ref Sender sender,
-                                  StopSource stopSource) {
-	return syncWaitImpl(sender, (() @trusted => cast() stopSource)());
+auto syncWait(Sender)(auto ref Sender sender,
+					  shared ref InPlaceStopSource stopSource) {
+	return syncWaitImpl(sender, stopSource);
 }
 
-auto syncWait(Sender)(auto scope ref Sender sender) {
+auto syncWait(Sender)(auto scope ref Sender sender) @trusted {
 	import concurrency.signal : globalStopSource;
-	auto childStopSource = new shared StopSource();
+	shared InPlaceStopSource childStopSource;
 	auto cb = InPlaceStopCallback(() shared {
 		childStopSource.stop();
 	});
 	StopToken parentStopToken = StopToken(globalStopSource);
 	parentStopToken.onStop(cb);
-	auto result =
-		syncWaitImpl(sender, (() @trusted => cast() childStopSource)());
 
-	childStopSource.assertNoCallbacks;
-	// detach stopSource
-	cb.dispose();
-	return result;
+	try {
+		auto result = syncWaitImpl(sender, childStopSource);
+
+		version (unittest) childStopSource.assertNoCallbacks;
+		// detach stopSource
+		cb.dispose();
+		return result;
+	} catch (Throwable t) {
+		cb.dispose();
+		throw t;
+	}
 }
 
 private
 Result!(Sender.Value) syncWaitImpl(Sender)(auto scope ref Sender sender,
-                                           StopSource stopSource) @safe {
+                                           ref shared InPlaceStopSource stopSource) @safe {
 	static assert(models!(Sender, isSender));
 	import concurrency.signal;
 	import core.stdc.signal : SIGTERM, SIGINT;
@@ -160,8 +164,8 @@ Result!(Sender.Value) syncWaitImpl(Sender)(auto scope ref Sender sender,
 	alias Value = Sender.Value;
 	alias Receiver = SyncWaitReceiver2!(Value);
 
-	auto state = Receiver.State(stopSource);
-	scope receiver = (() @trusted => Receiver(&state))();
+	auto state = Receiver.State.init;
+	scope receiver = (() @trusted => Receiver(&state, &stopSource))();
 	auto op = sender.connect(receiver);
 	op.start();
 
@@ -173,7 +177,8 @@ Result!(Sender.Value) syncWaitImpl(Sender)(auto scope ref Sender sender,
 	if (state.throwable !is null) {
 		if (auto e = cast(Exception) state.throwable)
 			return Result!Value(e);
-		throw state.throwable;
+		auto throwable = (() @trusted => state.throwable)();
+		throw throwable;
 	}
 
 	static if (is(Value == void))

@@ -171,17 +171,15 @@ unittest {
 unittest {
 	import concurrency.stoptoken;
 	import core.atomic : atomicStore, atomicLoad;
-	shared bool g;
+	shared bool g;stopSource
 
 	auto waiting =
 		ThreadSender().withStopToken((StopToken token) shared @trusted {
 			while (!token.isStopRequested) {}
 			g.atomicStore(true);
 		});
-	auto source = new StopSource();
-	auto stopper = just(source).then((StopSource source) shared {
-		source.stop();
-	});
+	shared source = InPlaceStopSource();
+	auto stopper = justFrom(() shared => source.stop());
 
 	whenAll(waiting.toShared().withStopSource(source), stopper)
 		.syncWait.isCancelled.should == true;

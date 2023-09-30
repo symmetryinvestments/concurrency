@@ -5,7 +5,7 @@ import unit_threaded;
 
 @("stopsource.stoptoken.stop") @safe
 unittest {
-	auto source = new StopSource();
+	auto source = shared InPlaceStopSource();
     auto token = StopToken(source);
     token.isStopRequested.should == false;
     source.stop();
@@ -15,7 +15,7 @@ unittest {
 @("stopsource.stopcallback.stop") @safe
 unittest {
     import core.atomic;
-	auto source = new StopSource();
+	auto source = shared InPlaceStopSource();
     auto token = StopToken(source);
     shared bool set;
     token.onStop(() shared { set.atomicStore(true); });
@@ -27,7 +27,7 @@ unittest {
 @("stopsource.inplacestopcallback.stop") @safe
 unittest {
     import core.atomic;
-	auto source = new StopSource();
+	auto source = shared InPlaceStopSource();
     auto token = StopToken(source);
     shared bool set;
     InPlaceStopCallback cb = InPlaceStopCallback(() shared { set.atomicStore(true); });

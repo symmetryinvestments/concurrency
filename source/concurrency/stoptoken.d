@@ -46,7 +46,7 @@ struct InPlaceStopSource {
 }
 
 class StopSource {
-	private InPlaceStopSource source;
+	package(concurrency) shared InPlaceStopSource source;
 
 	bool stop() nothrow @safe {
 		return source.stop();
@@ -131,7 +131,7 @@ StopCallback onStop(StopSource stopSource,
 }
 
 StopCallback onStop(
-	ref InPlaceStopSource stopSource,
+	ref shared InPlaceStopSource stopSource,
 	void delegate() nothrow @safe shared callback
 ) nothrow @safe {
 	auto cb = new StopCallback(callback);

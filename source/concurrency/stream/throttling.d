@@ -78,8 +78,8 @@ template ThrottleStreamOp(Stream, ThrottleEmitLogic emitLogic,
 		alias InnerReceiver =
 			TimerReceiver!(typeof(this), Properties.ElementType, emitLogic,
 			               timerLogic);
-		StopSource stopSource;
-		StopSource timerStopSource;
+		shared InPlaceStopSource stopSource;
+		shared InPlaceStopSource timerStopSource;
 		StopCallback cb;
 		Throwable throwable;
 		alias Op = OpType!(Properties.Sender,
@@ -97,8 +97,6 @@ template ThrottleStreamOp(Stream, ThrottleEmitLogic emitLogic,
 			this.dur = dur;
 			this.dg = dg;
 			this.receiver = receiver;
-			stopSource = new StopSource();
-			timerStopSource = new StopSource();
 			op = stream.collect(cast(Properties.DG) &onItem).connect(
 				SenderReceiver!(typeof(this), Properties.Value)(&this));
 		}

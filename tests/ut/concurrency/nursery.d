@@ -71,12 +71,12 @@ unittest {
 	nursery.getStopToken().isStopRequested().shouldBeTrue();
 }
 
-@("run.thread.stop.external") @trusted
+@("run.thread.stop.external") @safe
 unittest {
 	auto nursery = new shared Nursery();
-	auto stopSource = new shared StopSource();
+	shared stopSource = InPlaceStopSource(); 
 	nursery.run(ThreadSender().then(() shared @safe => stopSource.stop()));
-	nursery.syncWait(cast(StopSource) stopSource).isCancelled.should == true;
+	nursery.syncWait(stopSource).isCancelled.should == true;
 	nursery.getStopToken().isStopRequested().shouldBeTrue();
 	stopSource.isStopRequested().shouldBeTrue();
 }
@@ -139,7 +139,7 @@ unittest {
 @("withStopSource.1") @safe
 unittest {
 	import core.thread : Thread;
-	auto stopSource = new StopSource();
+	shared InPlaceStopSource stopSource;
 	auto nursery = new shared Nursery();
 
 	auto thread1 =
@@ -149,8 +149,7 @@ unittest {
 		}).withStopSource(stopSource);
 
 	// stop via the source
-	auto stopper = ValueSender!StopSource(stopSource)
-		.then((StopSource stopSource) shared => stopSource.stop());
+	auto stopper = justFrom(() shared => stopSource.stop());
 
 	nursery.run(thread1);
 	nursery.run(stopper);
@@ -161,7 +160,7 @@ unittest {
 @("withStopSource.2") @safe
 unittest {
 	import core.thread : Thread;
-	auto stopSource = new StopSource();
+	shared InPlaceStopSource stopSource;
 	auto nursery = new shared Nursery();
 
 	auto thread1 =
@@ -171,8 +170,7 @@ unittest {
 		}).withStopSource(stopSource);
 
 	// stop via the nursery
-	auto stopper = ValueSender!(shared Nursery)(nursery)
-		.then((shared Nursery nursery) shared => nursery.stop());
+	auto stopper = justFrom(() shared => nursery.stop());
 
 	nursery.run(thread1);
 	nursery.run(stopper);
