@@ -19,7 +19,7 @@ package struct SyncWaitReceiver2(Value) {
 			Value result;
 		Throwable throwable;
 
-		static auto init() {
+		static auto construct() {
 			return State(LocalThreadWorker(getLocalThreadExecutor()));
 		}
 	}
@@ -148,7 +148,7 @@ auto syncWait(Sender)(auto scope ref Sender sender) @trusted {
 		// detach stopSource
 		cb.dispose();
 		return result;
-	} catch (Throwable t) {
+	} catch (Throwable t) { // @suppress(dscanner.suspicious.catch_em_all)
 		cb.dispose();
 		throw t;
 	}
@@ -164,7 +164,7 @@ Result!(Sender.Value) syncWaitImpl(Sender)(auto scope ref Sender sender,
 	alias Value = Sender.Value;
 	alias Receiver = SyncWaitReceiver2!(Value);
 
-	auto state = Receiver.State.init;
+	auto state = Receiver.State.construct;
 	scope receiver = (() @trusted => Receiver(&state, &stopSource))();
 	auto op = sender.connect(receiver);
 	op.start();

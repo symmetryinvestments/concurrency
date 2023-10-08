@@ -312,7 +312,8 @@ auto withBaseScheduler(T, P)(auto ref T t, auto ref P p) {
 		static assert(
 			false,
 			"Neither " ~ T.stringof ~ " nor " ~ P.stringof
-				~ " are full schedulers. Chain the sender with a .withScheduler and ensure the Scheduler passes the isScheduler check."
+				~ " are full schedulers. Chain the sender with a .withScheduler"
+				~ " and ensure the Scheduler passes the isScheduler check."
 		);
 }
 

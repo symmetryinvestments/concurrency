@@ -21,13 +21,10 @@ enum ThrottleEmitLogic : uint {
 	last // emit the last item in the window
 }
 
-;
 enum ThrottleTimerLogic : uint {
 	noop, // don't reset the timer on new items
 	rearm // reset the timer on new items
 }
-
-;
 
 /// throttleFirst forwards one item and then enters a cooldown period during which it ignores items
 auto throttleFirst(Stream)(Stream s, Duration d) {

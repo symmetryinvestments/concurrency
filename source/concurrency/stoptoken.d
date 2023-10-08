@@ -5,7 +5,7 @@ module concurrency.stoptoken;
 
 struct InPlaceStopSource {
 	@disable this(ref return scope typeof(this) rhs);
-	private shared stop_state state;
+	private shared StopState state;
 	bool stop() nothrow @safe shared {
 		return state.request_stop();
 	}
@@ -28,7 +28,7 @@ struct InPlaceStopSource {
 
 	/// resets the internal state, only do this if you are sure nothing else is looking at this...
 	void reset(this t)() @system @nogc shared {
-		this.state = stop_state();
+		this.state = StopState();
 	}
 
 	private ref assumeSafeShared() @trusted @nogc nothrow {
@@ -75,7 +75,7 @@ class StopSource {
 }
 
 struct StopToken {
-	package(concurrency) shared stop_state* state;
+	package(concurrency) shared StopState* state;
 	this(StopSource source) nothrow @safe @nogc {
 		if (source !is null) {
 			this.state = &source.source.state;
@@ -87,7 +87,7 @@ struct StopToken {
 		this(cast()source);
 	}
 
-	this(ref shared stop_state state) nothrow @trusted @nogc {
+	this(ref shared StopState state) nothrow @trusted @nogc {
 		isStopPossible = true;
 		this.state = &state;
 	}
@@ -183,7 +183,7 @@ void onStop(StopSource stopSource, ref InPlaceStopCallback cb) nothrow @safe {
 	onStop(stopSource.source.state, cb);
 }
 
-void onStop(ref shared stop_state state, ref InPlaceStopCallback cb) nothrow @trusted { // TODO: @safe
+void onStop(ref shared StopState state, ref InPlaceStopCallback cb) nothrow @trusted { // TODO: @safe
 	// TODO: shared
 	if (state.try_add_callback(cast(shared)cb, true))
 		cb.state = &state;
@@ -224,7 +224,7 @@ struct InPlaceStopCallback {
 private:
 
 	void delegate() nothrow shared @safe callback;
-	shared stop_state* state;
+	shared StopState* state;
 
 	shared InPlaceStopCallback* next_ = null;
 	shared InPlaceStopCallback** prev_ = null;
@@ -261,7 +261,7 @@ private void spin_yield() nothrow @trusted @nogc {
 	Thread.yield();
 }
 
-private struct stop_state {
+private struct StopState {
 	import core.thread : Thread;
 	import core.atomic : atomicStore, atomicLoad, MemoryOrder, atomicOp, atomicFetchAdd, atomicFetchSub;
 
@@ -534,7 +534,7 @@ private:
 	InPlaceStopCallback* head_ = null;
 	Thread signallingThread_;
 
-	private ref assumeThreadSafe() @trusted nothrow @nogc shared {
+	ref assumeThreadSafe() @trusted nothrow @nogc shared {
 		return cast()this;
 	}
 }
