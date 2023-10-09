@@ -117,7 +117,7 @@ struct SchedulerAdapter(Worker) {
 struct ScheduleAfterOp(Worker, Receiver) {
 	import std.traits : ReturnType;
 	import concurrency.bitfield : SharedBitField;
-	import concurrency.stoptoken : StopCallback, onStop;
+	import concurrency.stoptoken : InPlaceStopCallback, onStop;
 	import concurrency.receiver : setValueOrError;
 
 	enum Flags {
@@ -127,12 +127,11 @@ struct ScheduleAfterOp(Worker, Receiver) {
 		setup = 0x4,
 	}
 
-	// alias Timer = ReturnType!(Worker.addTimer);
 	Worker worker;
 	Duration dur;
 	Receiver receiver;
 	Timer timer;
-	StopCallback stopCb;
+	InPlaceStopCallback stopCb;
 	shared SharedBitField!Flags flags;
 	@disable
 	this(ref return scope typeof(this) rhs);
@@ -144,9 +143,8 @@ struct ScheduleAfterOp(Worker, Receiver) {
 			return;
 		}
 
-		stopCb =
-			receiver.getStopToken()
-			        .onStop(cast(void delegate() nothrow @safe shared) &stop);
+		stopCb = InPlaceStopCallback(cast(void delegate() nothrow @safe shared) &stop);
+		receiver.getStopToken().onStop(stopCb);
 
 		try {
 			timer.userdata = cast(void delegate(TimerTrigger) @safe shared) &trigger;
