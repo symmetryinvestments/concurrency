@@ -64,7 +64,7 @@ private struct SSReceiver(Receiver, Value) {
 
 struct SSState {
 	shared InPlaceStopSource combinedStopSource;
-	StopCallback[2] cbs;
+	InPlaceStopCallback[2] cbs;
 }
 
 struct SSOp(Receiver, OuterStopSource, Sender) {
@@ -77,15 +77,18 @@ struct SSOp(Receiver, OuterStopSource, Sender) {
 	@disable
 	this(this);
 	this(Receiver receiver, OuterStopSource outerStopSource, Sender sender) @trusted {
-		state.cbs[0] = receiver.getStopToken().onStop(cast(void delegate() shared @safe nothrow)&state.combinedStopSource.stop);
+		state.cbs[0] = InPlaceStopCallback(cast(void delegate() shared @safe nothrow)&state.combinedStopSource.stop);
+		state.cbs[1] = InPlaceStopCallback(cast(void delegate() shared @safe nothrow)&state.combinedStopSource.stop);
+
+		receiver.getStopToken().onStop(state.cbs[0]);
 		static if (is(OuterStopSource == shared InPlaceStopSource*)) {
-			state.cbs[1] = onStop(*outerStopSource, cast(void delegate() shared @safe nothrow)&state.combinedStopSource.stop);
+			onStop(*outerStopSource, state.cbs[1]);
 		} else {
-			state.cbs[1] = outerStopSource.onStop(cast(void delegate() shared @safe nothrow)&state.combinedStopSource.stop);
+			outerStopSource.onStop(state.cbs[1]);
 		}
 
 		try {
-		op = sender.connect(SSReceiver!(Receiver, Sender.Value)(receiver, &state));
+			op = sender.connect(SSReceiver!(Receiver, Sender.Value)(receiver, &state));
 		} catch (Exception e) {
 			state.cbs[0].dispose();
 			state.cbs[1].dispose();

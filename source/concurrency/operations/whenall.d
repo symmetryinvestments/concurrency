@@ -143,9 +143,10 @@ private struct WhenAllOp(Receiver, Senders...) {
 			return;
 		}
 
-		state.cb = receiver.getStopToken().onStop(
-			cast(void delegate() nothrow @safe shared) &state.stop
-		); // butt ugly cast, but it won't take the second overload
+		// butt ugly cast, but it won't take the second overload
+		state.cb = InPlaceStopCallback(cast(void delegate() nothrow @safe shared) &state.stop);
+		receiver.getStopToken().onStop(state.cb);
+
 		static if (Senders.length > 1) {
 			foreach (i, _; Senders) {
 				ops[i].start();
@@ -179,7 +180,7 @@ struct WhenAllSender(Senders...)
 
 private class WhenAllState(Value) : StopSource {
 	import concurrency.bitfield;
-	StopCallback cb;
+	InPlaceStopCallback cb;
 	static if (is(typeof(Value.values)))
 		Value value;
 	Throwable exception;

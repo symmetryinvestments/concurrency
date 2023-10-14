@@ -89,9 +89,10 @@ private struct RaceOp(Receiver, Senders...) {
 			return;
 		}
 
-		state.cb = receiver.getStopToken().onStop(
-			cast(void delegate() nothrow @safe shared) &state.stop
-		); // butt ugly cast, but it won't take the second overload
+		// butt ugly cast, but it won't take the second overload
+		state.cb = InPlaceStopCallback(cast(void delegate() nothrow @safe shared) &state.stop);
+		receiver.getStopToken().onStop(state.cb);
+			
 		static if (Senders.length > 1) {
 			foreach (i, _; Senders) {
 				ops[i].start();
@@ -123,7 +124,7 @@ struct RaceSender(Senders...)
 
 private class State(Value) : StopSource {
 	import concurrency.bitfield;
-	StopCallback cb;
+	InPlaceStopCallback cb;
 	shared SharedBitField!Flags bitfield;
 	static if (!is(Value == void))
 		Value value;
