@@ -73,18 +73,36 @@ void setupCtrlCHandler(shared StopSource stopSource) @trusted {
 
 private static shared StopSource globalSource;
 
-// we export this function so that dynamic libraries can load it to access
-// the host's globalStopSource pointer.
-// Otherwise they would access their own local instance.
-// should not be called directly by usercode, instead use `globalStopSource`.
-export extern(C)
-shared(StopSource*) concurrency_globalStopSourcePointer() @safe {
-	return &globalSource;
+// a mixin for OS-specific visibility
+private mixin template globalStopSourcePointerImpl() {
+	// should not be called directly by usercode, call `getGlobalStopSourcePointer` instead
+	pragma(inline, false)
+	extern(C) shared(StopSource*) concurrency_globalStopSourcePointer() @safe {
+		return &globalSource;
+	}
 }
 
-private shared(StopSource*) getGlobalStopSourcePointer() @safe {
-	import concurrency.utils : dynamicLoad;
-	return dynamicLoad!concurrency_globalStopSourcePointer()();
+// We need to make sure all binaries (executable and shared libraries) in the
+// process share a single StopSource instance.
+version(Windows) {
+	// On Windows, the executable can export `concurrency_globalStopSourcePointer`
+	// explicitly via linker flag `/EXPORT:concurrency_globalStopSourcePointer`.
+	// DLLs containing `concurrency` use the executable's then, falling back to
+	// their own definition.
+	private mixin globalStopSourcePointerImpl;
+
+	private shared(StopSource*) getGlobalStopSourcePointer() @safe {
+		import concurrency.utils : dynamicLoad;
+		return dynamicLoad!concurrency_globalStopSourcePointer()();
+	}
+} else {
+	// Make sure the `concurrency_globalStopSourcePointer` function gets public
+	// visibility; coupled with the `--export-dynamic-symbol=…` linker flag in
+	// dub.sdl, the symbol is then exported as dynamic symbol from every binary
+	// containing this `concurrency` library, and the dynamic loader uniques the
+	// symbol across the whole process for us.
+	export mixin globalStopSourcePointerImpl;
+	alias getGlobalStopSourcePointer = concurrency_globalStopSourcePointer;
 }
 
 struct SignalHandler {

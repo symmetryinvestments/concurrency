@@ -206,7 +206,12 @@ If you want the termination to happen asynchronously, for instance because the c
 
 The concurrency library is designed to work with dynamic libraries. It exports 2 functions that it uses to load important globals and thread-locals from the host process.
 
-The only requirement is that the linker you are using supports `--export-dynamic-symbol` (at least gold, lld do).
+On Posix, the only requirement is that the linker you are using supports `--export-dynamic-symbol` (at least gold, lld do).
+
+On Windows, you need to export the 2 symbols explicitly from the executable to make the whole process (i.e., DLLs with statically linked `concurrency`) use these. This can be achieved by adding according linker flags for the executable, e.g., in `dub.sdl`:
+```
+lflags "/EXPORT:concurrency_getLocalThreadExecutor" "/EXPORT:concurrency_globalStopSourcePointer" platform="windows"
+```
 
 ## DSemver
 
