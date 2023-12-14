@@ -10,29 +10,47 @@ import core.time : Duration;
 import concurrency.data.queue.waitable;
 import concurrency.data.queue.mpsc;
 
-// we export the getLocalThreadExecutor function so that dynamic libraries
-// can load it to access the host's localThreadExecutor TLS instance.
-// Otherwise they would access their own local instance.
-// should not be called directly by usercode, call `silThreadExecutor` instead.
-export extern(C)
-LocalThreadExecutor concurrency_getLocalThreadExecutor() @safe {
-	static LocalThreadExecutor localThreadExecutor;
-	if (localThreadExecutor is null) {
-		localThreadExecutor = new LocalThreadExecutor();
-	}
+// a mixin for OS-specific visibility
+private mixin template getLocalThreadExecutorImpl() {
+	// should not be called directly by usercode, call `getLocalThreadExecutor` instead
+	pragma(inline, false)
+	extern(C) LocalThreadExecutor concurrency_getLocalThreadExecutor() @safe {
+		static LocalThreadExecutor localThreadExecutor;
+		if (localThreadExecutor is null) {
+			localThreadExecutor = new LocalThreadExecutor();
+		}
 
-	return localThreadExecutor;
+		return localThreadExecutor;
+	}
 }
 
-LocalThreadExecutor getLocalThreadExecutor() @trusted {
-	import concurrency.utils : dynamicLoad;
-	static LocalThreadExecutor localThreadExecutor;
-	if (localThreadExecutor is null) {
-		localThreadExecutor =
-			dynamicLoad!concurrency_getLocalThreadExecutor()();
-	}
+// We need to make sure all binaries (executable and shared libraries) in the
+// process share a single (thread-local) LocalThreadExecutor instance.
+version(Windows) {
+	// On Windows, the executable can export `concurrency_getLocalThreadExecutor`
+	// explicitly via linker flag `/EXPORT:concurrency_getLocalThreadExecutor`.
+	// DLLs containing `concurrency` use the executable's then, falling back to
+	// their own definition.
+	mixin getLocalThreadExecutorImpl;
 
-	return localThreadExecutor;
+	LocalThreadExecutor getLocalThreadExecutor() @trusted {
+		import concurrency.utils : dynamicLoad;
+		static LocalThreadExecutor localThreadExecutor;
+		if (localThreadExecutor is null) {
+			localThreadExecutor =
+				dynamicLoad!concurrency_getLocalThreadExecutor()();
+		}
+
+		return localThreadExecutor;
+	}
+} else {
+	// Make sure the `concurrency_getLocalThreadExecutor` function gets public
+	// visibility; coupled with the `--export-dynamic-symbol=…` linker flag in
+	// dub.sdl, the symbol is then exported as dynamic symbol from every binary
+	// containing this `concurrency` library, and the dynamic loader uniques the
+	// symbol across the whole process for us.
+	export mixin getLocalThreadExecutorImpl;
+	alias getLocalThreadExecutor = concurrency_getLocalThreadExecutor;
 }
 
 private struct AddTimer {

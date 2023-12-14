@@ -17,6 +17,7 @@ configuration "unittest" {
 	dflags "-dip1000"
 	sourcePaths "source" "tests"
 	importPaths "source" "tests"
+	lflags "/EXPORT:concurrency_getLocalThreadExecutor" "/EXPORT:concurrency_globalStopSourcePointer" platform="windows"
 }
 configuration "unittest-release" {
 	dependency "unit-threaded" version="*"
@@ -25,6 +26,7 @@ configuration "unittest-release" {
 	dflags "-dip1000" "-g"
 	sourcePaths "source" "tests/ut"
 	importPaths "source" "tests/ut"
+	lflags "/EXPORT:concurrency_getLocalThreadExecutor" "/EXPORT:concurrency_globalStopSourcePointer" platform="windows"
   # buildOptions "unittests"  "optimize"  "inline"
   buildOptions "unittests" "optimize"
 }
@@ -39,6 +41,7 @@ configuration "unittest-asan" {
 	dflags "-dip1000" "-fsanitize=address"
 	sourcePaths "source" "tests/ut"
 	importPaths "source" "tests/ut"
+	lflags "/EXPORT:concurrency_getLocalThreadExecutor" "/EXPORT:concurrency_globalStopSourcePointer" platform="windows"
   # buildOptions "unittests"  "optimize"  "inline"
   buildOptions "unittests"  "optimize"
 }
