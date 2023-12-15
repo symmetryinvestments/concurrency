@@ -75,9 +75,9 @@ template ThrottleStreamOp(Stream, ThrottleEmitLogic emitLogic,
 		alias InnerReceiver =
 			TimerReceiver!(typeof(this), Properties.ElementType, emitLogic,
 			               timerLogic);
-		shared InPlaceStopSource stopSource;
-		shared InPlaceStopSource timerStopSource;
-		StopCallback cb;
+		shared StopSource stopSource;
+		shared StopSource timerStopSource;
+		shared StopCallback cb;
 		Throwable throwable;
 		alias Op = OpType!(Properties.Sender,
 		                   SenderReceiver!(typeof(this), Properties.Value));
@@ -261,9 +261,9 @@ template ThrottleStreamOp(Stream, ThrottleEmitLogic emitLogic,
 		}
 
 		void start() @trusted nothrow scope {
-			cb = receiver.getStopToken().onStop(
-				cast(void delegate() nothrow @safe shared) &this.stop
-			); // butt ugly cast, but it won't take the second overload
+			auto stopToken = receiver.getStopToken();
+			// butt ugly cast, but it won't take the second overload
+			cb.register(stopToken, cast(void delegate() nothrow @safe shared) &this.stop);
 			op.start();
 		}
 	}
@@ -310,7 +310,7 @@ struct TimerReceiver(Op, ElementType, ThrottleEmitLogic emitLogic,
 	}
 
 	auto getStopToken() {
-		return StopToken(state.timerStopSource);
+		return state.timerStopSource.token();
 	}
 
 	auto getScheduler() {
@@ -350,7 +350,7 @@ struct SenderReceiver(Op, Value) {
 	}
 
 	auto getStopToken() {
-		return StopToken(state.stopSource);
+		return state.stopSource.token();
 	}
 
 	auto getScheduler() {

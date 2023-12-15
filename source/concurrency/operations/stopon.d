@@ -7,14 +7,14 @@ import concurrency.stoptoken;
 import concepts;
 import std.traits;
 
-auto stopOn(Sender)(Sender sender, StopToken stopToken) {
+auto stopOn(Sender)(Sender sender, shared StopToken stopToken) {
 	return StopOn!(Sender)(sender, stopToken);
 }
 
 private struct StopOnReceiver(Receiver, Value) {
 	private {
 		Receiver receiver;
-		StopToken stopToken;
+		shared StopToken stopToken;
 	}
 
 	static if (is(Value == void)) {
@@ -35,7 +35,7 @@ private struct StopOnReceiver(Receiver, Value) {
 		receiver.setError(e);
 	}
 
-	auto getStopToken() nothrow @trusted {
+	auto getStopToken() nothrow @safe {
 		return stopToken;
 	}
 
@@ -46,7 +46,7 @@ struct StopOn(Sender) if (models!(Sender, isSender)) {
 	static assert(models!(typeof(this), isSender));
 	alias Value = Sender.Value;
 	Sender sender;
-	StopToken stopToken;
+	shared StopToken stopToken;
 	auto connect(Receiver)(return Receiver receiver) @safe return scope {
 		alias R = StopOnReceiver!(Receiver, Sender.Value);
 		// ensure NRVO

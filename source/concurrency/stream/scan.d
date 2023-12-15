@@ -30,7 +30,7 @@ template ScanStreamOp(Stream, Fun, Seed) {
 		@disable
 		this(this);
 		this(Stream stream, Fun scanFn, Seed seed, DG dg,
-		     Receiver receiver) @trusted {
+		     Receiver receiver) @trusted return scope {
 			this.scanFn = scanFn;
 			this.acc = seed;
 			this.dg = dg;

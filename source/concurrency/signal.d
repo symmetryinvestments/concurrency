@@ -2,7 +2,7 @@ module concurrency.signal;
 
 import concurrency.stoptoken;
 
-ref shared(InPlaceStopSource) globalStopSource() @trusted {
+ref shared(StopSource) globalStopSource() @trusted {
 	import core.atomic : atomicLoad, cas;
 
 	if (globalSourcePtr.atomicLoad is null) {
@@ -13,7 +13,7 @@ ref shared(InPlaceStopSource) globalStopSource() @trusted {
 			return *globalSourcePtr;
 		}
 
-		shared InPlaceStopSource* empty = null;
+		shared StopSource* empty = null;
 		if (ptr.cas(empty, &globalSource)) {
 			setupCtrlCHandler(globalSource);
 			globalSourcePtr = &globalSource;
@@ -24,19 +24,8 @@ ref shared(InPlaceStopSource) globalStopSource() @trusted {
 	return *globalSourcePtr;
 }
 
-/// Returns true if first to set (otherwise it is ignored)
-bool setGlobalStopSource(ref shared InPlaceStopSource stopSource) @safe {
-	import core.atomic : cas;
-	auto ptr = getGlobalStopSourcePointer();
-	shared InPlaceStopSource* expected;
-	if (!ptr.cas(expected, &stopSource))
-		return false;
-	globalSource = stopSource;
-	return true;
-}
-
 /// Sets the stopSource to be called when receiving an interrupt
-void setupCtrlCHandler(ref shared InPlaceStopSource stopSource) @trusted {
+void setupCtrlCHandler(ref shared StopSource stopSource) @trusted {
 	import core.atomic;
 
 	auto old = atomicExchange(&SignalHandler.signalStopSource, &stopSource);
@@ -68,19 +57,19 @@ void setupCtrlCHandler(ref shared InPlaceStopSource stopSource) @trusted {
 	}
 }
 
-private static shared InPlaceStopSource* globalSourcePtr;
-private static shared InPlaceStopSource globalSource;
+private static shared StopSource* globalSourcePtr;
+private static shared StopSource globalSource;
 
 // we export this function so that dynamic libraries can load it to access
 // the host's globalStopSource pointer.
 // Otherwise they would access their own local instance.
 // should not be called directly by usercode, instead use `globalStopSource`.
 export extern(C)
-shared (InPlaceStopSource*)* concurrency_globalStopSourcePointer() @safe @nogc {
+shared (StopSource*)* concurrency_globalStopSourcePointer() @safe @nogc {
 	return &globalSourcePtr;
 }
 
-private shared (InPlaceStopSource*)* getGlobalStopSourcePointer() @safe @nogc {
+private shared (StopSource*)* getGlobalStopSourcePointer() @safe @nogc {
 	import concurrency.utils : dynamicLoad;
 	return dynamicLoad!concurrency_globalStopSourcePointer()();
 }
@@ -155,7 +144,7 @@ struct SignalHandler {
 			SignalHandler.notify(ABORT);
 	}
 
-	private static shared InPlaceStopSource* signalStopSource;
+	private static shared StopSource* signalStopSource;
 	private static shared Thread handlerThread;
 	private static void launchHandlerThread() {
 		if (handlerThread.atomicLoad !is null)

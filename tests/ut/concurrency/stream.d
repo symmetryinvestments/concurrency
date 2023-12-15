@@ -47,7 +47,7 @@ unittest {
 unittest {
 	import concurrency.operations : withStopSource;
 	shared int g = 0;
-	auto source = new shared StopSource();
+	auto source = shared StopSource();
 	infiniteStream(5).collect((int n) shared {
 		if (g < 14)
 			g.atomicOp!"+="(n);
@@ -82,7 +82,7 @@ unittest {
 unittest {
 	struct Loop {
 		size_t b, e;
-		void loop(DG, StopToken)(DG emit, StopToken stopToken) {
+		void loop(DG)(DG emit, shared StopToken stopToken) {
 			foreach (i; b .. e)
 				emit(i);
 		}
@@ -828,7 +828,7 @@ unittest {
 unittest {
 	import concurrency.stream.defer;
 	static struct S {
-		auto opCall() shared @safe {
+		auto opCall() @safe shared {
 			import concurrency.sender;
 			return just(1);
 		}

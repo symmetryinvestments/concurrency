@@ -1,13 +1,14 @@
 module concurrency.stream.cycle;
 
 import concurrency.stream.stream;
+import concurrency.stoptoken : StopToken;
 import std.range : ElementType;
 
 struct Cycle(Range) {
 	alias T = ElementType!Range;
 	alias DG = CollectDelegate!(T);
 	Range range;
-	void loop(StopToken)(DG emit, StopToken stopToken) @safe {
+	void loop(DG emit, shared StopToken stopToken) @safe {
 		for (; !stopToken.isStopRequested;) {
 			foreach (item; range) {
 				emit(item);

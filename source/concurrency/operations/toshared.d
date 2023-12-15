@@ -82,7 +82,7 @@ class SharedSender(Sender, Scheduler, ResetLogic resetLogic)
 				if ((newState >> 2) == 0) {
 					auto localStopSource = state.inst;
 					release(); // release early
-					localStopSource.stop();
+					localStopSource.stopSource.stop();
 					return false;
 				} else {
 					auto localReceiver = state.inst;
@@ -145,14 +145,15 @@ struct SharedSenderOp(Sender, Scheduler, ResetLogic resetLogic, Receiver) {
 	alias Props = Properties!(Sender);
 	SharedSender!(Sender, Scheduler, resetLogic) parent;
 	Receiver receiver;
-	StopCallback cb;
+	shared StopCallback cb;
 	@disable
 	this(ref return scope typeof(this) rhs);
 	@disable
 	this(this);
 	void start() nothrow @trusted scope {
 		parent.add(&(cast(shared) this).onValue);
-		cb = receiver.getStopToken.onStop(&(cast(shared) this).onStop);
+		auto stopToken = receiver.getStopToken;
+		cb.register(stopToken, &(cast(shared) this).onStop);
 	}
 
 	void onStop() nothrow @trusted shared {
@@ -223,8 +224,8 @@ private struct SharedSenderReceiver(Sender, Scheduler, ResetLogic resetLogic) {
 		state.process!(resetLogic)(v);
 	}
 
-	StopToken getStopToken() @trusted nothrow {
-		return StopToken(state.inst);
+	shared(StopToken) getStopToken() @safe nothrow {
+		return state.inst.stopSource.token();
 	}
 
 	Scheduler getScheduler() @safe nothrow scope {
@@ -255,7 +256,7 @@ private template process(ResetLogic resetLogic) {
 			auto localState = state.inst;
 			InternalValue v = localState.value.match!((typeof(null)) => assert(0, "not happening"), v => v);
 			release(oldState & (~0x3)); // release early and remove all ticks
-			if (localState.isStopRequested)
+			if (localState.stopSource.isStopRequested)
 				(() @trusted => v = Done())();
 			foreach (dg; localState.dgs[])
 				dg(v);
@@ -263,12 +264,13 @@ private template process(ResetLogic resetLogic) {
 	}
 }
 
-private class SharedSenderInstState(Sender) : StopSource {
+private class SharedSenderInstState(Sender) {
 	import concurrency.slist;
 	import std.traits : ReturnType;
 	import std.sumtype;
 	alias Props = Properties!(Sender);
 	shared SList!(Props.DG) dgs;
+	shared StopSource stopSource;
 	SumType!(typeof(null), Props.InternalValue) value;
 	this() {
 		this.dgs = new shared SList!(Props.DG);

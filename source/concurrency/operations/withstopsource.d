@@ -7,18 +7,9 @@ import concurrency.stoptoken;
 import concepts;
 import std.traits;
 
-template withStopSource(Sender) {
-	auto withStopSource(Sender sender, StopSource stopSource) {
-		return SSSender!(Sender, StopSource)(sender, stopSource);
-	}
-
-	auto withStopSource(Sender sender, shared StopSource stopSource) @trusted {
-		return SSSender!(Sender, StopSource)(sender, cast() stopSource);
-	}
-
-	auto withStopSource(Sender sender, ref shared InPlaceStopSource stopSource) @trusted {
-		return SSSender!(Sender, shared InPlaceStopSource*)(sender, &stopSource);
-	}
+// TODO: return scope?
+auto withStopSource(Sender)(Sender sender, ref shared StopSource stopSource) @trusted {
+	return SSSender!(Sender)(sender, &stopSource);
 }
 
 private struct SSReceiver(Receiver, Value) {
@@ -50,24 +41,26 @@ private struct SSReceiver(Receiver, Value) {
 		receiver.setError(e);
 	}
 
-	auto getStopToken() nothrow @trusted scope {
-		return StopToken(state.combinedStopSource);
+	auto getStopToken() nothrow @safe scope {
+		return state.combinedStopSource.token();
 	}
 
 	mixin ForwardExtensionPoints!receiver;
 
 	private void resetStopCallback() {
-		state.cbs[0].dispose();
-		state.cbs[1].dispose();
+		state.left.dispose();
+		state.right.dispose();
 	}
 }
 
 struct SSState {
-	shared InPlaceStopSource combinedStopSource;
-	InPlaceStopCallback[2] cbs;
+	shared StopSource combinedStopSource;
+	shared StopCallback left;
+	shared StopCallback right;
+	~this() @safe scope @nogc nothrow {}
 }
 
-struct SSOp(Receiver, OuterStopSource, Sender) {
+struct SSOp(Receiver, Sender) {
 	SSState state;
 	alias Op = OpType!(Sender, SSReceiver!(Receiver, Sender.Value));
 	Op op;
@@ -76,22 +69,19 @@ struct SSOp(Receiver, OuterStopSource, Sender) {
 	this(ref return scope typeof(this) rhs);
 	@disable
 	this(this);
-	this(Receiver receiver, OuterStopSource outerStopSource, Sender sender) @trusted {
-		state.cbs[0] = InPlaceStopCallback(cast(void delegate() shared @safe nothrow)&state.combinedStopSource.stop);
-		state.cbs[1] = InPlaceStopCallback(cast(void delegate() shared @safe nothrow)&state.combinedStopSource.stop);
+	~this() @trusted scope @nogc nothrow {}
+	this(Receiver receiver, shared StopSource* outerStopSource, Sender sender) @trusted {
+		auto token = receiver.getStopToken();
+		auto outerToken = outerStopSource.token();
 
-		receiver.getStopToken().onStop(state.cbs[0]);
-		static if (is(OuterStopSource == shared InPlaceStopSource*)) {
-			onStop(*outerStopSource, state.cbs[1]);
-		} else {
-			outerStopSource.onStop(state.cbs[1]);
-		}
+		state.left.register(token, cast(void delegate() @safe shared nothrow)&state.combinedStopSource.stop);
+		state.right.register(outerToken, cast(void delegate() @safe shared nothrow)&state.combinedStopSource.stop);
 
 		try {
 			op = sender.connect(SSReceiver!(Receiver, Sender.Value)(receiver, &state));
 		} catch (Exception e) {
-			state.cbs[0].dispose();
-			state.cbs[1].dispose();
+			state.left.dispose();
+			state.right.dispose();
 			throw e;
 		}
 	}
@@ -102,14 +92,14 @@ struct SSOp(Receiver, OuterStopSource, Sender) {
 	}
 }
 
-struct SSSender(Sender, StopSource) if (models!(Sender, isSender)) {
+struct SSSender(Sender) if (models!(Sender, isSender)) {
 	static assert(models!(typeof(this), isSender));
 	alias Value = Sender.Value;
 	Sender sender;
-	StopSource stopSource;
+	shared StopSource* stopSource;
 	auto connect(Receiver)(return Receiver receiver) @trusted return scope {
 		// ensure NRVO
-		auto op = SSOp!(Receiver, StopSource, Sender)(receiver, stopSource, sender);
+		auto op = SSOp!(Receiver, Sender)(receiver, stopSource, sender);
 		return op;
 	}
 }

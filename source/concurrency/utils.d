@@ -44,9 +44,9 @@ auto closure(Fun, Args...)(Fun fun, Args args) @trusted
 	auto cl = cast(shared) new Closure!(Fun, Args)(fun, args);
 	/// need to cast to @safe because a @trusted delegate doesn't fit a @safe one...
 	static if (hasFunctionAttributes!(Fun, "nothrow"))
-		alias ResultType = void delegate() nothrow shared @safe;
+		alias ResultType = void delegate() nothrow @safe shared;
 	else
-		alias ResultType = void delegate() shared @safe;
+		alias ResultType = void delegate() @safe shared;
 	return cast(ResultType) &cl.apply;
 }
 
