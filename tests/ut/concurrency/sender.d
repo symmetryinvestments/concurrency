@@ -35,6 +35,17 @@ unittest {
 		== true;
 }
 
+@("syncWaitSimple.value") @safe
+unittest {
+	import concurrency.syncwaitsimple;
+	import concurrency.signal : globalStopSource;
+
+	auto stopSource = &globalStopSource();
+
+	int result = (() @nogc => ValueSender!(int)(77).syncWaitSimple(*stopSource).trustedGet!int)();
+	result.shouldEqual(77);
+}
+
 @("value.start.attributes.1") @safe
 nothrow @nogc unittest {
 	ValueSender!(int)(5).connect(NullReceiver!int()).start();
@@ -174,11 +185,11 @@ unittest {
 	shared bool g;stopSource
 
 	auto waiting =
-		ThreadSender().withStopToken((StopToken token) shared @trusted {
+		ThreadSender().withStopToken((shared StopToken token) @trusted shared {
 			while (!token.isStopRequested) {}
 			g.atomicStore(true);
 		});
-	shared source = InPlaceStopSource();
+	shared source = StopSource();
 	auto stopper = justFrom(() shared => source.stop());
 
 	whenAll(waiting.toShared().withStopSource(source), stopper)
@@ -333,7 +344,7 @@ unittest {
 	import concurrency.stoptoken;
 	just(14, 52).syncWait.value.should == tuple(14, 52);
 	just(14, 53).then((int a, int b) => a * b).syncWait.value.should == 742;
-	just(14, 54).withStopToken((StopToken s, int a, int b) => a * b).syncWait
+	just(14, 54).withStopToken((shared StopToken s, int a, int b) => a * b).syncWait
 	            .value.should == 756;
 }
 

@@ -29,11 +29,10 @@ private struct StopWhenOp(Receiver, Sender, Trigger) {
 	this(Receiver receiver, return Sender source,
 	     return Trigger trigger) @trusted scope {
 		this.receiver = receiver;
-		state = new State!(Sender.Value)();
 		sourceOp = source
-			.connect(SourceReceiver!(Receiver, Sender.Value)(receiver, state));
+			.connect(SourceReceiver!(Receiver, Sender.Value)(receiver, &state));
 		triggerOp = trigger
-			.connect(TriggerReceiver!(Receiver, Sender.Value)(receiver, state));
+			.connect(TriggerReceiver!(Receiver, Sender.Value)(receiver, &state));
 	}
 
 	void start() @trusted nothrow scope {
@@ -42,9 +41,9 @@ private struct StopWhenOp(Receiver, Sender, Trigger) {
 			return;
 		}
 
+		auto token = receiver.getStopToken();
 		// butt ugly cast, but it won't take the second overload
-		state.cb = InPlaceStopCallback(cast(void delegate() nothrow @safe shared) &state.stop);
-		receiver.getStopToken().onStop(state.cb);
+		state.cb.register(token, cast(void delegate() nothrow @safe shared) &state.stopSource.stop);
 
 		sourceOp.start;
 		triggerOp.start;
@@ -65,9 +64,11 @@ struct StopWhenSender(Sender, Trigger)
 	}
 }
 
-private class State(Value) : StopSource {
+// refactor to use StopSource
+private struct State(Value) {
 	import concurrency.bitfield;
-	InPlaceStopCallback cb;
+	shared StopSource stopSource;
+	shared StopCallback cb;
 	shared SharedBitField!Flags bitfield;
 	static if (!is(Value == void))
 		Value value;
@@ -117,15 +118,15 @@ private bool isLast(size_t state) @safe nothrow pure {
 
 private struct TriggerReceiver(Receiver, Value) {
 	Receiver receiver;
-	State!(Value) state;
+	State!(Value)* state;
 	auto getStopToken() {
-		return StopToken(state);
+		return state.stopSource.token();
 	}
 
 	void setValue() @safe nothrow {
 		with (state.bitfield.update(Flags.tick)) {
 			if (!isLast(oldState))
-				state.stop();
+				state.stopSource.stop();
 			else
 				state.process(receiver, newState);
 		}
@@ -134,7 +135,7 @@ private struct TriggerReceiver(Receiver, Value) {
 	void setDone() @safe nothrow {
 		with (state.bitfield.update(Flags.doneOrError_produced, Flags.tick)) {
 			if (!isLast(oldState))
-				state.stop();
+				state.stopSource.stop();
 			else
 				state.process(receiver, newState);
 		}
@@ -146,7 +147,7 @@ private struct TriggerReceiver(Receiver, Value) {
 			if (!isDoneOrErrorProduced(oldState)) {
 				state.exception = exception;
 				release(); // release before stop
-				state.stop();
+				state.stopSource.stop();
 			} else {
 				release();
 				if (last)
@@ -161,9 +162,9 @@ private struct TriggerReceiver(Receiver, Value) {
 private struct SourceReceiver(Receiver, Value) {
 	import core.atomic : atomicOp, atomicLoad, MemoryOrder;
 	Receiver receiver;
-	State!(Value) state;
+	State!(Value)* state;
 	auto getStopToken() {
-		return StopToken(state);
+		return state.stopSource.token();
 	}
 
 	static if (!is(Value == void))
@@ -174,7 +175,7 @@ private struct SourceReceiver(Receiver, Value) {
 				
 				release();
 				if (!last)
-					state.stop();
+					state.stopSource.stop();
 				else if (isDoneOrErrorProduced(oldState))
 					state.process(receiver, oldState);
 				else
@@ -187,7 +188,7 @@ private struct SourceReceiver(Receiver, Value) {
 			with (state.bitfield.update(Flags.value_produced | Flags.tick)) {
 				bool last = isLast(oldState);
 				if (!last)
-					state.stop();
+					state.stopSource.stop();
 				else if (isDoneOrErrorProduced(oldState))
 					state.process(receiver, oldState);
 				else
@@ -199,7 +200,7 @@ private struct SourceReceiver(Receiver, Value) {
 		with (state.bitfield.update(Flags.doneOrError_produced | Flags.tick)) {
 			bool last = isLast(oldState);
 			if (!last)
-				state.stop();
+				state.stopSource.stop();
 			else
 				state.process(receiver, newState);
 		}
@@ -214,7 +215,7 @@ private struct SourceReceiver(Receiver, Value) {
 
 			release();
 			if (!last)
-				state.stop();
+				state.stopSource.stop();
 			else
 				state.process(receiver, newState);
 		}

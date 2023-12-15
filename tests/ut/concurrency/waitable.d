@@ -33,7 +33,7 @@ auto intSummer(Q)(Q q) {
 	import concurrency.stoptoken : StopToken;
 	import core.time : msecs;
 
-	return just(q).withStopToken((StopToken stopToken, Q q) shared @safe {
+	return just(q).withStopToken((shared StopToken stopToken, Q q) @safe shared {
 		int sum = 0;
 		while (!stopToken.isStopRequested()) {
 			if (auto node = q.pop(100.msecs)) {
@@ -58,8 +58,8 @@ unittest {
 	import core.time : msecs;
 
 	auto q = new WaitableQueue!(MPSCQueue!Node)();
-	q.intSummer.stopWhen(intProducer(q, 50000)).syncWait.value.should
-		== 1250025000;
+	q.intSummer.stopWhen(intProducer(q, 50_000)).syncWait.value.should
+		== 1_250_025_000;
 	q.empty.should == true;
 }
 
@@ -70,10 +70,10 @@ unittest {
 	auto q = new WaitableQueue!(MPSCQueue!Node)();
 	q
 		.intSummer
-		.stopWhen(whenAll(intProducer(q, 10000), intProducer(q, 10000),
-		                  intProducer(q, 10000), intProducer(q, 10000), ))
+		.stopWhen(whenAll(intProducer(q, 10_000), intProducer(q, 10_000),
+		                  intProducer(q, 10_000), intProducer(q, 10_000), ))
 		.syncWait
 		.value
-		.should == 200020000;
+		.should == 200_020_000;
 	q.empty.should == true;
 }

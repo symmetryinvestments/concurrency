@@ -25,7 +25,7 @@ package struct SyncWaitReceiver2(Value) {
 	}
 
 	State* state;
-	shared InPlaceStopSource* stopSource;
+	shared StopSource* stopSource;
 	void setDone() nothrow @safe {
 		state.canceled = true;
 		state.worker.stop();
@@ -48,7 +48,7 @@ package struct SyncWaitReceiver2(Value) {
 		}
 
 	auto getStopToken() nothrow @safe @nogc {
-		return StopToken(*stopSource);
+		return stopSource.token();
 	}
 
 	auto getScheduler() nothrow @safe {
@@ -113,6 +113,10 @@ struct Result(T) {
 		return std.sumtype.match!((T t) => t, function T(x) { throw new Exception("Unexpected value"); })(result);
 	}
 
+	auto trustedGet(T)() {
+		return std.sumtype.match!((T t) => t, function T(x) { assert(0, "nah"); })(result);
+	}
+
 	auto assumeOk() {
 		return value();
 	}
@@ -128,18 +132,18 @@ template match(Handlers...) {
 
 /// Start the Sender and waits until it completes, cancels, or has an error.
 auto syncWait(Sender)(auto ref Sender sender,
-					  shared ref InPlaceStopSource stopSource) {
+					  shared ref StopSource stopSource) {
 	return syncWaitImpl(sender, stopSource);
 }
 
 auto syncWait(Sender)(auto scope ref Sender sender) @trusted {
 	import concurrency.signal : globalStopSource;
-	shared InPlaceStopSource childStopSource;
-	auto cb = InPlaceStopCallback(() shared {
+	shared StopSource childStopSource;
+	shared parentStopToken = globalStopSource.token();
+	shared StopCallback cb;
+	cb.register(parentStopToken, () shared {
 		childStopSource.stop();
 	});
-	StopToken parentStopToken = StopToken(globalStopSource);
-	parentStopToken.onStop(cb);
 
 	try {
 		auto result = syncWaitImpl(sender, childStopSource);
@@ -156,7 +160,7 @@ auto syncWait(Sender)(auto scope ref Sender sender) @trusted {
 
 private
 Result!(Sender.Value) syncWaitImpl(Sender)(auto scope ref Sender sender,
-                                           ref shared InPlaceStopSource stopSource) @safe {
+                                           ref shared StopSource stopSource) @safe {
 	static assert(models!(Sender, isSender));
 	import concurrency.signal;
 	import core.stdc.signal : SIGTERM, SIGINT;

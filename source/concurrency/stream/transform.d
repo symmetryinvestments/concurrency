@@ -3,7 +3,6 @@ module concurrency.stream.transform;
 import concurrency.stream.stream;
 import concurrency.sender : OpType;
 import concurrency.receiver : ForwardExtensionPoints;
-import concurrency.stoptoken : StopSource;
 import std.traits : ReturnType;
 import concurrency.utils : isThreadSafeFunction;
 import concepts;

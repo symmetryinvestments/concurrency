@@ -180,7 +180,7 @@ auto waitingTask() {
 	import concurrency.thread : ThreadSender;
 	import concurrency.operations : withStopToken;
 
-	return ThreadSender().withStopToken((StopToken token) @trusted {
+	return ThreadSender().withStopToken((shared StopToken token) @trusted {
 		import core.thread : Thread;
 		while (!token.isStopRequested) {
 			Thread.yield();

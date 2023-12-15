@@ -61,7 +61,7 @@ struct WaitableQueueProducer(Q) {
 	private shared Q q;
 	private shared Semaphore sema;
 
-	bool push(Q.ElementType t) shared @trusted {
+	bool push(Q.ElementType t) @trusted shared {
 		bool r = (cast() q).push(t);
 		if (r)
 			(cast() sema).notify();

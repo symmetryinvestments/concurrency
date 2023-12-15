@@ -2,7 +2,7 @@ module concurrency.data.queue.mpsc;
 
 struct MPSCQueueProducer(Node) {
 	private MPSCQueue!(Node) q;
-	void push(Node* node) shared @trusted {
+	void push(Node* node) @trusted shared {
 		(cast() q).push(node);
 	}
 }

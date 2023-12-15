@@ -61,7 +61,7 @@ auto infiniteStream(T)(T t) {
 	alias DG = CollectDelegate!(T);
 	struct Loop {
 		T val;
-		void loop(StopToken)(DG emit, StopToken stopToken) {
+		void loop(DG emit, shared StopToken stopToken) {
 			while (!stopToken.isStopRequested)
 				emit(val);
 		}
@@ -75,7 +75,7 @@ auto iotaStream(T)(T start, T end) {
 	alias DG = CollectDelegate!(T);
 	struct Loop {
 		T b, e;
-		void loop(StopToken)(DG emit, StopToken stopToken) {
+		void loop(DG emit, shared StopToken stopToken) {
 			foreach (i; b .. e) {
 				emit(i);
 				if (stopToken.isStopRequested)
@@ -92,7 +92,7 @@ auto arrayStream(T)(T[] arr) {
 	alias DG = CollectDelegate!(T);
 	struct Loop {
 		T[] arr;
-		void loop(StopToken)(DG emit, StopToken stopToken) @safe {
+		void loop(DG emit, shared StopToken stopToken) @safe {
 			foreach (item; arr) {
 				emit(item);
 				if (stopToken.isStopRequested)
@@ -305,14 +305,14 @@ shared struct SharedStream(T) {
 			shared SharedStream!T source;
 			DG dg;
 			Receiver receiver;
-			StopCallback cb;
+			shared StopCallback cb;
 			@disable
 			this(ref return scope typeof(this) rhs);
 			@disable
 			this(this);
 			void start() nothrow @trusted {
 				auto stopToken = receiver.getStopToken();
-				cb = stopToken.onStop(&(cast(shared) this).onStop);
+				cb.register(stopToken, &(cast(shared) this).onStop);
 				if (stopToken.isStopRequested) {
 					cb.dispose();
 					receiver.setDone();
