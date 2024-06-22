@@ -16,6 +16,7 @@ int main(string[] args) {
 		"ut.concurrency.mpsc",
 		"ut.concurrency.waitable",
 		"ut.concurrency.asyncscope",
+		"ut.concurrency.sequence",
 		"concurrency.timingwheels",
 		"concurrency.stoptoken",
 		"ut.concurrency.stoptoken",
