@@ -475,3 +475,27 @@ struct SequenceTakeReceiver(Receiver) {
     import concurrency.receiver : ForwardExtensionPoints;
     mixin ForwardExtensionPoints!receiver;
 }
+
+// defer - create sequence by calling a sender-returning-function
+
+// cron - create a sequence like interval but using cron spec
+
+// flatmap{latest,concat} - create a sequence that flattens
+
+// sample - forward latest from sequence a when sequence b emits
+
+// scan - applies accumulator to each value
+
+// slide - create sliding window over sequence
+
+// throttling ?
+
+// merge ?
+
+// iota - emits sequence of start..end
+
+// interval - emits items on interval
+
+// share - creates a shared sequence that allows hot plugging receivers, like a broadcast
+
+// while/until - stops the stream 
