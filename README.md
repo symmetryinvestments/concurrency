@@ -1,6 +1,6 @@
 # Structured Concurrency
 
-<img src="https://github.com/symmetryinvestments/concurrency/workflows/build/badge.svg"/>&nbsp;<img src="https://img.shields.io/badge/ldc%201.28.1+%20-supported-brightgreen"/>&nbsp;<img src="https://img.shields.io/badge/dmd%202.098.1+%20-supported-brightgreen"/>
+<img src="https://github.com/symmetryinvestments/concurrency/workflows/build/badge.svg"/>&nbsp;<img src="https://img.shields.io/badge/ldc%201.35.0+%20-supported-brightgreen"/>&nbsp;<img src="https://img.shields.io/badge/dmd%202.105.3+%20-supported-brightgreen"/>
 Provides various primitives useful for structured concurrency and async tasks.
 
 ## Senders/Receivers
