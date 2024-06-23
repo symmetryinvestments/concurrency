@@ -165,6 +165,26 @@ unittest {
 	             .shouldEqual(3);
 }
 
+@("then.result.value") @safe
+unittest {
+	just(3).then((int i) => Result!int(i)).syncWait.value.should == 3;
+}
+
+@("then.result.completed") @safe
+unittest {
+	just(3).then((int i) => Result!void(Completed())).syncWait.isOk.should == true;
+}
+
+@("then.result.cancelled") @safe
+unittest {
+	just(3).then((int i) => Result!int(Cancelled())).syncWait.isCancelled;
+}
+
+@("then.result.error") @safe
+unittest {
+	just(3).then((int i) => Result!int(new Exception("stuff"))).syncWait.value.shouldThrowWithMessage("stuff");
+}
+
 @("whenAll.basic") @safe
 unittest {
 	whenAll(ValueSender!int(1), ValueSender!int(2)).syncWait.value.should

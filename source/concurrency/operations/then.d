@@ -18,11 +18,26 @@ private struct ThenReceiver(Receiver, Value, Fun) {
 	Fun fun;
 	static if (is(Value == void)) {
 		void setValue() @safe {
-			static if (is(ReturnType!Fun == void)) {
-				fun();
-				receiver.setValue();
-			} else
-				receiver.setValue(fun());
+			static if (is(ReturnType!Fun == Result!T, T)) {
+				auto r = fun();
+				r.match!((Cancelled c) {
+					receiver.setDone();
+				}, (Exception e) {
+					receiver.setError(e);
+				}, (Result!(T).Value v) {
+					static if (is(typeof(v) == Completed)) {
+						receiver.setValue();
+					} else {
+						receiver.setValue(v);
+					}
+				});
+			} else {
+				static if (is(ReturnType!Fun == void)) {
+					fun();
+					receiver.setValue();
+				} else
+					receiver.setValue(fun());
+			}
 		}
 	} else {
 		import std.typecons : isTuple;
@@ -30,7 +45,23 @@ private struct ThenReceiver(Receiver, Value, Fun) {
 			fun(Value.init.expand);
 		});
 		void setValue(Value value) @safe {
-			static if (is(ReturnType!Fun == void)) {
+			static if (is(ReturnType!Fun == Result!T, T)) {
+				static if (isExpandable)
+					auto r = fun(value.expand);
+				else
+					auto r = fun(value);
+				r.match!((Cancelled c) {
+					receiver.setDone();
+				}, (Exception e) {
+					receiver.setError(e);
+				}, (Result!(T).Value v) {
+					static if (is(typeof(v) == Completed)) {
+						receiver.setValue();
+					} else {
+						receiver.setValue(v);
+					}
+				});
+			} else static if (is(ReturnType!Fun == void)) {
 				static if (isExpandable)
 					fun(value.expand);
 				else
@@ -60,7 +91,10 @@ private struct ThenReceiver(Receiver, Value, Fun) {
 struct ThenSender(Sender, Fun) if (models!(Sender, isSender)) {
 	import std.traits : ReturnType;
 	static assert(models!(typeof(this), isSender));
-	alias Value = ReturnType!fun;
+	static if (is(ReturnType!fun == Result!T, T))
+		alias Value = T;
+	else
+		alias Value = ReturnType!fun;
 	Sender sender;
 	Fun fun;
 	auto connect(Receiver)(return Receiver receiver) @safe return scope {
