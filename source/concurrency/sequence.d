@@ -359,20 +359,18 @@ struct SequenceFilterNextSender(Sender, Fun, NextReceiver) {
 }
 
 struct SequenceFilterNextOp(Sender, Fun, NextReceiver, Receiver) {
-    Sender sender;
-    SequenceFilterNextState!(Fun, NextReceiver, Receiver) state;
     import concurrency.sender : OpType;
 
     alias Op = OpType!(Sender, SequenceFilterNextReceiver!(Sender.Value, Fun, NextReceiver, Receiver));
     Op op;
-    this(Sender sender, Fun fun, NextReceiver nextReceiver, Receiver receiver) {
-        this.sender = sender;
+    SequenceFilterNextState!(Fun, NextReceiver, Receiver) state;
+    this(Sender sender, Fun fun, NextReceiver nextReceiver, Receiver receiver) @trusted {
         state = SequenceFilterNextState!(Fun, NextReceiver, Receiver)(fun, nextReceiver, receiver);
+        op = sender.connect(SequenceFilterNextReceiver!(Sender.Value, Fun, NextReceiver, Receiver)(&state));
     }
     @disable this(ref return scope typeof(this) rhs);
     @disable this(this);
     void start() @trusted scope {
-        op = sender.connect(SequenceFilterNextReceiver!(Sender.Value, Fun, NextReceiver, Receiver)(&state));
         op.start();
     }
 }
@@ -392,6 +390,7 @@ struct SequenceFilterNextReceiver(Value, Fun, NextReceiver, Receiver) {
         import std.stdio;
         if (state.fun(value)) {
             auto sender = state.nextReceiver.setNext(just(value));
+            // TODO: put state in SequenceFilterNextOp
             sender.connectHeap(state.receiver).start();
         } else {
             state.receiver.setValue();
@@ -405,6 +404,73 @@ struct SequenceFilterNextReceiver(Value, Fun, NextReceiver, Receiver) {
     }
     auto receiver() nothrow @safe {
         return &state.nextReceiver;
+    }
+    import concurrency.receiver : ForwardExtensionPoints;
+    mixin ForwardExtensionPoints!receiver;
+}
+
+auto take(Sequence)(Sequence s, size_t n) {
+    return SequenceTake!(Sequence)(s, n);
+}
+
+struct SequenceTake(Sequence) {
+    import std.traits : ReturnType;
+    alias Value = void;
+    alias Element = Sequence.Element;
+    Sequence s;
+    size_t n;
+    auto connect(Receiver)(return Receiver receiver) @safe return scope {
+        auto op = SequenceTakeOp!(Sequence, Receiver)(s, receiver, n);
+        return op;
+    }
+}
+
+struct SequenceTakeOp(Sequence, Receiver) {
+    import concurrency.sender : OpType;
+
+    alias Op = OpType!(Sequence, SequenceTakeReceiver!Receiver);
+    Op op;
+    SequenceTakeState!(Receiver) state;
+    this(Sequence s, Receiver r, size_t n) @trusted return scope {
+        state = SequenceTakeState!(Receiver)(r, n);
+        op = s.connect(SequenceTakeReceiver!(Receiver)(&state));
+    }
+    void start() @safe nothrow {
+        op.start();
+    }
+}
+
+struct SequenceTakeState(Receiver) {
+    Receiver receiver;
+    size_t n;
+}
+
+struct SequenceTakeReceiver(Receiver) {
+    SequenceTakeState!(Receiver)* state;
+    auto setNext(Sender)(Sender sender) {
+        import concurrency.operations : then;
+        import concurrency : Result, Cancelled, Completed;
+
+        return state.receiver.setNext(sender.then((Sender.Value v) @safe shared {
+            if (state.n == 0)
+                return Result!(Sender.Value)(Cancelled());
+            else {
+                state.n--;
+                return Result!(Sender.Value)(v);
+            }
+        }));
+    }
+    auto setValue() {
+        receiver.setValue();
+    }
+    auto setDone() nothrow @safe {
+        receiver.setDone();
+    }
+    auto setError(Throwable t) nothrow @safe {
+        receiver.setError(t);
+    }
+    auto receiver() nothrow @safe {
+        return &state.receiver;
     }
     import concurrency.receiver : ForwardExtensionPoints;
     mixin ForwardExtensionPoints!receiver;

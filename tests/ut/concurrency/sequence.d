@@ -5,19 +5,19 @@ import concurrency;
 import unit_threaded;
 
 @("sequence.trampoline")
-unittest {
+@safe unittest {
     import std.range : iota;
     iota(0,100).sequence.toList.syncWait.value.length.should == 100;
     iota(0,100).sequence.toList.syncWait.value.length.should == 100;
 }
 
 @("collect")
-unittest {
+@safe unittest {
     [1,2,3,4].sequence.collect((int i) {}).syncWait.isOk.should == true;
 }
 
 @("toList")
-unittest {
+@safe unittest {
     [1,2,3,4].sequence.toList().syncWait.value.should == [1,2,3,4];
 }
 
@@ -27,6 +27,11 @@ unittest {
 }
 
 @("filter")
-unittest {
+@safe unittest {
     [1,2,3,4].sequence.filter((int i) => i%2 == 0).toList().syncWait.value.should == [2,4];
+}
+
+@("take")
+@safe unittest {
+    [1,2,3,4].sequence.take(3).toList().syncWait.value.should == [1,2,3];
 }
