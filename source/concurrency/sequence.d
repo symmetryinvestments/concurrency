@@ -401,7 +401,6 @@ struct SequenceFilterNextReceiver(Value, Fun, NextReceiver, Receiver) {
     auto setValue(Value value) {
         import concurrency : just;
         import concurrency : connectHeap;
-        import std.stdio;
         if (state.fun(value)) {
             auto sender = state.nextReceiver.setNext(just(value));
             // TODO: put state in SequenceFilterNextOp
