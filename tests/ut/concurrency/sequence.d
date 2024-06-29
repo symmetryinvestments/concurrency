@@ -35,3 +35,30 @@ import unit_threaded;
 @safe unittest {
     [1,2,3,4].sequence.take(3).toList().syncWait.value.should == [1,2,3];
 }
+
+@("deferSequence.function")
+@safe unittest {
+    deferSequence(() => just(42)).take(2).toList().syncWait.value.should == [42,42];
+}
+
+@("deferSequence.callable")
+@safe unittest {
+    static struct S {
+        int i;
+        this(int i) {
+            this.i = i;
+        }
+        auto opCall() @safe shared {
+            return just(i);
+        }
+    }
+    deferSequence(shared S(27)).take(2).toList().syncWait.value.should == [27,27];
+}
+
+
+@("deferSequence.timer")
+@safe unittest {
+    import core.time : msecs;
+    deferSequence(() => ScheduleAfter(1.msecs)).take(4).toList().syncWait.isOk.should == true;
+}
+

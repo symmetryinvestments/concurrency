@@ -503,7 +503,70 @@ struct SequenceTakeReceiver(Receiver) {
     mixin ForwardExtensionPoints!receiver;
 }
 
-// defer - create sequence by calling a sender-returning-function
+
+auto deferSequence(Fun)(Fun f) {
+	import concurrency.utils : isThreadSafeCallable;
+	static assert(isThreadSafeCallable!Fun);
+
+    return SequenceDefer!(Fun)(f);
+}
+
+struct SequenceDefer(Fun) {
+    import std.traits : ReturnType;
+    alias Value = void;
+    alias Element = ReturnType!(Fun).Value;
+    Fun f;
+    auto connect(Receiver)(return Receiver receiver) @safe return scope {
+        auto op = SequenceDeferOp!(Fun, Receiver)(f, receiver);
+        return op;
+    }
+}
+
+struct SequenceDeferOp(Fun, Receiver) {
+    import concurrency.sender : OpType;
+    import concurrency.operations : on;
+
+    alias ItemSender = typeof(fun().on(scheduler));
+    alias NextSender = NextSenderType!(ItemSender, Receiver);
+    alias Op = OpType!(NextSender, SequenceDeferReceiver!(Fun, Receiver));
+
+    Fun fun;
+    Receiver receiver;
+    TrampolineScheduler scheduler;
+    Op op;
+
+    @disable this(ref return scope typeof(this) rhs);
+    @disable this(this);
+    void start() @safe nothrow {
+        next();
+    }
+    void next() @trusted scope nothrow {
+        op = receiver.setNext(fun().on(scheduler))
+            .connect(SequenceDeferReceiver!(Fun, Receiver)(&this));
+        op.start();
+    }
+}
+
+struct SequenceDeferReceiver(Fun, Receiver) {
+    SequenceDeferOp!(Fun, Receiver)* op;
+    auto setValue() nothrow @safe {
+        op.next();
+    }
+    auto setDone() nothrow @safe {
+        op.receiver.setValueUnlessStopped();
+    }
+    auto setError(Throwable t) nothrow @safe {
+        op.receiver.setError(t);
+    }
+    auto getStopToken() nothrow @trusted {
+        return op.receiver.getStopToken();
+    }
+    auto getScheduler() nothrow @safe {
+        return op.receiver.getScheduler();
+    }
+    // TODO: probably should start with an Env
+    // might also use that to get Async into the Scheduler
+}
 
 // cron - create a sequence like interval but using cron spec
 
