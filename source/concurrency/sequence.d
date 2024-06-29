@@ -165,7 +165,7 @@ struct SequenceToListOp(Sequence, Receiver){
         state.receiver = r;
     }
     void start() @safe scope {
-        auto op = s.connect(SequenceToListReceiver!(Sequence.Element, Receiver)(state));
+        op = s.connect(SequenceToListReceiver!(Sequence.Element, Receiver)(state));
         op.start();
     }
 }
