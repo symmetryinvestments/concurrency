@@ -55,6 +55,13 @@ import unit_threaded;
     deferSequence(shared S(27)).take(2).toList().syncWait.value.should == [27,27];
 }
 
+@("trampolineScheduler")
+@safe unittest {
+    import core.time : msecs;
+    import concurrency.operations : on;
+    TrampolineScheduler s;
+    ScheduleAfter(1.msecs).on(s).syncWait().isOk.should == true;
+}
 
 @("deferSequence.timer")
 @safe unittest {
