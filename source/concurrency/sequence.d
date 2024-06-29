@@ -467,14 +467,25 @@ struct SequenceTakeReceiver(Receiver) {
         import concurrency.operations : then;
         import concurrency : Result, Cancelled, Completed;
 
-        return state.receiver.setNext(sender.then((Sender.Value v) @safe shared {
-            if (state.n == 0)
-                return Result!(Sender.Value)(Cancelled());
-            else {
-                state.n--;
-                return Result!(Sender.Value)(v);
-            }
-        }));
+        static if (is(Sender.Value == void)) {
+            return state.receiver.setNext(sender.then(() @safe shared {
+                if (state.n == 0)
+                    return Result!(Sender.Value)(Cancelled());
+                else {
+                    state.n--;
+                    return Result!(Sender.Value)();
+                }
+            }));
+        } else {
+            return state.receiver.setNext(sender.then((Sender.Value v) @safe shared {
+                if (state.n == 0)
+                    return Result!(Sender.Value)(Cancelled());
+                else {
+                    state.n--;
+                    return Result!(Sender.Value)(v);
+                }
+            }));
+        }
     }
     auto setValue() {
         receiver.setValue();
