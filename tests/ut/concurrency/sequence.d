@@ -69,3 +69,8 @@ import unit_threaded;
     deferSequence(() => ScheduleAfter(1.msecs)).take(4).toList().syncWait.isOk.should == true;
 }
 
+@("interval")
+@safe unittest {
+    import core.time : msecs;
+    interval(1.msecs, false).take(1).toList.syncWait.isOk.should == true;
+}

@@ -568,6 +568,29 @@ struct SequenceDeferReceiver(Fun, Receiver) {
     // might also use that to get Async into the Scheduler
 }
 
+import core.time : Duration;
+auto interval(Duration duration, bool emitAtStart) {
+    static struct S {
+        Duration duration;
+        bool emitAtStart;
+        this(Duration duration, bool emitAtStart) shared @safe nothrow {
+            this.duration = duration;
+            this.emitAtStart = emitAtStart;
+        }
+        auto opCall() @safe shared {
+            import core.time : seconds;
+            import concurrency.scheduler : ScheduleAfter;
+
+            if (emitAtStart) {
+                emitAtStart = false;
+                return ScheduleAfter(0.seconds);
+            }
+            return ScheduleAfter(duration);
+        }
+    }
+    return deferSequence(shared S(duration, emitAtStart));
+}
+
 // cron - create a sequence like interval but using cron spec
 
 // flatmap{latest,concat} - create a sequence that flattens
