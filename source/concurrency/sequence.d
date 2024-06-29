@@ -47,14 +47,14 @@ struct RangeSequenceOp(Range, Receiver) {
         import std.range : empty, front;
         import concurrency.operations : on;
         try {
-        if (range.empty)
-            receiver.setValue();
-        else {
-            op = receiver
-                .setNext(just(range.front).on(scheduler))
-                .connect(RangeSequenceNextReceiver!(Range, Receiver)(this));
-            op.start();
-        }
+            if (range.empty)
+                receiver.setValue();
+            else {
+                op = receiver
+                    .setNext(just(range.front).on(scheduler))
+                    .connect(RangeSequenceNextReceiver!(Range, Receiver)(this));
+                op.start();
+            }
         } catch (Exception e) {
             receiver.setError(e);
         }
