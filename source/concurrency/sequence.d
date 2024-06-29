@@ -444,6 +444,9 @@ struct SequenceTakeOp(Sequence, Receiver) {
     alias Op = OpType!(Sequence, SequenceTakeReceiver!Receiver);
     Op op;
     SequenceTakeState!(Receiver) state;
+
+    @disable this(ref return scope typeof(this) rhs);
+    @disable this(this);
     this(Sequence s, Receiver r, size_t n) @trusted return scope {
         state = SequenceTakeState!(Receiver)(r, n);
         op = s.connect(SequenceTakeReceiver!(Receiver)(&state));
