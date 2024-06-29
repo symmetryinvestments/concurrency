@@ -140,7 +140,11 @@ auto toList(Sequence)(Sequence s) {
 }
 
 struct SequenceToList(Sequence) {
-    alias Value = Sequence.Element[];
+    static if (is(Sequence.Element == void)) {
+        alias Value = void;
+    } else {
+        alias Value = Sequence.Element[];
+    }
     Sequence s;
     auto connect(Receiver)(return Receiver receiver) @safe return scope {
         auto op = SequenceToListOp!(Sequence, Receiver)(s, receiver);
@@ -168,7 +172,9 @@ struct SequenceToListOp(Sequence, Receiver){
 
 struct SequenceToListState(Element, Receiver) {
     Receiver receiver;
-    Element[] list;
+    static if (!is(Element == void)) {
+        Element[] list;
+    }
 }
 
 struct SequenceToListReceiver(Element, Receiver) {
@@ -179,10 +185,18 @@ struct SequenceToListReceiver(Element, Receiver) {
     auto setNext(Sender)(Sender sender) {
         import concurrency.operations : then;
 
-        return sender.then((Sender.Value v) @safe shared { op.list ~= v; });
+        static if (is(Element == void)) {
+            return sender.then(() @safe shared {});
+        } else {
+            return sender.then((Sender.Value v) @safe shared { op.list ~= v; });
+        }
     }
     auto setValue() {
-        op.receiver.setValue(op.list);
+        static if (is(Element == void)) {
+            op.receiver.setValue();
+        } else {
+            op.receiver.setValue(op.list);
+        }
     }
     auto setDone() nothrow @safe {
         op.receiver.setDone();
