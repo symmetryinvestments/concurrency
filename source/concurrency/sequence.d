@@ -131,8 +131,12 @@ struct SequenceCollectReceiver(Fun, Receiver) {
     auto setError(Throwable t) nothrow @safe {
         receiver.setError(t);
     }
-    import concurrency.receiver : ForwardExtensionPoints;
-    mixin ForwardExtensionPoints!receiver;
+    auto getStopToken() nothrow @safe {
+        return receiver.getStopToken();
+    }
+    auto getScheduler() nothrow @safe {
+        return receiver.getScheduler();
+    }
 }
 
 auto toList(Sequence)(Sequence s) {
