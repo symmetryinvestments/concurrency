@@ -290,27 +290,32 @@ struct TrampolineOp(Receiver) {
 }
 
 auto transform(Sequence, Fun)(Sequence s, Fun f) {
-    return SequenceTransform!(Sequence, Fun)(s, f);
+    import concurrency.operations : then;
+    return s.nextTransform!(s => s.then(f));
 }
 
-struct SequenceTransform(Sequence, Fun) {
-    import std.traits : ReturnType;
+template nextTransform(alias fun) {
+    auto nextTransform(Sequence)(Sequence s) {
+        return SequenceNextTransform!(fun, Sequence)(s);
+    }
+}
+
+struct SequenceNextTransform(alias fun, Sequence) {
+    import concurrency : just;
     alias Value = void;
-    alias Element = ReturnType!(Fun);
+    alias Element = typeof(fun(just(Sequence.Element.init))).Value;
     Sequence s;
-    Fun f;
     auto connect(Receiver)(return Receiver receiver) @safe return scope {
-        auto op = s.connect(SequenceTransformReceiver!(Fun, Receiver)(f, receiver));
+        auto op = s.connect(SequenceNextTransformReceiver!(fun, Receiver)(receiver));
         return op;
     }
 }
 
-struct SequenceTransformReceiver(Fun, Receiver) {
-    Fun fun;
+struct SequenceNextTransformReceiver(alias fun, Receiver) {
     Receiver receiver;
     auto setNext(Sender)(Sender sender) {
         import concurrency.operations : then;
-        return receiver.setNext(sender.then(fun));
+        return receiver.setNext(fun(sender));
     }
     auto setValue() {
         receiver.setValue();
