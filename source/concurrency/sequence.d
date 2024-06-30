@@ -509,8 +509,8 @@ struct SequenceTakeReceiver(Receiver) {
 
 
 auto deferSequence(Fun)(Fun f) {
-	import concurrency.utils : isThreadSafeCallable;
-	static assert(isThreadSafeCallable!Fun);
+    import concurrency.utils : isThreadSafeCallable;
+    static assert(isThreadSafeCallable!Fun);
 
     return SequenceDefer!(Fun)(f);
 }
