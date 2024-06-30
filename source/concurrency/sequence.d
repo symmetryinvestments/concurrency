@@ -40,7 +40,7 @@ struct RangeSequenceOp(Range, Receiver) {
         this.range = range;
         this.receiver = receiver;
     }
-    void start() {
+    void start() @safe scope {
         next();
     }
     private void next() @trusted nothrow {
@@ -88,11 +88,6 @@ struct RangeSequenceNextReceiver(Range, Receiver) {
     void setError(Throwable t) nothrow @safe {
         op.receiver.setError(t);
     }
-    // auto receiver() nothrow @safe {
-    //     return &op.receiver;
-    // }
-    // import concurrency.receiver : ForwardExtensionPoints;
-    // mixin ForwardExtensionPoints!receiver;
     auto getStopToken() nothrow @safe {
         return op.receiver.getStopToken();
     }
@@ -164,12 +159,12 @@ struct SequenceToListOp(Sequence, Receiver){
     Op op;
     @disable this(ref return scope typeof(this) rhs);
     @disable this(this);
-    this(Sequence s, Receiver r) {
+    this(Sequence s, Receiver r) @safe scope {
         this.s = s;
         state.receiver = r;
+        op = s.connect(SequenceToListReceiver!(Sequence.Element, Receiver)(state));
     }
     void start() @safe scope {
-        op = s.connect(SequenceToListReceiver!(Sequence.Element, Receiver)(state));
         op.start();
     }
 }
@@ -195,7 +190,7 @@ struct SequenceToListReceiver(Element, Receiver) {
             return sender.then((Sender.Value v) @safe shared { op.list ~= v; });
         }
     }
-    auto setValue() {
+    auto setValue() nothrow @safe {
         static if (is(Element == void)) {
             op.receiver.setValue();
         } else {
