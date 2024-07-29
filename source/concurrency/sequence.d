@@ -601,6 +601,60 @@ auto interval(Duration duration, bool emitAtStart) {
     }
     return deferSequence(shared S(duration, emitAtStart));
 }
+
+/// checks that T is a Sequence
+void checkSequence(T)() @safe {
+    import concurrency.scheduler : SchedulerObjectBase;
+    import concurrency.stoptoken : StopToken;
+    T t = T.init;
+    struct Scheduler {
+        import core.time : Duration;
+        import concurrency : VoidSender;
+        auto schedule() @safe {
+            return VoidSender();
+        }
+
+        auto scheduleAfter(Duration) @safe {
+            return VoidSender();
+        }
+    }
+
+    static struct Receiver {
+        int* i; // force it scope
+        static if (is(T.Value == void))
+            void setValue() @safe {}
+
+        else
+            void setValue(T.Value) @safe {}
+
+        auto setNext(Sender)(Sender s) @safe nothrow {
+            return s;
+        }
+
+        void setDone() @safe nothrow {}
+
+        void setError(Throwable e) @safe nothrow {}
+
+        shared(StopToken) getStopToken() @safe nothrow {
+            return shared(StopToken).init;
+        }
+
+        Scheduler getScheduler() @safe nothrow {
+            return Scheduler.init;
+        }
+    }
+
+    import concurrency : OpType, isValidOp;
+
+    scope receiver = Receiver.init;
+    OpType!(T, Receiver) op = t.connect(receiver);
+    static if (!isValidOp!(T, Receiver))
+        pragma(msg, "Warning: ", T,
+               "'s operation state is not returned via the stack");
+}
+
+enum isSequence(T) = is(typeof(checkSequence!T));
+
 struct ScanSequenceTransformer(Fun, Seed) {
     Fun fun;
     Seed seed;
