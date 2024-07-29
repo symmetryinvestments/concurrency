@@ -75,3 +75,9 @@ import unit_threaded;
     import core.time : msecs;
     interval(1.msecs, false).take(1).toList.syncWait.isOk.should == true;
 }
+
+
+@("scan")
+@safe unittest {
+    [1,1,1,1].sequence.scan((int i, int acc) => acc + i, 0).toList().syncWait.value.should == [1,2,3,4];
+}

@@ -601,6 +601,22 @@ auto interval(Duration duration, bool emitAtStart) {
     }
     return deferSequence(shared S(duration, emitAtStart));
 }
+struct ScanSequenceTransformer(Fun, Seed) {
+    Fun fun;
+    Seed seed;
+    auto setNext(Sender)(Sender sender) {
+        import concurrency.operations : then;
+        return sender.then((Sender.Value value) @safe shared {
+            seed = fun(value, seed);
+            return seed;
+        });
+    }
+}
+
+auto scan(Sequence, Fun, Seed)(Sequence s, Fun fun, Seed seed) {
+    auto transformer = ScanSequenceTransformer!(Fun, Seed)(fun, seed);
+    return s.nextTransform(transformer);
+}
 
 // cron - create a sequence like interval but using cron spec
 
