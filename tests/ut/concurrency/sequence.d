@@ -119,6 +119,11 @@ import unit_threaded;
     [VoidSender()].sequence.flatten.toList().syncWait.isOk.should == true;
 }
 
+@("flatMap.just")
+@safe unittest {
+    import core.time : msecs;
+    [1,2,3].sequence.flatMap((int i) => just(i*3)).toList().syncWait.value.should == [3,6,9];
+}
 
 @("scan")
 @safe unittest {
