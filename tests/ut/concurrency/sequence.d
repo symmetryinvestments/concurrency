@@ -24,6 +24,7 @@ import unit_threaded;
 @("transform")
 @safe unittest {
     [1,2,3,4].sequence.transform((int i) => i*2).toList().syncWait.value.should == [2,4,6,8];
+    [1,2,3,4].sequence.transform((int i){}).toList().syncWait.isOk.should == true;
 }
 
 @("filter")
