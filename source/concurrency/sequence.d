@@ -40,7 +40,7 @@ struct RangeSequenceOp(Range, Receiver) {
         this.range = range;
         this.receiver = receiver;
     }
-    void start() @safe scope {
+    void start() @safe scope nothrow {
         next();
     }
     private void next() @trusted nothrow {
@@ -164,7 +164,7 @@ struct SequenceToListOp(Sequence, Receiver){
         state.receiver = r;
         op = s.connect(SequenceToListReceiver!(Sequence.Element, Receiver)(state));
     }
-    void start() @safe scope {
+    void start() @safe scope nothrow {
         op.start();
     }
 }
@@ -264,7 +264,7 @@ struct TrampolineOp(Receiver) {
 
     @disable this(ref return scope typeof(this) rhs);
     @disable this(this);
-    void start() @trusted scope {
+    void start() @trusted scope nothrow {
         auto current = TrampolineState.current;
         if (current is null) {
             auto state = TrampolineState.construct();
@@ -321,11 +321,10 @@ struct SequenceNextTransform(Sequence, NextTransformer) {
 struct SequenceNextTransformReceiver(NextTransformer, Receiver) {
     NextTransformer t;
     Receiver receiver;
-    auto setNext(Sender)(Sender sender) {
-        import concurrency.operations : then;
+    auto setNext(Sender)(Sender sender) nothrow @safe {
         return receiver.setNext(t.setNext(sender));
     }
-    auto setValue() {
+    auto setValue() nothrow @safe {
         receiver.setValue();
     }
     auto setDone() nothrow @safe {
@@ -396,7 +395,7 @@ struct SequenceFilterNextOp(Sender, Fun, NextReceiver, Receiver) {
     }
     @disable this(ref return scope typeof(this) rhs);
     @disable this(this);
-    void start() @trusted scope {
+    void start() @trusted scope nothrow {
         op.start();
     }
 }
