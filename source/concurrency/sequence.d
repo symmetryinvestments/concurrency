@@ -655,6 +655,166 @@ void checkSequence(T)() @safe {
 
 enum isSequence(T) = is(typeof(checkSequence!T));
 
+private struct FlattenSenderSequenceTransformer {
+    auto setNext(Sender)(Sender s) {
+        return s.flatten;
+    }
+}
+auto flatten(SenderOrSequence)(SenderOrSequence s) {
+    import concurrency : isSender;
+    static if (isSender!(SenderOrSequence)) {
+        alias Sender = SenderOrSequence;
+        static if (isSender!(Sender.Value)) {
+            // Sender of Sender
+            return FlattenSenderSender!(Sender)(s);
+        } else static if (isSequence!(Sender.Value)) {
+            // Sender of Sequence
+            return FlattenSenderSequence!(Sender)(s);
+        } else static assert(0, "Must be a sender/sequence of sender(s)/sequence(s)");
+    } else static if (isSequence!(SenderOrSequence)) {
+        alias Sequence = SenderOrSequence;
+        static if (isSender!(Sequence.Element)) {
+            // Sequence of Senders
+            return s.nextTransform(FlattenSenderSequenceTransformer());
+        } else static if (isSequence!(Sequence.Element)) {
+            // Sequence of Sequences
+            return FlattenSequence!(Sequence)(s);
+        } else 
+            static assert(0, "Must be a sender/sequence of sender(s)/sequence(s)");
+    } else 
+        static assert(0, "Must be a sender/sequence of sender(s)/sequence(s)");
+}
+
+struct FlattenSenderSequence(Sender) {
+    alias Value = Sender.Value.Value;
+    alias Element = Sender.Value.Element;
+    Sender s;
+    auto connect(Receiver)(return Receiver receiver) @safe return scope {
+        auto op = FlattenSenderSenderOp!(Sender, Receiver)(s, receiver);
+        return op;
+    }
+}
+
+struct FlattenSenderSender(Sender) {
+    alias Value = Sender.Value.Value;
+    Sender s;
+    auto connect(Receiver)(return Receiver receiver) @safe return scope {
+        auto op = FlattenSenderSenderOp!(Sender, Receiver)(s, receiver);
+        return op;
+    }
+}
+
+struct FlattenSenderSenderOp(Sender, Receiver) {
+    import concurrency.sender : OpType;
+
+    Receiver receiver;
+    // TODO: can put these 2 ops in the same memory location to save space
+    alias Op = OpType!(Sender, FlattenSenderReceiver!(Sender, Receiver));
+    alias Op2 = OpType!(Sender.Value, Receiver);
+    Op op;
+    Op2 op2;
+    @disable this(ref return scope typeof(this) rhs);
+    @disable this(this);
+    this(Sender sender, Receiver receiver) scope {
+        this.receiver = receiver;
+        op = sender.connect(FlattenSenderReceiver!(Sender, Receiver)(this));
+        op2 = Op2();
+    }
+    void start() nothrow {
+        op.start();
+    }
+}
+
+struct FlattenSenderReceiver(Sender, Receiver) {
+    FlattenSenderSenderOp!(Sender, Receiver)* op;
+    this(ref FlattenSenderSenderOp!(Sender, Receiver) op) {
+        this.op = &op;
+    }
+    auto setValue(Sender.Value s) @trusted nothrow {
+        try {
+            op.op2 = s.connect(op.receiver);
+            op.op2.start();
+        } catch (Exception e) {
+            op.receiver.setError(e);
+        }
+    }
+    auto setDone() nothrow @safe {
+        op.receiver.setDone();
+    }
+    auto setError(Throwable t) nothrow @safe {
+        op.receiver.setError(t);
+    }
+    auto getStopToken() nothrow @trusted {
+        return op.receiver.getStopToken();
+    }
+    auto getScheduler() nothrow @safe {
+        return op.receiver.getScheduler();
+    }
+}
+
+struct FlattenSequence(Sequence) {
+    alias Value = Sequence.Value;
+    alias Element = Sequence.Element.Element;
+    Sequence s;
+    auto connect(Receiver)(return Receiver receiver) @safe return scope {
+        auto op = FlattenSequenceOp!(Sequence, Receiver)(s, receiver);
+        return op;
+    }
+}
+
+struct FlattenSequenceOp(Sequence, Receiver) {
+    import concurrency.sender : OpType;
+
+    Receiver receiver;
+    alias Op = OpType!(Sequence, FlattenSequenceReceiver!(Sequence, Receiver));
+    Op op;
+    @disable this(ref return scope typeof(this) rhs);
+    @disable this(this);
+    this(Sequence sequence, Receiver receiver) @safe scope {
+        this.receiver = receiver;
+        op = sequence.connect(FlattenSequenceReceiver!(Sequence, Receiver)(this));
+    }
+    void start() @safe scope nothrow {
+        op.start();
+    }
+}
+
+private struct FlattenSequenceTranformer(Receiver) {
+    Receiver* receiver;
+    this(ref Receiver receiver) @trusted return scope {
+        this.receiver = &receiver;
+    }
+    auto setNext(Sender)(Sender s) @safe nothrow {
+        return receiver.setNext(s);
+    }
+}
+
+struct FlattenSequenceReceiver(Sequence, Receiver) {
+    FlattenSequenceOp!(Sequence, Receiver)* op;
+    this(ref FlattenSequenceOp!(Sequence, Receiver) op) {
+        this.op = &op;
+    }
+    auto setNext(Sender)(Sender sender) @trusted nothrow return scope {
+        auto transformer = FlattenSequenceTranformer!(Receiver)(op.receiver);
+        return nextTransform(sender.flatten, transformer).collect((){});
+    }
+    auto setValue() @safe nothrow {
+        op.receiver.setValue();
+    }
+    auto setDone() nothrow @safe {
+        op.receiver.setDone();
+    }
+    auto setError(Throwable t) nothrow @safe {
+        op.receiver.setError(t);
+    }
+    auto getStopToken() nothrow @trusted {
+        return op.receiver.getStopToken();
+    }
+    auto getScheduler() nothrow @safe {
+        return op.receiver.getScheduler();
+    }
+}
+
 struct ScanSequenceTransformer(Fun, Seed) {
     Fun fun;
     Seed seed;

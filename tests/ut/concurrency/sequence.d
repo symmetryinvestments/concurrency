@@ -76,6 +76,49 @@ import unit_threaded;
     interval(1.msecs, false).take(1).toList.syncWait.isOk.should == true;
 }
 
+@("flatten.sender.just")
+@safe unittest {
+    just(just(77)).flatten.syncWait.value.should == 77;
+}
+
+@("flatten.sender.ScheduleAfter")
+@safe unittest {
+    import core.time : msecs;
+
+    just(ScheduleAfter(1.msecs)).flatten.syncWait.isOk.should == true;
+}
+
+@("flatten.sender.sequence")
+@safe unittest {
+    import core.time : msecs;
+
+    just([1,2,3,4].sequence).flatten.toList().syncWait.value.should == [1,2,3,4];
+}
+
+@("flatten.sequence.sender")
+@safe unittest {
+    import core.time : msecs;
+    import std.algorithm : map;
+
+    [just(1),just(2)].sequence.flatten.toList().syncWait.value.should == [1,2];
+    [1,2,3,4].map!(i => just(i)).sequence.flatten.toList().syncWait.value.should == [1,2,3,4];
+}
+
+@("flatten.sequence.sequence")
+@safe unittest {
+    import core.time : msecs;
+    import std.algorithm : map;
+
+    [[1,2].sequence, [2,3].sequence].sequence.flatten.toList().syncWait.value.should == [1,2,2,3];
+}
+
+@("flatten.sequence.VoidSender")
+@safe unittest {
+    import core.time : msecs;
+
+    [VoidSender()].sequence.flatten.toList().syncWait.isOk.should == true;
+}
+
 
 @("scan")
 @safe unittest {
