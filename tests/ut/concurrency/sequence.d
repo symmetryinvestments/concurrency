@@ -125,6 +125,16 @@ import unit_threaded;
     [1,2,3].sequence.flatMap((int i) => just(i*3)).toList().syncWait.value.should == [3,6,9];
 }
 
+@("nextTransform")
+@safe unittest {
+    static struct Transformer {
+        auto setNext(Sender)(Sender s) {
+            return s;
+        }
+    }
+    just([1,2].sequence).flatten.nextTransform(Transformer()).toList.syncWait.value.should == [1,2];
+}
+
 @("scan")
 @safe unittest {
     [1,1,1,1].sequence.scan((int i, int acc) => acc + i, 0).toList().syncWait.value.should == [1,2,3,4];
