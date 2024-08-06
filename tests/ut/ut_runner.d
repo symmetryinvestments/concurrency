@@ -20,5 +20,6 @@ int main(string[] args) {
 		"concurrency.timingwheels",
 		"concurrency.stoptoken",
 		"ut.concurrency.stoptoken",
+		"ut.concurrency.io",
 	);
 }

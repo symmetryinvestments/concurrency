@@ -25,12 +25,19 @@ mixin template ForwardExtensionPoints(alias receiver) {
 	auto getScheduler() nothrow @safe {
 		return receiver.getScheduler();
 	}
+
+	static if (__traits(hasMember, receiver, "getIOScheduler")) {
+		auto getIOScheduler() nothrow @safe {
+			return receiver.getIOScheduler();
+		}
+	}
 }
 
 /// A polymorphic receiver of type T
 interface ReceiverObjectBase(T) {
 	import concurrency.stoptoken : StopToken;
 	import concurrency.scheduler : SchedulerObjectBase;
+	import concurrency.ioscheduler : IOSchedulerObjectBase;
 	static assert(models!(ReceiverObjectBase!T, isReceiver));
 	static if (is(T == void))
 		void setValue() @safe;
@@ -40,6 +47,7 @@ interface ReceiverObjectBase(T) {
 	void setError(Throwable e) nothrow @safe;
 	shared(StopToken) getStopToken() nothrow @safe;
 	SchedulerObjectBase getScheduler() scope nothrow @safe;
+	IOSchedulerObjectBase getIOScheduler() scope nothrow @safe;
 }
 
 struct NullReceiver(T) {
@@ -94,5 +102,14 @@ void setValueOrError(Receiver, T)(auto ref Receiver receiver,
 		} catch (Exception e) {
 			receiver.setError(e);
 		}
+	}
+}
+
+void setErrno(Receiver)(ref Receiver receiver, string msg, int n) @safe nothrow {
+    import std.exception : ErrnoException;
+	try {
+		receiver.setError(new ErrnoException(msg, n));
+	} catch (Exception e) {
+		receiver.setError(e);
 	}
 }

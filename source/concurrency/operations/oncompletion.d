@@ -17,6 +17,7 @@ private struct OnCompletionReceiver(Value, SideEffect, Receiver) {
 	Receiver receiver;
 	SideEffect sideEffect;
 	static if (is(Value == void))
+		// TODO: mustn't this be nothrow?
 		void setValue() @safe {
 			sideEffect();
 			receiver.setValue();
