@@ -127,7 +127,13 @@ struct ListElement(T) {
 	T userdata;
 	ulong scheduled_at;
 	ushort position = 0xffff;
+	TimerCommand command;
 	ListElement!T* prev, next;
+}
+
+enum TimerCommand : ushort {
+	Register = 1,
+	Cancel = 2,
 }
 
 struct TimingWheels(T) {

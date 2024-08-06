@@ -84,7 +84,6 @@ class LocalThreadExecutor : Executor {
 	import core.thread : ThreadID;
 	import std.process : thisThreadID;
 	import concurrency.scheduler : Timer;
-	import concurrency.timingwheels;
 
 	static struct Node {
 		VoidDelegate dg;
@@ -94,7 +93,7 @@ class LocalThreadExecutor : Executor {
 	private {
 		ThreadID threadId;
 		WorkQueue queue;
-		TimingWheels!TimerDelegate wheels;
+		TimingWheels wheels;
 		shared ulong nextTimerId;
 	}
 

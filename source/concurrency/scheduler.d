@@ -23,33 +23,6 @@ interface SchedulerObjectBase {
 	SenderObjectBase!void scheduleAfter(Duration d) @safe;
 }
 
-
-// We can pull the LocalThreadExecutor (and its schedule/scheduleAfter) out into a specialized context.
-// Just like we did with the iouring context
-
-// The interesting bit is that the syncWait algorithm then might be inferred as @nogc
-
-// The question remains how we would want to integrate these.
-// With iouring we created a runner that would take a sender and would inject the scheduler and allow itself to steal the current thread.
-
-// That last part is important, we don't want to spawn a thread just to run timers, we can do it perfectly fine on the current thread.
-// Same with iouring or other event loops.
-
-// That said, we can, if we want to, move the event loop to another thread.
-
-// The only thing we can't do is cross schedule timers from one thread to another.
-// Well, that is not true, we can create two context objects that expose a Scheduler 
-
-
-
-
-
-
-// Guess we just have to write it and see....
-
-// Dietmar Kuhl used a iocontext with a run function that allows running it on the current thread.
-// In rant I had the iocontext's runner return a sender so you could await that.
-
 class SchedulerObject(S) : SchedulerObjectBase {
 	import concurrency.sender : toSenderObject;
 	S scheduler;
@@ -77,10 +50,13 @@ enum TimerTrigger {
 	cancel
 }
 
-alias TimerDelegate = void delegate(TimerTrigger) @safe shared;
+alias TimerDelegate = void delegate(TimerTrigger) @safe shared nothrow;
 
 import concurrency.timingwheels : ListElement;
+static import concurrency.timingwheels;
 alias Timer = ListElement!(TimerDelegate);
+alias TimingWheels = concurrency.timingwheels.TimingWheels!(TimerDelegate);
+public import concurrency.timingwheels : TimerCommand;
 
 auto localThreadScheduler() {
 	import concurrency.thread : LocalThreadWorker, getLocalThreadExecutor;
@@ -179,7 +155,7 @@ struct ScheduleAfterOp(Worker, Receiver) {
 		stopCb.register(token, cast(void delegate() nothrow @safe shared) &stop);
 
 		try {
-			timer.userdata = cast(void delegate(TimerTrigger) @safe shared) &trigger;
+			timer.userdata = cast(void delegate(TimerTrigger) @safe shared nothrow) &trigger;
 			worker.addTimer(timer, dur);
 		} catch (Exception e) {
 			receiver.setError(e);
@@ -254,14 +230,13 @@ struct ManualTimeScheduler {
 }
 
 class ManualTimeWorker {
-	import concurrency.timingwheels : TimingWheels;
 	import concurrency.executor : VoidDelegate;
 	import core.sync.mutex : Mutex;
 	import core.sync.condition : Condition;
 	import core.time : msecs, hnsecs;
 	import std.array : Appender;
 	private {
-		TimingWheels!TimerDelegate wheels;
+		TimingWheels wheels;
 		Condition condition;
 		size_t time = 1;
 		shared ulong nextTimerId;

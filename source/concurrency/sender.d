@@ -42,7 +42,7 @@ import core.time : Duration;
 
 /// checks that T is a Sender
 void checkSender(T)() @safe {
-	import concurrency.scheduler : SchedulerObjectBase;
+	import concurrency.ioscheduler : NullIOScheduler;
 	import concurrency.stoptoken : StopToken;
 	T t = T.init;
 	struct Scheduler {
@@ -74,6 +74,10 @@ void checkSender(T)() @safe {
 
 		Scheduler getScheduler() @safe nothrow {
 			return Scheduler.init;
+		}
+
+		NullIOScheduler getIOScheduler() @safe nothrow {
+			return NullIOScheduler("Testing NullIOScheduler");
 		}
 	}
 
@@ -225,10 +229,12 @@ template toReceiverObject(T) {
 		import concurrency.receiver;
 		import concurrency.stoptoken : StopToken;
 		import concurrency.scheduler : SchedulerObjectBase;
+		import concurrency.ioscheduler : IOSchedulerObjectBase;
 
 		return new class(receiver) ReceiverObjectBase!T {
 			Receiver receiver;
 			SchedulerObjectBase scheduler;
+			IOSchedulerObjectBase ioScheduler;
 			this(Receiver receiver) {
 				this.receiver = receiver;
 			}
@@ -261,6 +267,21 @@ template toReceiverObject(T) {
 					scheduler = receiver.getScheduler().toSchedulerObject;
 				}
 				return scheduler;
+			}
+
+			IOSchedulerObjectBase getIOScheduler() nothrow @safe scope {
+				import concurrency.ioscheduler : toIOSchedulerObject;
+				static if (__traits(hasMember, receiver, "getIOScheduler")) {
+					if (ioScheduler is null) {
+						ioScheduler = receiver.getIOScheduler().toIOSchedulerObject;
+					}
+				} else {
+					import concurrency.ioscheduler : NullIOScheduler;
+					if (ioScheduler is null) {
+						ioScheduler = NullIOScheduler("Type " ~Receiver.stringof ~ " doesn't have IOScheduler.").toIOSchedulerObject;
+					}
+				}
+				return ioScheduler;
 			}
 		};
 	}
