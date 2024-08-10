@@ -27,8 +27,7 @@ configuration "unittest-release" {
 	sourcePaths "source" "tests/ut"
 	importPaths "source" "tests/ut"
 	lflags "/EXPORT:concurrency_getLocalThreadExecutor" "/EXPORT:concurrency_globalStopSourcePointer" platform="windows"
-  # buildOptions "unittests"  "optimize"  "inline"
-  buildOptions "unittests" "optimize"
+	buildOptions "unittests" "optimize"
 }
 configuration "nodip" {
 	targetType "library"
@@ -42,6 +41,5 @@ configuration "unittest-asan" {
 	sourcePaths "source" "tests/ut"
 	importPaths "source" "tests/ut"
 	lflags "/EXPORT:concurrency_getLocalThreadExecutor" "/EXPORT:concurrency_globalStopSourcePointer" platform="windows"
-  # buildOptions "unittests"  "optimize"  "inline"
-  buildOptions "unittests"  "optimize"
+	buildOptions "unittests"  "optimize"
 }
