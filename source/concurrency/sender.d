@@ -315,27 +315,27 @@ struct ConnectHeapReceiver(Receiver, Value) {
 	static if (is(Value == void)) {
 		void setValue() @safe {
 			Receiver local = receiver;
-			destroyState();
 			local.setValue();
+			destroyState();
 		}
-	} else{ 
+	} else { 
 		void setValue(Value v) @safe {
 			Receiver local = receiver;
-			destroyState();
 			local.setValue(v);
+			destroyState();
 		}
 	}
 
 	void setDone() nothrow @safe {
 		Receiver local = receiver;
-		destroyState();
 		local.setDone();
+		destroyState();
 	}
 
 	void setError(Throwable e) nothrow @safe {
 		Receiver local = receiver;
-		destroyState();
 		local.setError(e);
+		destroyState();
 	}
 
     import concurrency.receiver : ForwardExtensionPoints;
@@ -402,21 +402,33 @@ struct ThrowingSender {
 struct DoneSender {
 	static assert(models!(typeof(this), isSender));
 	alias Value = void;
-	static struct DoneOp(Receiver) {
-		Receiver receiver;
-		@disable
-		this(ref return scope typeof(this) rhs);
-		@disable
-		this(this);
-		void start() nothrow @trusted scope {
-			receiver.setDone();
-		}
-	}
 
 	auto connect(Receiver)(return Receiver receiver) @safe return scope {
 		// ensure NRVO
-		auto op = DoneOp!(Receiver)(receiver);
+		auto op = TypedDoneSender!(void)().connect(receiver);
 		return op;
+	}
+}
+
+struct TypedDoneSender(T) {
+	static assert(models!(typeof(this), isSender));
+	alias Value = T;
+
+	auto connect(Receiver)(return Receiver receiver) @safe return scope {
+		// ensure NRVO
+		auto op = TypedDoneOp!(Receiver)(receiver);
+		return op;
+	}
+}
+
+struct TypedDoneOp(Receiver) {
+	Receiver receiver;
+	@disable
+	this(ref return scope typeof(this) rhs);
+	@disable
+	this(this);
+	void start() nothrow @trusted scope {
+		receiver.setDone();
 	}
 }
 
@@ -448,22 +460,35 @@ struct ErrorSender {
 	static assert(models!(typeof(this), isSender));
 	alias Value = void;
 	Throwable exception;
-	static struct ErrorOp(Receiver) {
-		Receiver receiver;
-		Throwable exception;
-		@disable
-		this(ref return scope typeof(this) rhs);
-		@disable
-		this(this);
-		void start() nothrow @trusted scope {
-			receiver.setError(exception);
-		}
-	}
 
 	auto connect(Receiver)(return Receiver receiver) @safe return scope {
 		// ensure NRVO
-		auto op = ErrorOp!(Receiver)(receiver, exception);
+		auto op = TypedErrorSender!(void)(exception).connect(receiver);
 		return op;
+	}
+}
+
+/// A sender that always calls setError
+struct TypedErrorSender(T) {
+	static assert(models!(typeof(this), isSender));
+	alias Value = T;
+	Throwable exception;
+	auto connect(Receiver)(return Receiver receiver) @safe return scope {
+		// ensure NRVO
+		auto op = TypedErrorOp!(Receiver)(receiver, exception);
+		return op;
+	}
+}
+
+struct TypedErrorOp(Receiver) {
+	Receiver receiver;
+	Throwable exception;
+	@disable
+	this(ref return scope typeof(this) rhs);
+	@disable
+	this(this);
+	void start() nothrow @trusted scope {
+		receiver.setError(exception);
 	}
 }
 
