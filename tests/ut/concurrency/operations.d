@@ -526,7 +526,7 @@ unittest {
 		}
 
 		void signalChild() @trusted shared {
-			(cast() childEvent).set();
+			(cast() childEvent).setIfInitialized();
 		}
 
 		void waitChild() @trusted shared {
@@ -534,7 +534,7 @@ unittest {
 		}
 
 		void signalParent() @trusted shared {
-			(cast() parentEvent).set();
+			(cast() parentEvent).setIfInitialized();
 		}
 
 		void waitParent() @trusted shared {
