@@ -8,7 +8,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        dc: [dmd-latest, ldc-latest, dmd-2.105.3, ldc-1.35.0]
+        dc: [dmd-latest, ldc-latest, dmd-2.107.1, ldc-1.37.0]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
