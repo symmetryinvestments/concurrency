@@ -211,8 +211,19 @@ interface SenderObjectBase(T) {
 	alias Op = OperationObject;
 	OperationObject connect(return ReceiverObjectBase!(T) receiver) @safe scope;
 	OperationObject connect(Receiver)(return Receiver receiver) @trusted scope {
-		return connect(new class(receiver) ReceiverObjectBase!T {
+		return connect(receiver.toReceiverObject!(T)());
+	}
+}
+
+template toReceiverObject(T) {
+	auto toReceiverObject(Receiver)(return Receiver receiver) @trusted {
+		import concurrency.receiver;
+		import concurrency.stoptoken : StopToken;
+		import concurrency.scheduler : SchedulerObjectBase;
+
+		return new class(receiver) ReceiverObjectBase!T {
 			Receiver receiver;
+			SchedulerObjectBase scheduler;
 			this(Receiver receiver) {
 				this.receiver = receiver;
 			}
@@ -241,9 +252,12 @@ interface SenderObjectBase(T) {
 
 			SchedulerObjectBase getScheduler() nothrow @safe scope {
 				import concurrency.scheduler : toSchedulerObject;
-				return receiver.getScheduler().toSchedulerObject;
+				if (scheduler is null) {
+					scheduler = receiver.getScheduler().toSchedulerObject;
+				}
+				return scheduler;
 			}
-		});
+		};
 	}
 }
 
