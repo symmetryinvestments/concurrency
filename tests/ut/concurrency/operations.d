@@ -839,3 +839,8 @@ unittest {
 	Countdown(3).syncWait().assumeOk();
 	Countdown(3).repeat().syncWait().isError.should == true;
 }
+
+@("ignorevalue.happy") @safe
+unittest {
+	just(42).ignoreValue().syncWait.get!Completed.should == Completed();
+}
