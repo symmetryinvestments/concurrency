@@ -57,8 +57,10 @@ final class MPSCQueue(Node) {
 		tail = &stub;
 		if (last is &stub)
 			last = last.next.toUnshared();
-		if (first is &stub)
+		if (first is &stub) {
 			first = null;
+			last = null;
+		}
 		return Chain!Node(first, last);
 	}
 
