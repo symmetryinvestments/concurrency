@@ -389,6 +389,7 @@ private struct StopState {
 			atomicStore(head.state, blank);
 			head = next;
 		}
+		atomicStore(head, null);
 		unlock();
 		assert(false, "StopSource has lingering callbacks");
 	}
