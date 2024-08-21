@@ -844,3 +844,30 @@ unittest {
 unittest {
 	just(42).ignoreValue().syncWait.get!Completed.should == Completed();
 }
+
+@("doFinally.value") @safe
+unittest {
+	import core.atomic : atomicOp;
+	shared int g = 0;
+	just(42).doFinally(() @safe shared => g.atomicOp!"+="(1)).syncWait
+	        .assumeOk;
+	g.should == 1;
+}
+
+@("doFinally.done") @safe
+unittest {
+	import core.atomic : atomicOp;
+	shared int g = 0;
+	DoneSender().doFinally(() @safe shared => g.atomicOp!"+="(1)).syncWait
+	            .isCancelled.should == true;
+	g.should == 1;
+}
+
+@("doFinally.error") @safe
+unittest {
+	import core.atomic : atomicOp;
+	shared int g = 0;
+	ThrowingSender().doFinally(() @safe shared => g.atomicOp!"+="(1))
+	                .syncWait.isError.should == true;
+	g.should == 1;
+}
