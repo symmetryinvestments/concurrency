@@ -891,3 +891,90 @@ unittest {
 	                .syncWait.isError.should == true;
 	g.should == 1;
 }
+
+@("letValue.outer.void") @safe
+unittest {
+	VoidSender()
+		.letValue(() => just(42))
+		.syncWait
+		.value
+		.should == 42;
+}
+
+@("letValue.outer.just") @safe
+unittest {
+	just(42)
+		.letValue((int i) => just(i))
+		.syncWait
+		.value
+		.should == 42;
+}
+
+@("letValue.outer.error") @safe
+unittest {
+	shared int g = 0;
+
+	ThrowingSender()
+		.letValue(() @safe shared {
+			g = 1;
+			return just(42);
+		})
+		.syncWait
+		.isError
+		.should == true;
+	
+	g.should == 0;
+}
+
+@("letValue.outer.done") @safe
+unittest {
+	shared int g = 0;
+
+	DoneSender()
+		.letValue(() @safe shared {
+			g = 1;
+			return just(42);
+		})
+		.syncWait
+		.isCancelled
+		.should == true;
+	
+	g.should == 0;
+}
+
+@("letValue.inner.void") @safe
+unittest {
+	just(42)
+		.letValue((int i) => VoidSender())
+		.syncWait
+		.assumeOk;
+}
+
+@("letValue.inner.void") @safe
+unittest {
+	just(42)
+		.letValue((int i) => VoidSender())
+		.syncWait
+		.assumeOk;
+}
+
+@("letValue.inner.error") @safe
+unittest {
+	just(42)
+		.letValue((int i) => ThrowingSender())
+		.syncWait
+		.isError
+		.should == true;
+}
+
+@("letValue.inner.exception") @safe
+unittest {
+	just(42)
+		.letValue((int i) {
+			throw new Exception("foobar");
+			return VoidSender();
+		})
+		.syncWait
+		.isError
+		.should == true;
+}

@@ -27,3 +27,4 @@ public import concurrency.operations.onresult;
 public import concurrency.operations.repeat;
 public import concurrency.operations.ignorevalue;
 public import concurrency.operations.dofinally;
+public import concurrency.operations.letvalue;

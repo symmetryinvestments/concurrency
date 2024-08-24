@@ -376,7 +376,10 @@ struct VoidSender {
 		this(ref return scope typeof(this) rhs);
 		@disable
 		this(this);
-		void start() nothrow @safe {
+		// TODO: this needs to be @safe
+		// but it might require a lot of other things to be
+		// scoped in turn
+		void start() nothrow @trusted scope {
 			import concurrency.receiver : setValueOrError;
 			receiver.setValueOrError();
 		}
