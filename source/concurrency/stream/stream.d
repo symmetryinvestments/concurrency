@@ -118,6 +118,10 @@ template loopStream(E) {
 				this(ref return scope typeof(this) rhs);
 				@disable
 				this(this);
+
+				@disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+				@disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
 				this(T t, DG dg, Receiver receiver) {
 					this.t = t;
 					this.dg = dg;

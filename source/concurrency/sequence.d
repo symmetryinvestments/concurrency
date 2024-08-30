@@ -36,6 +36,10 @@ struct RangeSequenceOp(Range, Receiver) {
     TrampolineScheduler scheduler;
     @disable this(ref return scope typeof(this) rhs);
     @disable this(this);
+
+    @disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+    @disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
     this(Range range, Receiver receiver) {
         this.range = range;
         this.receiver = receiver;
@@ -43,16 +47,18 @@ struct RangeSequenceOp(Range, Receiver) {
     void start() @safe scope nothrow {
         next();
     }
-    private void next() @trusted nothrow {
+    private void next() @trusted scope nothrow {
         import std.range : empty, front;
         import concurrency.operations : on;
+        import concurrency.sender : emplaceOperationalState;
         try {
             if (range.empty)
                 receiver.setValue();
             else {
-                op = receiver
-                    .setNext(just(range.front).on(scheduler))
-                    .connect(RangeSequenceNextReceiver!(Range, Receiver)(this));
+                auto recv = RangeSequenceNextReceiver!(Range, Receiver)(this);
+                op.emplaceOperationalState(receiver
+                    .setNext(just(range.front).on(scheduler)),
+                    recv);
                 op.start();
             }
         } catch (Exception e) {
@@ -159,6 +165,10 @@ struct SequenceToListOp(Sequence, Receiver){
     Op op;
     @disable this(ref return scope typeof(this) rhs);
     @disable this(this);
+
+    @disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+    @disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
     this(Sequence s, Receiver r) @safe scope {
         this.s = s;
         state.receiver = r;
@@ -264,6 +274,10 @@ struct TrampolineOp(Receiver) {
 
     @disable this(ref return scope typeof(this) rhs);
     @disable this(this);
+
+    @disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+    @disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
     void start() @trusted scope nothrow {
         auto current = TrampolineState.current;
         if (current is null) {
@@ -395,6 +409,10 @@ struct SequenceFilterNextOp(Sender, Fun, NextReceiver, Receiver) {
     }
     @disable this(ref return scope typeof(this) rhs);
     @disable this(this);
+
+    @disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+    @disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
     void start() @trusted scope nothrow {
         op.start();
     }
@@ -458,6 +476,10 @@ struct SequenceTakeOp(Sequence, Receiver) {
 
     @disable this(ref return scope typeof(this) rhs);
     @disable this(this);
+
+    @disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+    @disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
     this(Sequence s, Receiver r, size_t n) @trusted return scope {
         state = SequenceTakeState!(Receiver)(r, n);
         op = s.connect(SequenceTakeReceiver!(Receiver)(&state));
@@ -548,12 +570,17 @@ struct SequenceDeferOp(Fun, Receiver) {
 
     @disable this(ref return scope typeof(this) rhs);
     @disable this(this);
+
+    @disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+    @disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
     void start() @safe nothrow {
         next();
     }
     void next() @trusted scope nothrow {
-        op = receiver.setNext(fun().on(scheduler))
-            .connect(SequenceDeferReceiver!(Fun, Receiver)(&this));
+        import concurrency.sender : emplaceOperationalState;
+        op.emplaceOperationalState(receiver.setNext(fun().on(scheduler)),
+            SequenceDeferReceiver!(Fun, Receiver)(&this));
         op.start();
     }
 }
@@ -715,10 +742,13 @@ struct FlattenSenderSenderOp(Sender, Receiver) {
     Op2 op2;
     @disable this(ref return scope typeof(this) rhs);
     @disable this(this);
+
+    @disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+    @disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
     this(Sender sender, Receiver receiver) scope {
         this.receiver = receiver;
         op = sender.connect(FlattenSenderReceiver!(Sender, Receiver)(this));
-        op2 = Op2();
     }
     void start() nothrow {
         op.start();
@@ -732,7 +762,8 @@ struct FlattenSenderReceiver(Sender, Receiver) {
     }
     auto setValue(Sender.Value s) @trusted nothrow {
         try {
-            op.op2 = s.connect(op.receiver);
+            import concurrency.sender : emplaceOperationalState;
+            op.op2.emplaceOperationalState(s, op.receiver);
             op.op2.start();
         } catch (Exception e) {
             op.receiver.setError(e);
@@ -770,6 +801,10 @@ struct FlattenSequenceOp(Sequence, Receiver) {
     Op op;
     @disable this(ref return scope typeof(this) rhs);
     @disable this(this);
+
+    @disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+    @disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
     this(Sequence sequence, Receiver receiver) @safe scope {
         this.receiver = receiver;
         op = sequence.connect(FlattenSequenceReceiver!(Sequence, Receiver)(this));
@@ -843,6 +878,10 @@ struct FlatMapSequenceOp(Sequence, Fun, Receiver) {
 
     @disable this(ref return scope typeof(this) rhs);
     @disable this(this);
+
+    @disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+    @disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
     this(Sequence sequence, Fun fun, Receiver receiver) {
         this.fun = fun;
         this.receiver = receiver;

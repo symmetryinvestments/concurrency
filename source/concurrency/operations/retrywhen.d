@@ -19,9 +19,11 @@ auto retryWhen(Sender, Logic)(Sender sender, Logic logic)
 private struct TriggerReceiver(Sender, Receiver, Logic) {
 	alias Value = void;
 	private RetryWhenOp!(Sender, Receiver, Logic)* op;
-	void setValue() @safe {
-		op.sourceOp =
-			op.sender.connect(SourceReceiver!(Sender, Receiver, Logic)(op));
+	void setValue() @trusted {
+        import concurrency.sender : emplaceOperationalState;
+		op.sourceOp.emplaceOperationalState(op.sender,
+			SourceReceiver!(Sender, Receiver, Logic)(op)
+		);
 		op.sourceOp.start();
 	}
 
@@ -60,9 +62,12 @@ private struct SourceReceiver(Sender, Receiver, Logic) {
 	void setError(Throwable t) @trusted nothrow {
 		if (auto ex = cast(Exception) t) {
 			try {
-				op.triggerOp =
-					op.logic.failure(ex)
-					  .connect(TriggerReceiver!(Sender, Receiver, Logic)(op));
+        		import concurrency.sender : emplaceOperationalState;
+				auto recv = TriggerReceiver!(Sender, Receiver, Logic)(op);
+				op.triggerOp.emplaceOperationalState(
+					op.logic.failure(ex),
+					recv
+				);
 				op.triggerOp.start();
 			} catch (Throwable t2) {
 				op.receiver.setError(t2);
@@ -96,6 +101,10 @@ private struct RetryWhenOp(Sender, Receiver, Logic) {
 	this(ref return scope typeof(this) rhs);
 	@disable
 	this(this);
+
+    @disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+    @disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
 	this(return Sender sender, Receiver receiver, Logic logic) @trusted scope {
 		this.sender = sender;
 		this.receiver = receiver;

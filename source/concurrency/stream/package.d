@@ -160,6 +160,10 @@ auto intervalStream(Duration duration, bool emitAtStart = false) {
 		this(this);
 		@disable
 		this(ref return scope typeof(this) rhs);
+
+		@disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+		@disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
 		this(Duration duration, DG dg, Receiver receiver, bool emitAtStart) {
 			this.duration = duration;
 			this.dg = dg;
@@ -185,9 +189,12 @@ auto intervalStream(Duration duration, bool emitAtStart = false) {
 		}
 
 		private void load() @trusted nothrow {
+        	import concurrency.sender : emplaceOperationalState;
 			try {
-				op = receiver.getScheduler().scheduleAfter(duration)
-				             .connect(ItemReceiver!(typeof(this))(&this));
+				op.emplaceOperationalState(
+					receiver.getScheduler().scheduleAfter(duration),
+				    ItemReceiver!(typeof(this))(&this)
+				);
 				op.start();
 			} catch (Exception e) {
 				receiver.setError(e);
@@ -233,6 +240,10 @@ auto via(Stream, Sender)(Stream stream, Sender sender)
 		this(ref return scope typeof(this) rhs);
 		@disable
 		this(this);
+
+		@disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+		@disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
 		this(Stream stream, Sender sender, DG dg, Receiver receiver) @trusted {
 			op = stream.collect(dg).senderVia(sender).connect(receiver);
 		}
@@ -254,6 +265,10 @@ auto doneStream() {
 		this(ref return scope typeof(this) rhs);
 		@disable
 		this(this);
+
+		@disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+		@disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
 		this(DG dg, Receiver receiver) {
 			this.receiver = receiver;
 		}
@@ -275,6 +290,10 @@ auto errorStream(Exception e) {
 		this(ref return scope typeof(this) rhs);
 		@disable
 		this(this);
+
+		@disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+		@disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
 		this(Exception e, DG dg, Receiver receiver) {
 			this.e = e;
 			this.receiver = receiver;
@@ -310,6 +329,10 @@ shared struct SharedStream(T) {
 			this(ref return scope typeof(this) rhs);
 			@disable
 			this(this);
+
+			@disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+			@disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
 			void start() nothrow @trusted {
 				auto stopToken = receiver.getStopToken();
 				cb.register(stopToken, &(cast(shared) this).onStop);

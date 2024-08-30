@@ -44,6 +44,10 @@ template SampleStreamOp(StreamBase, StreamTrigger) {
 		this(ref return scope inout typeof(this) rhs);
 		@disable
 		this(this);
+
+		@disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+		@disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
 		this(StreamBase base, StreamTrigger trigger, DG dg,
 		     return Receiver receiver) @trusted scope {
 			this.dg = dg;

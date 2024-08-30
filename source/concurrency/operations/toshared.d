@@ -39,7 +39,7 @@ class SharedSender(Sender, Scheduler, ResetLogic resetLogic)
 		Sender sender;
 		Scheduler scheduler;
 		SharedSenderState!(Sender) state;
-		void add(Props.DG dg) @safe nothrow {
+		void add(Props.DG dg) @trusted nothrow {
 			with (state.counter.lock(0, Flags.tick)) {
 				if (was(Flags.completed)) {
 					InternalValue value = state.inst.value.match!((InternalValue v) => v, (typeof(null)) => assert(0, "not happening"));
@@ -47,6 +47,7 @@ class SharedSender(Sender, Scheduler, ResetLogic resetLogic)
 					dg(value);
 				} else {
 					if ((oldState >> 2) == 0) {
+		        		import concurrency.sender : emplaceOperationalState;
 						auto localState =
 							new SharedSenderInstStateImpl!(Sender, Scheduler,
 							                               resetLogic)();
@@ -54,10 +55,13 @@ class SharedSender(Sender, Scheduler, ResetLogic resetLogic)
 						release(); // release early
 						localState.dgs.pushBack(dg);
 						try {
-							localState.op = sender.connect(
-								SharedSenderReceiver!(
+							auto recv = SharedSenderReceiver!(
 									Sender, Scheduler, resetLogic
-								)(&state, scheduler));
+								)(&state, scheduler);
+							localState.op.emplaceOperationalState(
+								sender,
+								recv
+							);
 						} catch (Exception e) {
 							state.process!(resetLogic)(InternalValue(e));
 						}
@@ -150,6 +154,10 @@ struct SharedSenderOp(Sender, Scheduler, ResetLogic resetLogic, Receiver) {
 	this(ref return scope typeof(this) rhs);
 	@disable
 	this(this);
+
+    @disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+    @disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
 	void start() nothrow @trusted scope {
 		parent.add(&(cast(shared) this).onValue);
 		auto stopToken = receiver.getStopToken;

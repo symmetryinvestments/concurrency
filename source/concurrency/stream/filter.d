@@ -25,6 +25,10 @@ template FilterStreamOp(Stream, Fun) {
 		this(ref return scope typeof(this) rhs);
 		@disable
 		this(this);
+
+		@disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+		@disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
 		this(Stream stream, Fun fun, DG dg, Receiver receiver) @trusted {
 			this.fun = fun;
 			this.dg = dg;

@@ -33,6 +33,10 @@ struct ToListOp(Stream, Receiver) {
 	this(this);
 	@disable
 	this(ref return scope typeof(this) rhs);
+
+	@disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+	@disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
 	this(Stream stream, return Receiver receiver) @trusted return scope {
 		state.receiver = receiver;
 		op = stream.collect(cast(Properties.DG) &item)

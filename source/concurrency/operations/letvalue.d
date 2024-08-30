@@ -2,7 +2,7 @@ module concurrency.operations.letvalue;
 
 auto letValue(Sender, Fun)(Sender sender, Fun fun) {
    	import concurrency.utils;
-	static assert(isThreadSafeCallable!Fun);
+	// static assert(isThreadSafeCallable!Fun);
 
     return LetValue!(Sender, Fun)(sender, fun);
 }
@@ -31,7 +31,7 @@ struct LetValueOp(Sender, Fun, Receiver) {
     alias OpB = OpType!(FinalSender, Receiver);
 
     Fun fun;
-    
+
     // LetValueOp essentially has 2 states:
     // 1) executing the input Sender
     // 2) executing the Sender returned by Fun.
@@ -46,24 +46,26 @@ struct LetValueOp(Sender, Fun, Receiver) {
     // To avoid storing yet another member we use the `fun` as
     // a discriminator. If it is `null` it means we are executing the
     // second Sender.
-    union {
+    // union {
         OpA opA;
         OpB opB;
-    }
+    // }
+    
     static if (!is(Sender.Value == void)) {
         Sender.Value value;
     }
 
-    this(Sender sender, Fun fun, return Receiver receiver) @trusted scope {
+    @disable
+    this(ref return scope typeof(this) rhs);
+    @disable
+    this(this);
+
+	@disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+	@disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
+    this(return Sender sender, Fun fun, return Receiver receiver) @trusted return scope {
         this.fun = fun;
         opA = sender.connect(LetValueReceiver!(Sender.Value, Receiver)(receiver, &next));
-    }
-
-    ~this() @trusted {
-        if (fun is null)
-            opB.destroy();
-        else
-            opA.destroy();
     }
 
     void start() @trusted nothrow scope {
@@ -72,8 +74,11 @@ struct LetValueOp(Sender, Fun, Receiver) {
 
     static if (is(Sender.Value == void)) {
         void next(Receiver receiver) @trusted nothrow {
+            import concurrency.sender : emplaceOperationalState;
+
             try {
-                opB = nextSender().connect(receiver);
+                auto sender = nextSender();
+                opB.emplaceOperationalState(sender, receiver);
             } catch (Exception e) {
                 receiver.setError(e);
                 return;
@@ -82,29 +87,29 @@ struct LetValueOp(Sender, Fun, Receiver) {
         }
         private auto nextSender() @trusted {
             auto localFun = fun;
-            opA.destroy();
             fun = null;
             return localFun();
         }
     } else {
         void next(Sender.Value value, Receiver receiver) @trusted nothrow {
+            import concurrency.sender : emplaceOperationalState;
+
             this.value = value;
             try {
-                opB = nextSender(this.value).connect(receiver);
+                auto sender = nextSender();
+                opB.emplaceOperationalState(sender, receiver);
             } catch (Exception e) {
                 receiver.setError(e);
                 return;
             }
             opB.start();
         }
-        private auto nextSender(Sender.Value value) @trusted {
+        private auto nextSender() @trusted {
             auto localFun = fun;
-            opA.destroy();
             fun = null;
-            return localFun(value);
+            return localFun(this.value);
         }
     }
-
 }
 
 struct LetValueReceiver(Value, Receiver) {

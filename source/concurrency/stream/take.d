@@ -62,6 +62,10 @@ template TakeOp(Stream) {
 		this(ref return scope typeof(this) rhs);
 		@disable
 		this(this);
+
+		@disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+		@disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
 		this(return Stream stream, size_t n, Properties.DG dg,
 		     return Receiver receiver) @trusted scope {
 			this.dg = dg;

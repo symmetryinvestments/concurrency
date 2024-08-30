@@ -275,6 +275,10 @@ private struct NurseryOp {
 	this(ref return scope typeof(this) rhs);
 	@disable
 	this(this);
+
+    @disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+    @disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
 	this(shared Nursery n,
 	     ReceiverObject r) @safe {
 		nursery = n;

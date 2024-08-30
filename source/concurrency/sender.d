@@ -116,6 +116,10 @@ struct ValueSender(T) {
 		this(ref return scope typeof(this) rhs);
 		@disable
 		this(this);
+
+		@disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+		@disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
 		void start() nothrow @trusted scope {
 			import concurrency.receiver : setValueOrError;
 			static if (!is(T == void))
@@ -155,6 +159,10 @@ struct JustFromSender(Fun) {
 		this(ref return scope typeof(this) rhs);
 		@disable
 		this(this);
+
+		@disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+		@disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
 		void start() @trusted nothrow {
 			import std.traits : hasFunctionAttributes;
 			static if (hasFunctionAttributes!(Fun, "nothrow")) {
@@ -332,6 +340,10 @@ struct ThrowingSender {
 		this(ref return scope typeof(this) rhs);
 		@disable
 		this(this);
+
+		@disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+		@disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
 		void start() {
 			receiver.setError(new Exception("ThrowingSender"));
 		}
@@ -354,6 +366,10 @@ struct DoneSender {
 		this(ref return scope typeof(this) rhs);
 		@disable
 		this(this);
+
+		@disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+		@disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
 		void start() nothrow @trusted scope {
 			receiver.setDone();
 		}
@@ -376,6 +392,10 @@ struct VoidSender {
 		this(ref return scope typeof(this) rhs);
 		@disable
 		this(this);
+
+		@disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+		@disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
 		// TODO: this needs to be @safe
 		// but it might require a lot of other things to be
 		// scoped in turn
@@ -404,6 +424,10 @@ struct ErrorSender {
 		this(ref return scope typeof(this) rhs);
 		@disable
 		this(this);
+
+		@disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+		@disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
 		void start() nothrow @trusted scope {
 			receiver.setError(exception);
 		}
@@ -472,6 +496,10 @@ struct PromiseSenderOp(T, Receiver) {
 	this(ref return scope typeof(this) rhs);
 	@disable
 	this(this);
+
+	@disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+	@disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
 	void start() nothrow @trusted scope {
 		// if already completed we can optimize
 		if (parent.isCompleted) {
@@ -704,4 +732,21 @@ struct Defer(Fun) {
 
 auto defer(Fun)(Fun fun) {
 	return Defer!(Fun)(fun);
+}
+
+pragma(inline)
+void emplaceOperationalState(Op, Sender, Receiver)(ref Op op, auto ref Sender sender, auto ref Receiver receiver) @system {
+	import std.traits;
+	static if (hasElaborateDestructor!Op) {
+		op.destroy();
+	}
+    auto hack = cast(EmplaceOp!(Op)*)&op;
+    hack.__ctor(sender, receiver);
+}
+
+private struct EmplaceOp(Op) {
+    Op op;
+    this(Sender, Receiver)(ref Sender sender, ref Receiver receiver) {
+        op = sender.connect(receiver);
+    }
 }

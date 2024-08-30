@@ -9,7 +9,7 @@ import std.traits;
 
 auto repeat(Sender)(Sender sender) {
 	static assert(is(Sender.Value : void),
-	              "Can only repeat effectful Senders.");
+				  "Can only repeat effectful Senders.");
 	return RepeatSender!(Sender)(sender);
 }
 
@@ -40,6 +40,10 @@ private struct RepeatOp(Receiver, Sender) {
 	this(ref return scope typeof(this) rhs);
 	@disable
 	this(this);
+
+	@disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+	@disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
 	this(Sender sender, Receiver receiver) @trusted scope {
 		this.sender = sender;
 		this.receiver = receiver;
@@ -54,7 +58,8 @@ private struct RepeatOp(Receiver, Sender) {
 	}
 
 	private void reset() @trusted scope {
-		op = sender.connect(RepeatReceiver!(Receiver)(receiver, &reset));
+		import concurrency.sender : emplaceOperationalState;
+		op.emplaceOperationalState(sender, RepeatReceiver!(Receiver)(receiver, &reset));
 		op.start();
 	}
 }

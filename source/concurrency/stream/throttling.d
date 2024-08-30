@@ -189,12 +189,16 @@ template ThrottleStreamOp(Stream, ThrottleEmitLogic emitLogic,
 		}
 
 		void armTimer() {
-			timerOp = receiver.getScheduler().scheduleAfter(dur)
-			                  .connect(InnerReceiver(&this));
+        	import concurrency.sender : emplaceOperationalState;
+			timerOp.emplaceOperationalState(
+				receiver.getScheduler().scheduleAfter(dur),
+			    InnerReceiver(&this)
+			);
 			timerOp.start();
 		}
 
 		void rearmTimer() @trusted {
+        	import concurrency.sender : emplaceOperationalState;
 			flags.update(ThrottleFlags.timerRearming);
 			timerStopSource.stop();
 
@@ -207,8 +211,10 @@ template ThrottleStreamOp(Stream, ThrottleEmitLogic emitLogic,
 			timerStopSource.reset();
 
 			flags.update(0, 0, ThrottleFlags.timerRearming);
-			timerOp = receiver.getScheduler().scheduleAfter(dur)
-			                  .connect(InnerReceiver(&this));
+			timerOp.emplaceOperationalState(
+				receiver.getScheduler().scheduleAfter(dur),
+			    InnerReceiver(&this)
+			);
 			timerOp.start();
 		}
 

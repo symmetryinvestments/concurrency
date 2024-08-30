@@ -64,8 +64,12 @@ private struct RaceOp(Receiver, Senders...) {
 	this(this);
 	@disable
 	this(ref return scope typeof(this) rhs);
+
+	@disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+	@disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
 	this(Receiver receiver, return Senders senders,
-	     bool noDropouts) @trusted scope {
+		 bool noDropouts) @trusted scope {
 		state = State!R(noDropouts);
 		this.receiver = receiver;
 		static if (Senders.length > 1) {
@@ -74,9 +78,10 @@ private struct RaceOp(Receiver, Senders...) {
 					ElementReceiver!(Sender)(receiver, &state, Senders.length));
 			}
 		} else {
+			import concurrency.sender : emplaceOperationalState;
 			ops.length = senders[0].length;
 			foreach (i; 0 .. senders[0].length) {
-				ops[i] = senders[0][i].connect(
+				ops[i].emplaceOperationalState(senders[0][i],
 					ElementReceiver(receiver, &state, senders[0].length));
 			}
 		}

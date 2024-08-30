@@ -114,23 +114,28 @@ private struct WhenAllOp(Receiver, Senders...) {
 	this(this);
 	@disable
 	this(ref return scope typeof(this) rhs);
+
+	@disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+	@disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
 	this(return Receiver receiver,
-	     return Senders senders) @trusted scope return {
+		 return Senders senders) @trusted scope return {
 		this.receiver = receiver;
 		static if (Senders.length > 1) {
 			foreach (i, Sender; Senders) {
 				ops[i] = senders[i].connect(
 					WhenAllReceiver!(Receiver, Sender.Value,
-					                 R)(receiver, &state, i, Senders.length));
+									 R)(receiver, &state, i, Senders.length));
 			}
 		} else {
 			static if (!is(ArrayElement!(Senders).Value : void))
 				state.value.values.length = senders[0].length;
 			ops.length = senders[0].length;
+			import concurrency.sender : emplaceOperationalState;
 			foreach (i; 0 .. senders[0].length) {
-				ops[i] = senders[0][i].connect(
+				ops[i].emplaceOperationalState(senders[0][i],
 					WhenAllReceiver!(Receiver, ArrayElement!(Senders).Value,
-					                 R)(receiver, &state, i, senders[0].length));
+									 R)(receiver, &state, i, senders[0].length));
 			}
 		}
 	}

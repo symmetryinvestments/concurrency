@@ -384,6 +384,10 @@ struct ThreadSender {
 		this(ref return scope typeof(this) rhs);
 		@disable
 		this(this);
+
+		@disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+		@disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
 		this(Receiver receiver) {
 			this.receiver = receiver;
 		}
@@ -419,6 +423,10 @@ struct StdTaskPool {
 	this(ref return scope typeof(this) rhs);
 	@disable
 	this(this);
+
+	@disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+	@disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
 	this(TaskPool pool) @trusted scope shared {
 		this.pool = cast(shared) pool;
 	}
@@ -497,6 +505,10 @@ private struct TaskPoolSender {
 		this(ref return scope typeof(this) rhs);
 		@disable
 		this(this);
+
+		@disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+		@disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
 		this(Receiver receiver, TaskPool pool) @safe return scope {
 			myTask = task!(setValue)(receiver);
 			this.pool = pool;

@@ -28,6 +28,10 @@ template DeferStreamOp(Fun) {
 		this(ref return scope inout typeof(this) rhs);
 		@disable
 		this(this);
+
+		@disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+		@disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
 		this(Fun fun, DG dg, return Receiver receiver) @trusted scope {
 			this.fun = fun;
 			this.dg = dg;
@@ -35,8 +39,11 @@ template DeferStreamOp(Fun) {
 		}
 
 		void start() @trusted nothrow scope {
-			op = fun().connect(
-				DeferReceiver!(Sender.Value, Receiver)(dg, receiver, &start));
+       		import concurrency.sender : emplaceOperationalState;
+			op.emplaceOperationalState(
+				fun(),
+				DeferReceiver!(Sender.Value, Receiver)(dg, receiver, &start)
+			);
 			op.start();
 		}
 	}

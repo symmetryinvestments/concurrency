@@ -26,6 +26,10 @@ private struct StopWhenOp(Receiver, Sender, Trigger) {
 	this(this);
 	@disable
 	this(ref return scope typeof(this) rhs);
+
+    @disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+    @disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
 	this(Receiver receiver, return Sender source,
 	     return Trigger trigger) @trusted scope {
 		this.receiver = receiver;
