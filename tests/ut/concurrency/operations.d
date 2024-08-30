@@ -978,3 +978,65 @@ unittest {
 		.isError
 		.should == true;
 }
+
+@("letDone.outer.void") @safe
+unittest {
+	just(41)
+		.letDone(() => just(42))
+		.syncWait
+		.value
+		.should == 41;
+}
+
+@("letDone.outer.error") @safe
+unittest {
+	shared int g = 0;
+
+	ThrowingSender()
+		.letDone(() @safe shared {
+			g = 1;
+			return VoidSender();
+		})
+		.syncWait
+		.isError
+		.should == true;
+	
+	g.should == 0;
+}
+
+@("letDone.outer.done") @safe
+unittest {
+	shared int g = 0;
+
+	DoneSender()
+		.letDone(() @safe shared {
+			g = 1;
+			return VoidSender();
+		})
+		.syncWait
+		.isCancelled
+		.should == false;
+	
+	g.should == 1;
+}
+
+@("letDone.inner.error") @safe
+unittest {
+	DoneSender()
+		.letDone(() => ThrowingSender())
+		.syncWait
+		.isError
+		.should == true;
+}
+
+@("letDone.inner.exception") @safe
+unittest {
+	DoneSender()
+		.letDone(() {
+			throw new Exception("foobar");
+			return VoidSender();
+		})
+		.syncWait
+		.isError
+		.should == true;
+}
