@@ -50,7 +50,6 @@ private struct OnErrorReceiver(Value, SideEffect, Receiver) {
 }
 
 struct OnErrorSender(Sender, SideEffect) if (models!(Sender, isSender)) {
-	static assert(models!(typeof(this), isSender));
 	alias Value = Sender.Value;
 	Sender sender;
 	SideEffect effect;

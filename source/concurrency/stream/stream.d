@@ -34,7 +34,6 @@ enum isStream(T) = is(typeof(checkStream!T));
 interface StreamObjectBase(T) {
 	import concurrency.sender : SenderObjectBase;
 	alias ElementType = T;
-	static assert(models!(typeof(this), isStream));
 	alias DG = CollectDelegate!(ElementType);
 
 	SenderObjectBase!void collect(DG dg) @safe;
@@ -44,7 +43,6 @@ interface StreamObjectBase(T) {
 class StreamObjectImpl(Stream) : StreamObjectBase!(Stream.ElementType)
 		if (models!(Stream, isStream)) {
 	import concurrency.receiver : ReceiverObjectBase;
-	static assert(models!(typeof(this), isStream));
 	private Stream stream;
 	this(Stream stream) {
 		this.stream = stream;
@@ -87,7 +85,6 @@ auto fromStreamOp(StreamElementType, SenderValue, alias Op,
 	}
 
 	static struct FromStream {
-		static assert(models!(typeof(this), isStream));
 		alias ElementType = StreamElementType;
 		Args args;
 		auto collect(DG dg) @safe {
@@ -108,7 +105,6 @@ template loopStream(E) {
 	alias DG = CollectDelegate!(E);
 	auto loopStream(T)(T t) {
 		static struct LoopStream {
-			static assert(models!(typeof(this), isStream));
 			alias ElementType = E;
 			static struct LoopOp(Receiver) {
 				T t;

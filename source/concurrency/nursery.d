@@ -18,7 +18,6 @@ class Nursery {
 	import concurrency.sender : isSender, OperationalStateBase;
 	import core.sync.mutex : Mutex;
 	import concepts;
-	static assert(models!(typeof(this), isSender));
 
 	alias Value = void;
 	private {

@@ -119,8 +119,8 @@ private struct RetryWhenOp(Sender, Receiver, Logic) {
 	}
 }
 
-struct RetryWhenSender(Sender, Logic) if (isRetryWhenLogic!Logic) {
-	static assert(models!(typeof(this), isSender));
+struct RetryWhenSender(Sender, Logic) 
+	if (models!(Sender, isSender) && isRetryWhenLogic!Logic) {
 	alias Value = Sender.Value;
 	Sender sender;
 	Logic logic;

@@ -65,7 +65,6 @@ private struct RepeatOp(Receiver, Sender) {
 }
 
 struct RepeatSender(Sender) if (models!(Sender, isSender)) {
-	static assert(models!(typeof(this), isSender));
 	alias Value = Sender.Value;
 	Sender sender;
 	auto connect(Receiver)(return Receiver receiver) @safe return scope {

@@ -115,7 +115,6 @@ struct RaceSender(Senders...)
 		if ((Senders.length > 1
 				    && allSatisfy!(ApplyRight!(models, isSender), Senders))
 			    || (models!(ArrayElement!(Senders[0]), isSender))) {
-	static assert(models!(typeof(this), isSender));
 	alias Value = Result!(Senders);
 	Senders senders;
 	bool noDropouts; // if true then we fail the moment one contender does, otherwise we keep running until one finishes

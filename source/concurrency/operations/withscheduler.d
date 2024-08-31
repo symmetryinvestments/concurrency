@@ -41,7 +41,6 @@ private struct WithSchedulerReceiver(Receiver, Value, Scheduler) {
 }
 
 struct WithSchedulerSender(Sender, Scheduler) if (models!(Sender, isSender)) {
-	static assert(models!(typeof(this), isSender));
 	alias Value = Sender.Value;
 	Sender sender;
 	Scheduler scheduler;

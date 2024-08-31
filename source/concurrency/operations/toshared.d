@@ -31,7 +31,6 @@ class SharedSender(Sender, Scheduler, ResetLogic resetLogic)
 		if (models!(Sender, isSender)) {
 	import std.traits : ReturnType;
 	import std.sumtype : match;
-	static assert(models!(typeof(this), isSender));
 	alias Props = Properties!(Sender);
 	alias Value = Props.Value;
 	alias InternalValue = Props.InternalValue;

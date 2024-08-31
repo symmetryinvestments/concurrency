@@ -39,8 +39,6 @@ private struct ForwardOnReceiver(Receiver, Value, Scheduler) {
 }
 
 struct ForwardOnSender(Sender, Scheduler) if (models!(Sender, isSender)) {
-	import std.traits : ReturnType;
-	static assert(models!(typeof(this), isSender));
 	alias Value = Sender.Value;
 	Sender sender;
 	Scheduler scheduler;

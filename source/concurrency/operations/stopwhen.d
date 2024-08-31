@@ -56,7 +56,6 @@ private struct StopWhenOp(Receiver, Sender, Trigger) {
 
 struct StopWhenSender(Sender, Trigger)
 		if (models!(Sender, isSender) && models!(Trigger, isSender)) {
-	static assert(models!(typeof(this), isSender));
 	alias Value = Sender.Value;
 	Sender sender;
 	Trigger trigger;

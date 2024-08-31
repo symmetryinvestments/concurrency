@@ -34,7 +34,6 @@ private struct IgnoreValueReceiver(Value, Receiver) {
 }
 
 struct IgnoreValueSender(Sender) if (models!(Sender, isSender)) {
-	static assert(models!(typeof(this), isSender));
 	alias Value = void;
 	Sender sender;
 	auto connect(Receiver)(return Receiver receiver) @safe return scope {

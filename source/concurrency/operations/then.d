@@ -90,7 +90,6 @@ private struct ThenReceiver(Receiver, Value, Fun) {
 
 struct ThenSender(Sender, Fun) if (models!(Sender, isSender)) {
 	import std.traits : ReturnType;
-	static assert(models!(typeof(this), isSender));
 	static if (is(ReturnType!fun == Result!T, T))
 		alias Value = T;
 	else

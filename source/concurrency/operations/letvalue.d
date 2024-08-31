@@ -1,5 +1,8 @@
 module concurrency.operations.letvalue;
 
+import concurrency.sender;
+import concepts;
+
 auto letValue(Sender, Fun)(Sender sender, Fun fun) {
    	import concurrency.utils;
 	// static assert(isThreadSafeCallable!Fun);
@@ -7,7 +10,7 @@ auto letValue(Sender, Fun)(Sender sender, Fun fun) {
     return LetValue!(Sender, Fun)(sender, fun);
 }
 
-struct LetValue(Sender, Fun) {
+struct LetValue(Sender, Fun) if (models!(Sender, isSender)) {
     import std.traits : ReturnType;
     alias FinalSender = ReturnType!(Fun);
     alias Value = FinalSender.Value;

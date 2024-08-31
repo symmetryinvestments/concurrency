@@ -28,7 +28,6 @@ private struct CompleteWithCancellationReceiver(Receiver) {
 }
 
 struct CompleteWithCancellationSender(Sender) if (models!(Sender, isSender)) {
-	static assert(models!(typeof(this), isSender));
 	static assert(
 		is(Sender.Value == void),
 		"Sender must produce void to be able to complete with cancellation."

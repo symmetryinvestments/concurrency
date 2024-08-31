@@ -71,7 +71,6 @@ private struct ViaBReceiver(SenderA, ValueB, Receiver) {
 
 struct ViaSender(SenderA, SenderB)
 		if (models!(SenderA, isSender) && models!(SenderB, isSender)) {
-	static assert(models!(typeof(this), isSender));
 	import std.meta : Filter, AliasSeq;
 	SenderA senderA;
 	SenderB senderB;

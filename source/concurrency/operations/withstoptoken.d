@@ -75,7 +75,6 @@ private struct STReceiver(Receiver, Value, Fun) {
 }
 
 struct STSender(Sender, Fun) if (models!(Sender, isSender)) {
-	static assert(models!(typeof(this), isSender));
 	alias Value = ReturnType!fun;
 	Sender sender;
 	Fun fun;

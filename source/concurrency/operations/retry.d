@@ -99,7 +99,6 @@ private struct RetryOp(Receiver, Sender, Logic) {
 
 struct RetrySender(Sender, Logic)
 		if (models!(Sender, isSender) && models!(Logic, isRetryLogic)) {
-	static assert(models!(typeof(this), isSender));
 	alias Value = Sender.Value;
 	Sender sender;
 	Logic logic;

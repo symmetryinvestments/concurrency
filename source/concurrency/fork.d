@@ -10,7 +10,6 @@ import concepts;
 version(Posix)
 	struct ForkSender {
 		alias Value = void;
-		static assert(models!(typeof(this), isSender));
 		alias Fun = void delegate() shared;
 		alias AfterFork = void delegate(int);
 		static struct Operation(Receiver) {

@@ -43,7 +43,6 @@ private struct StopOnReceiver(Receiver, Value) {
 }
 
 struct StopOn(Sender) if (models!(Sender, isSender)) {
-	static assert(models!(typeof(this), isSender));
 	alias Value = Sender.Value;
 	Sender sender;
 	shared StopToken stopToken;

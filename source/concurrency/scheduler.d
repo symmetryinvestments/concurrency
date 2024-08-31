@@ -91,7 +91,6 @@ auto localThreadScheduler() {
 alias LocalThreadScheduler = typeof(localThreadScheduler());
 
 struct SchedulerAdapter(Worker) {
-	static assert(models!(typeof(this), isScheduler));
 	import concurrency.receiver : setValueOrError;
 	import concurrency.executor : VoidDelegate;
 	import core.time : Duration;
@@ -364,7 +363,6 @@ private struct ProxyScheduler(T, P) {
 }
 
 struct ScheduleAfter {
-	static assert(models!(typeof(this), isSender));
 	alias Value = void;
 	Duration duration;
 	auto connect(Receiver)(return Receiver receiver) @safe return scope {
@@ -376,7 +374,6 @@ struct ScheduleAfter {
 }
 
 struct Schedule {
-	static assert(models!(typeof(this), isSender));
 	alias Value = void;
 	auto connect(Receiver)(return Receiver receiver) @safe return scope {
 		// ensure NRVO

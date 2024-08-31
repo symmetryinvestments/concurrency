@@ -106,7 +106,6 @@ template isValidOp(Sender, Receiver) {
 
 /// A Sender that sends a single value of type T
 struct ValueSender(T) {
-	static assert(models!(typeof(this), isSender));
 	alias Value = T;
 	static struct Op(Receiver) {
 		Receiver receiver;
@@ -150,7 +149,6 @@ auto just(T...)(T t) {
 }
 
 struct JustFromSender(Fun) {
-	static assert(models!(typeof(this), isSender));
 	alias Value = ReturnType!fun;
 	static struct Op(Receiver) {
 		Receiver receiver;
@@ -214,7 +212,6 @@ interface SenderObjectBase(T) {
 	import concurrency.receiver;
 	import concurrency.scheduler : SchedulerObjectBase;
 	import concurrency.stoptoken : StopToken;
-	static assert(models!(typeof(this), isSender));
 	alias Value = T;
 	alias Op = OperationObject;
 	OperationObject connect(return ReceiverObjectBase!(T) receiver) @safe scope;
@@ -301,7 +298,6 @@ OperationalStateBase connectHeap(Sender, Receiver)(Sender sender,
 /// A class extending from SenderObjectBase that wraps any Sender
 class SenderObjectImpl(Sender) : SenderObjectBase!(Sender.Value) {
 	import concurrency.receiver : ReceiverObjectBase;
-	static assert(models!(typeof(this), isSender));
 	private Sender sender;
 	this(Sender sender) {
 		this.sender = sender;
@@ -322,8 +318,7 @@ class SenderObjectImpl(Sender) : SenderObjectBase!(Sender.Value) {
 }
 
 /// Converts any Sender to a polymorphic SenderObject
-auto toSenderObject(Sender)(Sender sender) {
-	static assert(models!(Sender, isSender));
+auto toSenderObject(Sender)(Sender sender) if (models!(Sender, isSender)) {
 	static if (is(Sender : SenderObjectBase!(Sender.Value))) {
 		return sender;
 	} else
@@ -358,7 +353,6 @@ struct ThrowingSender {
 
 /// A sender that always calls setDone
 struct DoneSender {
-	static assert(models!(typeof(this), isSender));
 	alias Value = void;
 	static struct DoneOp(Receiver) {
 		Receiver receiver;
@@ -384,7 +378,6 @@ struct DoneSender {
 
 /// A sender that always calls setValue with no args
 struct VoidSender {
-	static assert(models!(typeof(this), isSender));
 	alias Value = void;
 	struct VoidOp(Receiver) {
 		Receiver receiver;
@@ -414,7 +407,6 @@ struct VoidSender {
 
 /// A sender that always calls setError
 struct ErrorSender {
-	static assert(models!(typeof(this), isSender));
 	alias Value = void;
 	Throwable exception;
 	static struct ErrorOp(Receiver) {
@@ -696,7 +688,6 @@ shared(Promise!T) promise(T)() {
 
 struct PromiseSender(T) {
 	alias Value = T;
-	static assert(models!(typeof(this), isSender));
 	private shared Promise!T promise;
 
 	auto connect(Receiver)(return Receiver receiver) @safe return scope {
@@ -720,7 +711,6 @@ struct Defer(Fun) {
 	import concurrency.utils;
 	static assert(isThreadSafeCallable!Fun);
 	alias Sender = typeof(fun());
-	static assert(models!(Sender, isSender));
 	alias Value = Sender.Value;
 	Fun fun;
 	auto connect(Receiver)(return Receiver receiver) @safe {

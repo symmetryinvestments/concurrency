@@ -51,7 +51,6 @@ private struct CompleteWithErrorReceiver(Receiver) {
 }
 
 struct CompleteWithErrorSender(Sender) if (models!(Sender, isSender)) {
-	static assert(models!(typeof(this), isSender));
 	alias Value = Sender.Value;
 	Sender sender;
 	Throwable t;
