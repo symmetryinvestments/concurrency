@@ -896,6 +896,12 @@ auto scan(Sequence, Fun, Seed)(Sequence s, Fun fun, Seed seed) {
     return s.nextTransform(transformer);
 }
 
+auto iotaSequence(T)(T start, T end) {
+    import std.range : iota;
+
+    return iota(start, end).sequence();
+}
+
 // cron - create a sequence like interval but using cron spec
 
 // flatmap{latest,concat} - create a sequence that flattens
@@ -909,8 +915,6 @@ auto scan(Sequence, Fun, Seed)(Sequence s, Fun fun, Seed seed) {
 // throttling ?
 
 // merge ?
-
-// iota - emits sequence of start..end
 
 // interval - emits items on interval
 

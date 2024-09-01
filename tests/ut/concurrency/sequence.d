@@ -139,3 +139,8 @@ import unit_threaded;
 @safe unittest {
     [1,1,1,1].sequence.scan((int i, int acc) => acc + i, 0).toList().syncWait.value.should == [1,2,3,4];
 }
+
+@("iotaSequence.basic")
+@safe unittest {
+    iotaSequence(5, 10).toList().syncWait.value.should == [5,6,7,8,9];
+}
