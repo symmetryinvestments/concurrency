@@ -197,3 +197,37 @@ import unit_threaded;
         driver,
     ).syncWait.value.should == [1,3,5,7];
 }
+
+@("slide.basic")
+@safe unittest {
+    [1,2,3,4,5,6].sequence().slide(3,1).toList().syncWait.value.should == [
+        [1,2,3],
+        [2,3,4],
+        [3,4,5],
+        [4,5,6]
+    ];
+}
+
+@("slide.step.skip")
+@safe unittest {
+    [1,2,3,4,5,6].sequence().slide(3,2).toList().syncWait.value.should == [
+        [1,2,3],
+        [3,4,5]
+    ];
+}
+
+@("slide.step.full")
+@safe unittest {
+    [1,2,3,4,5,6].sequence().slide(3,3).toList().syncWait.value.should == [
+        [1,2,3],
+        [4,5,6]
+    ];
+}
+
+@("slide.step.negative")
+@safe unittest {
+    [1,2,3,4,5,6].sequence().slide(2,3).toList().syncWait.value.should == [
+        [1,2],
+        [4,5]
+    ];
+}

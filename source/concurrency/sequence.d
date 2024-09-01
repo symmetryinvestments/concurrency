@@ -1197,16 +1197,89 @@ struct SampleSequenceOp(BaseSequence, TriggerSequence, Receiver) {
     }
 }
 
+auto slide(Sequence)(Sequence sequence, long window, long step = 1) {
+    static assert(!is(Sequence.Element == void), "Sequence passed to slide must produce elements.");
+    
+	import std.exception : enforce;
+	enforce(window > 0, "window must be greater than 0.");
+	enforce(step > 0, "step must be greated than 0.");
+
+    return SlideSequence!(Sequence)(sequence, window, step);
+}
+
+struct SlideSequence(Sequence) {
+    alias Value = void;
+    alias Element = Sequence.Element[];
+
+    Sequence sequence;
+    long window, step;
+
+    auto connect(Receiver)(return Receiver receiver) @safe return scope {
+        auto op = SlideSequenceOp!(Sequence, Receiver)(sequence, window, step, receiver);
+        return op;
+    }
+}
+
+struct SlideSequenceOp(Sequence, Receiver) {
+    import concurrency.sender : OpType;
+    alias Element = Sequence.Element;
+
+    alias Op = OpType!(FilterMapSequence!(Sequence, Nullable!(Element[]) delegate(Sequence.Element) @safe pure nothrow), Receiver);
+
+    long step, pos;
+    Element[] arr;
+    Op op;
+
+    @disable this(ref return scope typeof(this) rhs);
+    @disable this(this);
+
+    @disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+    @disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+        
+    this(Sequence sequence, long window, long step, return Receiver receiver) @trusted return scope {
+        arr.length = window;
+        this.step = step;
+        op = sequence.filterMap(&this.onNext).connect(receiver);
+    }
+
+    void start() scope {
+        op.start();
+    }
+
+    Nullable!(Element[]) onNext(Sequence.Element element) @safe {
+        import std.algorithm : moveAll;
+        if (pos < 0) {
+            pos++;
+            return Nullable!(Element[]).init;
+        }
+
+        if (pos+1 > arr.length) {
+            if (step < arr.length) {
+                moveAll(arr[step .. $], arr[0 .. $ - step]);
+                pos -= step;
+            } else {
+                pos = (cast(long)arr.length) - step;
+                if (pos < 0) {
+                    pos++;
+                    return Nullable!(Element[]).init;
+                }
+            }
+        }
+
+        arr[pos] = element;
+        pos++;
+
+        if (pos == arr.length) {
+            return Nullable!(Element[])(arr.dup);
+        } else {
+            return Nullable!(Element[]).init;
+        }
+    }
+}
 
 // cron - create a sequence like interval but using cron spec
 
 // flatmap{latest,concat} - create a sequence that flattens
-
-// sample - forward latest from sequence a when sequence b emits
-
-// scan - applies accumulator to each value
-
-// slide - create sliding window over sequence
 
 // throttling ?
 
