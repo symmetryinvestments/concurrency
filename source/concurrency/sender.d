@@ -329,7 +329,9 @@ auto toSenderObject(Sender)(Sender sender) if (models!(Sender, isSender)) {
 /// A sender that always sets an error
 struct ThrowingSender {
 	alias Value = void;
+	string msg = "ThrowingSender";
 	static struct Op(Receiver) {
+		string msg;
 		Receiver receiver;
 		@disable
 		this(ref return scope typeof(this) rhs);
@@ -339,14 +341,14 @@ struct ThrowingSender {
 		@disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
 		@disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
 
-		void start() {
-			receiver.setError(new Exception("ThrowingSender"));
+		void start() @trusted scope {
+			receiver.setError(new Exception(msg));
 		}
 	}
 
 	auto connect(Receiver)(return Receiver receiver) @safe return scope {
 		// ensure NRVO
-		auto op = Op!Receiver(receiver);
+		auto op = Op!Receiver(msg, receiver);
 		return op;
 	}
 }

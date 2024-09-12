@@ -80,14 +80,11 @@ unittest {
 
 @("race.exception.double") @safe
 unittest {
-	auto slow = ThreadSender().then(() @trusted shared {
-		Thread.sleep(50.msecs);
-		throw new Exception("Slow");
-	});
-	auto fast = ThreadSender().then(() shared {
-		throw new Exception("Fast");
-	});
+	auto slow = ThrowingSender("Slow").via(delay(50.msecs));
+	auto fast = ThrowingSender("Fast");
+
 	race(slow, fast).syncWait.assumeOk.shouldThrowWithMessage("Fast");
+	race(fast, slow).syncWait.assumeOk.shouldThrowWithMessage("Fast");
 }
 
 @("race.cancel-other") @safe
