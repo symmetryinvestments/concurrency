@@ -35,6 +35,8 @@ import unit_threaded;
 @("take")
 @safe unittest {
     [1,2,3,4].sequence.take(3).toList().syncWait.value.should == [1,2,3];
+    [1,2,3,4].sequence.take(3).transform((int i) => i*2).toList().syncWait.value.should == [2,4,6];
+    [1,2,3,4].sequence.transform((int i) => i*2).take(3).toList().syncWait.value.should == [2,4,6];
 }
 
 @("deferSequence.function")
@@ -135,9 +137,16 @@ import unit_threaded;
     just([1,2].sequence).flatten.nextTransform(Transformer()).toList.syncWait.value.should == [1,2];
 }
 
-@("scan")
+@("scan.value")
 @safe unittest {
     [1,1,1,1].sequence.scan((int i, int acc) => acc + i, 0).toList().syncWait.value.should == [1,2,3,4];
+}
+
+@("scan.void")
+@safe unittest {
+    import core.time : msecs;
+    interval(1.msecs, false).scan((int acc) => acc + 1, 0).take(4).toList.syncWait.value.should == [1,2,3,4];
+    interval(1.msecs, false).take(4).scan((int acc) => acc + 1, 0).toList.syncWait.value.should == [1,2,3,4];
 }
 
 @("iotaSequence.basic")

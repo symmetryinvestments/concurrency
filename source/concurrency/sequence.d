@@ -321,9 +321,14 @@ auto nextTransform(Sequence, NextTransformer)(Sequence s, NextTransformer t) {
 }
 
 struct SequenceNextTransform(Sequence, NextTransformer) {
+    import concurrency.sender : VoidSender;
     import concurrency : just;
     alias Value = void;
-    alias Element = typeof(t.setNext(just(Sequence.Element.init))).Value;
+    static if (is(Sequence.Element == void)) {
+        alias Element = typeof(t.setNext(VoidSender())).Value;
+    } else {
+        alias Element = typeof(t.setNext(just(Sequence.Element.init))).Value;
+    }
     Sequence s;
     NextTransformer t;
     auto connect(Receiver)(return Receiver receiver) @safe return scope {
@@ -506,7 +511,7 @@ struct SequenceTakeReceiver(Receiver) {
                     return Result!(Sender.Value)(Cancelled());
                 else {
                     state.n--;
-                    return Result!(Sender.Value)();
+                    return Result!(Sender.Value)(Completed());
                 }
             }));
         } else {
@@ -923,10 +928,17 @@ struct ScanSequenceTransformer(Fun, Seed) {
     Seed seed;
     auto setNext(Sender)(Sender sender) {
         import concurrency.operations : then;
-        return sender.then((Sender.Value value) @safe shared {
-            seed = fun(value, seed);
-            return seed;
-        });
+        static if (is(Sender.Value == void)) {
+            return sender.then(() @safe shared {
+                seed = fun(seed);
+                return seed;
+            });
+        } else {
+            return sender.then((Sender.Value value) @safe shared {
+                seed = fun(value, seed);
+                return seed;
+            });
+        }
     }
 }
 
