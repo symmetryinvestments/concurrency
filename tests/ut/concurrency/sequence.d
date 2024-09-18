@@ -154,7 +154,7 @@ import unit_threaded;
     iotaSequence(5, 10).toList().syncWait.value.should == [5,6,7,8,9];
 }
 
-@("filterMap")
+@("filterMap.int")
 @safe unittest {
     import std.typecons : Nullable;
     [1,2,3,4].sequence.filterMap((int i) {
@@ -163,4 +163,13 @@ import unit_threaded;
         else
             return Nullable!(int).init;
     }).toList().syncWait.value.should == [9,12];
+}
+
+@("filterMap.void")
+@safe unittest {
+    import core.time : msecs;
+    import std.typecons : Nullable;
+    interval(1.msecs, false).filterMap(() {
+        return Nullable!int(1);
+    }).take(4).toList().syncWait.value.should == [1,1,1,1];
 }

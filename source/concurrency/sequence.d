@@ -957,10 +957,18 @@ auto filterMap(Sequence, Fun)(Sequence s, Fun f) {
     return FilterMapSequence!(Sequence, Fun)(s, f);
 }
 
+import std.typecons : Nullable;
+alias NullabledType(P : Nullable!T, T) = T;
+
 struct FilterMapSequence(Sequence, Fun) {
     import std.traits : ReturnType;
     alias Value = void;
-    alias Element = Sequence.Element;
+    alias FunReturn = ReturnType!Fun;
+    static if (is(FunReturn == void)) {
+        alias Element = void;
+    } else {
+        alias Element = NullabledType!(ReturnType!(Fun));
+    }
     Sequence s;
     Fun f;
     auto connect(Receiver)(return Receiver receiver) @safe return scope {
@@ -1029,16 +1037,31 @@ struct FilterMapSequenceNextState(Fun, NextReceiver, Receiver) {
 struct FilterMapSequenceNextReceiver(Value, Fun, NextReceiver, Receiver) {
     FilterMapSequenceNextState!(Fun, NextReceiver, Receiver)* state;
 
-    auto setValue(Value value) {
-        import concurrency : just;
-        import concurrency : connectHeap;
-        auto result = state.fun(value);
-        if (result.isNone) {
-            state.receiver.setValue();
-        } else {
-            auto sender = state.nextReceiver.setNext(just(result.getSome));
-            // TODO: put state in FilterMapSequenceNextOp
-            sender.connectHeap(state.receiver).start();
+    static if (is(Value == void)) {
+        auto setValue() {
+            import concurrency : just;
+            import concurrency : connectHeap;
+            auto result = state.fun();
+            if (result.isNone) {
+                state.receiver.setValue();
+            } else {
+                auto sender = state.nextReceiver.setNext(just(result.getSome));
+                // TODO: put state in FilterMapSequenceNextOp
+                sender.connectHeap(state.receiver).start();
+            }
+        }
+    } else {
+        auto setValue(Value value) {
+            import concurrency : just;
+            import concurrency : connectHeap;
+            auto result = state.fun(value);
+            if (result.isNone) {
+                state.receiver.setValue();
+            } else {
+                auto sender = state.nextReceiver.setNext(just(result.getSome));
+                // TODO: put state in FilterMapSequenceNextOp
+                sender.connectHeap(state.receiver).start();
+            }
         }
     }
     auto setError(Throwable t) nothrow @safe {
