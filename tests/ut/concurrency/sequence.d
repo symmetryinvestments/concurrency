@@ -173,3 +173,27 @@ import unit_threaded;
         return Nullable!int(1);
     }).take(4).toList().syncWait.value.should == [1,1,1,1];
 }
+
+@("sample")
+@safe unittest {
+    import core.time : msecs;
+	import concurrency.scheduler : ManualTimeWorker;
+    import concurrency.operations : then, whenAll, withScheduler;
+
+	auto worker = new shared ManualTimeWorker();
+	auto driver = just(worker).then((shared ManualTimeWorker worker) shared {
+        for(;;) {
+            auto span = worker.timeUntilNextEvent();
+            if (span.isNull)
+                break;
+            worker.advance(span.get());
+        }
+    });
+    whenAll(
+        sample(
+            interval(1.msecs, false).scan((int acc) => acc + 1, 0),
+            interval(2.msecs, false)
+        ).take(4).toList().withScheduler(worker.getScheduler()),
+        driver,
+    ).syncWait.value.should == [1,3,5,7];
+}
