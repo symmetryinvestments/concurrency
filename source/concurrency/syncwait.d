@@ -76,7 +76,7 @@ struct Result(T) {
 		alias Value = T;
 	}
 
-	alias V = SumType!(Cancelled, Exception, Value);
+	alias V = SumType!(Value, Cancelled, Exception);
 	
 	V result;
 	this(P)(P p) {
