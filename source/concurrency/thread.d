@@ -269,7 +269,7 @@ package void executeInNewThread(VoidFunction fn) @system nothrow {
 			version(Posix)
 				pthread_detach(
 					pthread_self
-				); //NOTE: see git.symmetry.dev/SIL/plugins/alpha/web/-/issues/3
+				);
 		}, fn)).start();
 	try {
 		/*
@@ -299,7 +299,7 @@ package void executeInNewThread(VoidDelegate fn) @system nothrow {
 			version(Posix)
 				pthread_detach(
 					pthread_self
-				); //NOTE: see git.symmetry.dev/SIL/plugins/alpha/web/-/issues/3
+				);
 		}, fn)).start();
 	try {
 		/*
