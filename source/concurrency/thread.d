@@ -208,6 +208,11 @@ package struct LocalThreadWorker {
 		executor.queue.push(new WorkNode(WorkItem(dg)));
 	}
 
+	void addTimer(ref Timer timer) @trusted {
+		import core.time : hnsecs;
+		addTimer(timer, timer.scheduled_at.hnsecs);
+	}
+
 	void addTimer(ref Timer timer, Duration dur) @trusted {
 		// import core.atomic : atomicOp;
 		// ulong id = executor.nextTimerId.atomicOp!("+=")(1);

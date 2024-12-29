@@ -129,6 +129,10 @@ struct ListElement(T) {
 	ushort position = 0xffff;
 	TimerCommand command;
 	ListElement!T* prev, next;
+	void setScheduledAt(Duration dur) @system {
+		scheduled_at = dur.split!"hnsecs".hnsecs;
+		command = TimerCommand.Register;
+	}
 }
 
 enum TimerCommand : ushort {
