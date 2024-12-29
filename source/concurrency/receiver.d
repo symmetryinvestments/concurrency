@@ -26,7 +26,7 @@ mixin template ForwardExtensionPoints(alias receiver) {
 		return receiver.getScheduler();
 	}
 
-	static if (__traits(hasMember, receiver, "getIOScheduler")) {
+	static if (__traits(compiles, receiver.getIOScheduler())) {
 		auto getIOScheduler() nothrow @safe {
 			return receiver.getIOScheduler();
 		}

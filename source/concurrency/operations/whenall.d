@@ -77,10 +77,11 @@ private template WhenAllResult(Senders...) if (Senders.length > 1) {
 	}
 }
 
-alias ArrayElement(T : P[], P) = P;
+// alias ElementType(T : P[], P) = P;
+import std.range : ElementType;
 
 private template WhenAllResult(Senders...) if (Senders.length == 1) {
-	alias Element = ArrayElement!(Senders).Value;
+	alias Element = ElementType!(Senders).Value;
 	static if (is(Element : void)) {
 		struct WhenAllResult {}
 	} else {
@@ -103,12 +104,12 @@ private struct WhenAllOp(Receiver, Senders...) {
 		alias Ops = staticMap!(ConnectResult, Senders);
 	} else {
 		alias ElementReceiver =
-			WhenAllReceiver!(Receiver, ArrayElement!(Senders).Value, R);
-		alias Ops = OpType!(ArrayElement!(Senders), ElementReceiver)[];
+			WhenAllReceiver!(Receiver, ElementType!(Senders).Value, R);
+		alias Ops = OpType!(ElementType!(Senders), ElementReceiver)[];
 	}
 
 	Receiver receiver;
-	WhenAllState!R state;
+	WhenAllState!(Receiver, R) state;
 	Ops ops;
 	@disable
 	this(this);
@@ -121,21 +122,26 @@ private struct WhenAllOp(Receiver, Senders...) {
 	this(return Receiver receiver,
 		 return Senders senders) @trusted scope return {
 		this.receiver = receiver;
+		state.receiver = receiver;
 		static if (Senders.length > 1) {
+			state.senderCount = Senders.length;
 			foreach (i, Sender; Senders) {
 				ops[i] = senders[i].connect(
 					WhenAllReceiver!(Receiver, Sender.Value,
-									 R)(receiver, &state, i, Senders.length));
+									 R)(&state, i));
 			}
 		} else {
-			static if (!is(ArrayElement!(Senders).Value : void))
+			state.senderCount = senders[0].length;
+			static if (!is(ElementType!(Senders).Value : void))
 				state.value.values.length = senders[0].length;
 			ops.length = senders[0].length;
 			import concurrency.sender : emplaceOperationalState;
-			foreach (i; 0 .. senders[0].length) {
-				ops[i].emplaceOperationalState(senders[0][i],
-					WhenAllReceiver!(Receiver, ArrayElement!(Senders).Value,
-									 R)(receiver, &state, i, senders[0].length));
+			size_t i;
+			foreach (ref s; senders[0]) {
+				ops[i].emplaceOperationalState(s,
+					WhenAllReceiver!(Receiver, ElementType!(Senders).Value,
+									 R)(&state, i));
+				i++;
 			}
 		}
 	}
@@ -168,7 +174,7 @@ struct WhenAllSender(Senders...)
 		if ((Senders.length > 1
 				    && allSatisfy!(ApplyRight!(models, isSender), Senders)
 					)
-			    || (models!(ArrayElement!(Senders[0]), isSender))) {
+			    || (models!(ElementType!(Senders[0]), isSender))) {
 	alias Result = WhenAllResult!(Senders);
 	static if (hasMember!(Result, "values"))
 		alias Value = typeof(Result.values);
@@ -182,22 +188,22 @@ struct WhenAllSender(Senders...)
 	}
 }
 
-private struct WhenAllState(Value) {
+private struct WhenAllState(Receiver, Value) {
 	import concurrency.bitfield;
 	shared StopSource stopSource;
 	shared StopCallback cb;
+	Receiver receiver;
 	static if (is(typeof(Value.values)))
 		Value value;
+	size_t senderCount;
 	Throwable exception;
 	shared SharedBitField!Flags bitfield;
 }
 
 private struct WhenAllReceiver(Receiver, InnerValue, Value) {
 	import core.atomic : atomicOp, atomicLoad, MemoryOrder;
-	Receiver receiver;
-	WhenAllState!(Value)* state;
+	WhenAllState!(Receiver,Value)* state;
 	size_t senderIndex;
-	size_t senderCount;
 	auto getStopToken() {
 		return state.stopSource.token();
 	}
@@ -211,7 +217,7 @@ private struct WhenAllReceiver(Receiver, InnerValue, Value) {
 	}
 
 	private bool isLast(size_t state) {
-		return (state >> 3) == atomicLoad(senderCount);
+		return (state >> 3) == atomicLoad(this.state.senderCount);
 	}
 
 	static if (!is(InnerValue == void))
@@ -261,20 +267,24 @@ private struct WhenAllReceiver(Receiver, InnerValue, Value) {
 	private void process(size_t newState) {
 		state.cb.dispose();
 
-		if (receiver.getStopToken().isStopRequested)
-			receiver.setDone();
+		if (state.receiver.getStopToken().isStopRequested)
+			state.receiver.setDone();
 		else if (isDoneOrErrorProduced(newState)) {
 			if (state.exception)
-				receiver.setError(state.exception);
+				state.receiver.setError(state.exception);
 			else
-				receiver.setDone();
+				state.receiver.setDone();
 		} else {
 			import concurrency.receiver : setValueOrError;
 			static if (is(typeof(Value.values)))
-				receiver.setValueOrError(state.value.values);
+				state.receiver.setValueOrError(state.value.values);
 			else
-				receiver.setValueOrError();
+				state.receiver.setValueOrError();
 		}
+	}
+
+	ref Receiver receiver() {
+		return state.receiver;
 	}
 
 	mixin ForwardExtensionPoints!receiver;
