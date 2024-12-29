@@ -66,11 +66,14 @@ struct IOUringContext {
         return RunSender!(Sender)(&this, sender);
     }
 
-    private void addTimer(ref Timer timer, Duration dur) @trusted shared {
-        timer.scheduled_at = dur.split!"hnsecs".hnsecs;
-        timer.command = TimerCommand.Register;
+    private void addTimer(ref Timer timer) @trusted shared {
         timers.push(&timer);
         wakeup();
+    }
+
+    private void addTimer(ref Timer timer, Duration dur) @trusted shared {
+        timer.setScheduledAt(dur);
+        addTimer(timer);
     }
 
     private void cancelTimer(ref Timer timer) @trusted shared {
@@ -474,6 +477,10 @@ private struct IOUringTimer {
     import core.time : msecs, Duration;
 
     private shared IOUringContext* context;
+
+    void addTimer(ref Timer timer) @safe {
+        context.addTimer(timer);
+    }
 
     void addTimer(ref Timer timer, Duration dur) @safe {
         context.addTimer(timer, dur);

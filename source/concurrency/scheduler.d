@@ -131,7 +131,6 @@ struct ScheduleAfterOp(Worker, Receiver) {
 	}
 
 	Worker worker;
-	Duration dur;
 	Receiver receiver;
 	Timer timer;
 	shared StopCallback stopCb;
@@ -143,6 +142,12 @@ struct ScheduleAfterOp(Worker, Receiver) {
 
     @disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
     @disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+
+	this(return Worker worker, Duration dur, return Receiver receiver) @trusted scope {
+		this.worker = worker;
+		this.receiver = receiver;
+		this.timer.setScheduledAt(dur);
+	}
 
 	// ~this() @safe scope {}
 	void start() @trusted scope nothrow {
@@ -156,7 +161,7 @@ struct ScheduleAfterOp(Worker, Receiver) {
 
 		try {
 			timer.userdata = cast(void delegate(TimerTrigger) @safe shared nothrow) &trigger;
-			worker.addTimer(timer, dur);
+			worker.addTimer(timer);
 		} catch (Exception e) {
 			receiver.setError(e);
 			return;
@@ -255,6 +260,11 @@ class ManualTimeWorker {
 
 	ManualTimeScheduler getScheduler() @safe shared {
 		return ManualTimeScheduler(this);
+	}
+
+	void addTimer(ref Timer timer) @trusted shared {
+		import core.time : hnsecs;
+		addTimer(timer, timer.scheduled_at.hnsecs);
 	}
 
 	void addTimer(ref Timer timer, Duration dur) @trusted shared {
