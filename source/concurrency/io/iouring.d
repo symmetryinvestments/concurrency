@@ -38,7 +38,7 @@ struct IOUringContext {
     // or even IORING_OP_LINK_TIMEOUT to link the timeout to the 
     // wakeup event
     private bool dirtyTimers;
-    private long nextTimer;
+    private ulong nextTimer;
     private shared bool needsWakeup;
     private this(uint size) @trusted {
         // TODO: look into `IORING_SETUP_SQPOLL` for fast submission
@@ -123,6 +123,7 @@ struct IOUringContext {
 
     private int run(scope shared StopToken stopToken) @safe nothrow {
         import core.atomic : atomicStore, MemoryOrder;
+        import core.stdc.errno;
 
         assert(threadId == thisThreadID, "Thread that started IOUringContext must also drive it.");
         pending.append(requests.popAll());
@@ -137,7 +138,7 @@ struct IOUringContext {
             // will result in blocked request. Instead we need to cancel all requests
             // until the stopToken is triggered.
             // Would it be possible to cancel the whole context in one go?
-            if (rc < 0)
+            if (rc < 0 && !ETIMEDOUT)
                 return -rc;
             atomicStore!(MemoryOrder.raw)(needsWakeup, false);
 
@@ -187,8 +188,7 @@ struct IOUringContext {
         if (incr > 0) {
             Timer* t;
             wheels.advance(incr, t);
-            if (t !is null)
-                dirtyTimers = true;
+            dirtyTimers = true;
             while (t !is null) {
                 auto next = t.next;
                 t.userdata(TimerTrigger.trigger);
@@ -201,7 +201,7 @@ struct IOUringContext {
 		import std.datetime.systime : Clock;
 		import core.time : hnsecs;
 
-        long now = Clock.currStdTime;
+        ulong now = Clock.currStdTime;
         if (dirtyTimers) {
             dirtyTimers = false;
     		auto nextTriggerOpt = wheels.timeUntilNextEvent(tickSize, now);
