@@ -433,7 +433,7 @@ struct Uring
             if (_expect(r < 0, false)) return -errno;
             return r;
         }
-        return wait(want); // just simple wait
+        return wait(want, args); // just simple wait
     }
 
     /// ditto
