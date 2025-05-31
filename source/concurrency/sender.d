@@ -3,6 +3,7 @@ module concurrency.sender;
 import concepts;
 import std.traits : ReturnType, isCallable;
 import core.time : Duration;
+import concurrency.utils;
 
 // A Sender represents something that completes with either:
 // 1. a value (which can be void)
@@ -137,7 +138,7 @@ struct ValueSender(T) {
 	Op!Receiver connect(Receiver)(return Receiver receiver) @safe {
 		// ensure NRVO
 		static if (!is(T == void))
-			auto op = Op!(Receiver)(receiver, value);
+			auto op = Op!(Receiver)(receiver, value.copyOrMove);
 		else
 			auto op = Op!(Receiver)(receiver);
 		return op;
@@ -147,7 +148,7 @@ struct ValueSender(T) {
 auto just(T...)(T t) {
 	import std.typecons : tuple, Tuple;
 	static if (T.length == 1)
-		return ValueSender!(T[0])(t);
+		return ValueSender!(T[0])(t.copyOrMove);
 	else
 		return ValueSender!(Tuple!T)(tuple(t));
 }

@@ -3,6 +3,7 @@ module concurrency.syncwait;
 import concurrency.stoptoken;
 import concurrency.sender;
 import concurrency.thread;
+import concurrency.utils;
 import concepts;
 import std.sumtype;
 
@@ -43,7 +44,7 @@ package struct SyncWaitReceiver2(Value) {
 
 	else
 		void setValue(Value value) nothrow @trusted {
-			state.result = value;
+			state.result = value.copyOrMove;
 			state.worker.stop();
 		}
 
@@ -57,13 +58,13 @@ package struct SyncWaitReceiver2(Value) {
 	}
 }
 
-struct Cancelled {
-}
-
 template isA(T) {
 	bool isA(S)(ref S s) if (isSumType!S) {
-		return std.sumtype.match!((ref T t) => true, x => false)(s);
+		return std.sumtype.match!((ref T t) => true, (ref x) => false)(s);
 	}
+}
+
+struct Cancelled {
 }
 
 struct Completed {
@@ -80,7 +81,8 @@ struct Result(T) {
 	
 	V result;
 	this(P)(P p) {
-		result = p;
+		import std.algorithm : move;
+		result = p.move;
 	}
 
 	bool isCancelled() {
@@ -96,10 +98,11 @@ struct Result(T) {
 	}
 
 	auto value() {
+		import std.algorithm : move;
 		static if (is(T == void))
 			alias valueHandler = (Completed c) {};
 		else
-			alias valueHandler = (T t) => t;
+			alias valueHandler = (ref T t) { return t.move(); };
 
 		return std.sumtype.match!(valueHandler, function T(Cancelled C) {
 			throw new Exception("Cancelled");
@@ -136,7 +139,7 @@ auto syncWait(Sender)(auto ref Sender sender,
 	return syncWaitImpl(sender, stopSource);
 }
 
-auto syncWait(Sender)(auto scope ref Sender sender) @trusted {
+auto syncWait(Sender)(scope auto ref Sender sender) @trusted {
 	import concurrency.signal : globalStopSource;
 	shared StopSource childStopSource;
 	shared parentStopToken = globalStopSource.token();
@@ -159,7 +162,7 @@ auto syncWait(Sender)(auto scope ref Sender sender) @trusted {
 }
 
 private
-Result!(Sender.Value) syncWaitImpl(Sender)(auto scope ref Sender sender,
+Result!(Sender.Value) syncWaitImpl(Sender)(scope auto ref Sender sender,
                                            ref shared StopSource stopSource) @safe {
 	static assert(models!(Sender, isSender));
 	import concurrency.signal;
@@ -185,8 +188,9 @@ Result!(Sender.Value) syncWaitImpl(Sender)(auto scope ref Sender sender,
 		throw throwable;
 	}
 
+	import std.algorithm : move;
 	static if (is(Value == void))
 		return Result!Value(Completed());
 	else
-		return Result!Value(state.result);
+		return Result!Value(state.result.move);
 }

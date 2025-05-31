@@ -4,6 +4,7 @@ import concurrency;
 import concurrency.receiver;
 import concurrency.sender;
 import concurrency.stoptoken;
+import concurrency.utils;
 import concepts;
 import std.traits;
 
@@ -19,12 +20,12 @@ private struct ViaAReceiver(ValueB, ValueA, Receiver) {
 	static if (!is(ValueA == void))
 		void setValue(ValueA valueA) @safe {
 			import std.typecons : tuple;
-			receiver.setValue(tuple(valueB, valueA));
+			receiver.setValue(tuple(valueB.copyOrMove, valueA.copyOrMove));
 		}
 
 	else
 		void setValue() @safe {
-			receiver.setValue(valueB);
+			receiver.setValue(valueB.copyOrMove);
 		}
 
 	void setDone() @safe nothrow {
@@ -46,7 +47,7 @@ private struct ViaBReceiver(SenderA, ValueB, Receiver) {
 		void setValue(ValueB val) @safe {
 			// TODO: tried to allocate this on the stack, but failed...
 			auto op = senderA.connectHeap(
-				ViaAReceiver!(ValueB, SenderA.Value, Receiver)(val, receiver));
+				ViaAReceiver!(ValueB, SenderA.Value, Receiver)(val.copyOrMove, receiver));
 			op.start();
 		}
 	} else {

@@ -4,6 +4,7 @@ import concurrency;
 import concurrency.receiver;
 import concurrency.sender;
 import concurrency.stoptoken;
+import concurrency.utils;
 import concepts;
 import std.traits;
 
@@ -23,7 +24,7 @@ private struct StopOnReceiver(Receiver, Value) {
 		}
 	} else {
 		void setValue(Value value) @safe {
-			receiver.setValue(value);
+			receiver.setValue(value.copyOrMove);
 		}
 	}
 

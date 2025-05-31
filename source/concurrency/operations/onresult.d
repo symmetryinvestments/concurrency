@@ -4,6 +4,7 @@ import concurrency;
 import concurrency.receiver;
 import concurrency.sender;
 import concurrency.stoptoken;
+import concurrency.utils;
 import concepts;
 
 /// runs a side-effect whenever the underlying sender completes with value or cancellation
@@ -27,7 +28,7 @@ private struct OnResultReceiver(Value, SideEffect, Receiver) {
 	else
 		void setValue(Value value) @safe {
 			sideEffect(Result!(Value)(value));
-			receiver.setValue(value);
+			receiver.setValue(value.copyOrMove);
 		}
 
 	void setDone() @trusted nothrow {

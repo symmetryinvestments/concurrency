@@ -4,6 +4,7 @@ import concurrency;
 import concurrency.receiver;
 import concurrency.sender;
 import concurrency.stoptoken;
+import concurrency.utils;
 import concepts;
 
 /// runs a side-effect whenever the underlying sender errors
@@ -24,7 +25,7 @@ private struct OnErrorReceiver(Value, SideEffect, Receiver) {
 
 	else
 		void setValue(Value value) @safe {
-			receiver.setValue(value);
+			receiver.setValue(value.copyOrMove);
 		}
 
 	void setDone() @safe nothrow {

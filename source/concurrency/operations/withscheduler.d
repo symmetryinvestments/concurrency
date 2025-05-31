@@ -4,6 +4,7 @@ import concurrency;
 import concurrency.receiver;
 import concurrency.sender;
 import concurrency.stoptoken;
+import concurrency.utils;
 import concepts;
 import std.traits;
 
@@ -20,7 +21,7 @@ private struct WithSchedulerReceiver(Receiver, Value, Scheduler) {
 		}
 	} else {
 		void setValue(Value value) @safe {
-			receiver.setValue(value);
+			receiver.setValue(value.copyOrMove);
 		}
 	}
 
@@ -40,7 +41,7 @@ private struct WithSchedulerReceiver(Receiver, Value, Scheduler) {
 	mixin ForwardExtensionPoints!receiver;
 }
 
-struct WithSchedulerSender(Sender, Scheduler) if (models!(Sender, isSender)) {
+struct WithSchedulerSender(Sender, Scheduler) { //if (models!(Sender, isSender)) {
 	alias Value = Sender.Value;
 	Sender sender;
 	Scheduler scheduler;

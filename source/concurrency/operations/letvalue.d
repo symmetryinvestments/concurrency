@@ -1,6 +1,7 @@
 module concurrency.operations.letvalue;
 
 import concurrency.sender;
+import concurrency.utils;
 import concepts;
 
 auto letValue(Sender, Fun)(Sender sender, Fun fun) {
@@ -97,7 +98,7 @@ struct LetValueOp(Sender, Fun, Receiver) {
         void next(Sender.Value value, Receiver receiver) @trusted nothrow {
             import concurrency.sender : emplaceOperationalState;
 
-            this.value = value;
+            this.value = value.copyOrMove;
             try {
                 auto sender = nextSender();
                 opB.emplaceOperationalState(sender, receiver);
@@ -126,7 +127,7 @@ struct LetValueReceiver(Value, Receiver) {
     } else {
         void delegate(Value, Receiver) @trusted nothrow next;
         void setValue(Value value) @safe nothrow {
-            next(value, receiver);
+            next(value.copyOrMove, receiver);
         }
     }
 
