@@ -6,7 +6,7 @@ import concurrency.sender;
 import concurrency.stoptoken;
 import concepts;
 import std.traits;
-import concurrency.utils : spin_yield, casWeak;
+import concurrency.utils : spin_yield, casWeak, copyOrMove;
 
 WhenAllSender!(Senders) whenAll(Senders...)(Senders senders) {
 	return WhenAllSender!(Senders)(senders);
@@ -56,14 +56,18 @@ private template WhenAllResult(Senders...) if (Senders.length > 1) {
 	static if (ValueTypes.length > 0) {
 		struct WhenAllResult {
 			Values values;
-			void setValue(T)(T t, size_t index) @trusted {
+			void setValue(T)(ref T t, size_t index) @trusted {
 				switch (index) {
 					foreach (idx, I; Indexes) {
 						case idx:
 							static if (ValueTypes.length == 1)
-								values = t;
-							else static if (is(typeof(values[I - 1]) == T))
-								values[I - 1] = t;
+								values = t.copyOrMove;
+							else static if (is(typeof(values[I - 1]) == T)) {
+								static if (__traits(isScalar, T))
+									values[I - 1] = t;
+								else
+									values[I - 1] = t.copyOrMove;
+							}
 							return;
 					}
 
@@ -87,8 +91,8 @@ private template WhenAllResult(Senders...) if (Senders.length == 1) {
 	} else {
 		struct WhenAllResult {
 			Element[] values;
-			void setValue(Element)(Element elem, size_t index) {
-				values[index] = elem;
+			void setValue(Element)(ref Element elem, size_t index) {
+				values[index] = elem.copyOrMove;
 			}
 		}
 	}
@@ -171,17 +175,17 @@ private struct WhenAllOp(Receiver, Senders...) {
 import std.meta : allSatisfy, ApplyRight;
 
 struct WhenAllSender(Senders...)
-		if ((Senders.length > 1
+		{ /*if ((Senders.length > 1
 				    && allSatisfy!(ApplyRight!(models, isSender), Senders)
 					)
-			    || (models!(ElementType!(Senders[0]), isSender))) {
+			    || (models!(ElementType!(Senders[0]), isSender))) {*/
 	alias Result = WhenAllResult!(Senders);
 	static if (hasMember!(Result, "values"))
 		alias Value = typeof(Result.values);
 	else
 		alias Value = void;
 	Senders senders;
-	auto connect(Receiver)(return Receiver receiver) @safe return scope {
+	auto connect(Receiver)(return Receiver receiver) @trusted return scope {
 		// ensure NRVO
 		auto op = WhenAllOp!(Receiver, Senders)(receiver, senders);
 		return op;

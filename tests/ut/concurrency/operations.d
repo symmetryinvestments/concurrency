@@ -7,6 +7,7 @@ import concurrency.operations;
 import concurrency.receiver;
 import concurrency.stoptoken;
 import concurrency.nursery;
+import concurrency.utils;
 import unit_threaded;
 import core.time;
 import core.thread;
@@ -24,7 +25,7 @@ struct OutOfBandValueSender(T) {
 		@disable
 		this(this);
 		void run() {
-			receiver.setValue(value);
+			receiver.setValue(value.copyOrMove);
 		}
 
 		void start() @trusted scope {

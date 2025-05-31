@@ -1,5 +1,6 @@
 module ut.concurrency.sender;
 
+import ut.concurrency.helper;
 import concurrency;
 import concurrency.sender;
 import concurrency.thread;
@@ -347,6 +348,11 @@ unittest {
 	static assert(!__traits(compiles, disappearSender(just(s))));
 	static assert(
 		!__traits(compiles, disappearSender(just(s).retry(Times(5)))));
+}
+
+@("just.move") @safe
+unittest {
+	just(Uncopyable(42)).syncWait().value.p.should == 42;
 }
 
 @("defer.static.fun") @safe

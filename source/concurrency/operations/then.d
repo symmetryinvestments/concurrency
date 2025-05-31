@@ -4,10 +4,10 @@ import concurrency;
 import concurrency.receiver;
 import concurrency.sender;
 import concurrency.stoptoken;
+import concurrency.utils;
 import concepts;
 
 auto then(Sender, Fun)(Sender sender, Fun fun) {
-	import concurrency.utils;
 	static assert(isThreadSafeFunction!Fun);
 	return ThenSender!(Sender, Fun)(sender, fun);
 }
@@ -24,11 +24,11 @@ private struct ThenReceiver(Receiver, Value, Fun) {
 					receiver.setDone();
 				}, (Exception e) {
 					receiver.setError(e);
-				}, (Result!(T).Value v) {
+				}, (ref Result!(T).Value v) {
 					static if (is(typeof(v) == Completed)) {
 						receiver.setValue();
 					} else {
-						receiver.setValue(v);
+						receiver.setValue(v.copyOrMove);
 					}
 				});
 			} else {
@@ -49,30 +49,30 @@ private struct ThenReceiver(Receiver, Value, Fun) {
 				static if (isExpandable)
 					auto r = fun(value.expand);
 				else
-					auto r = fun(value);
+					auto r = fun(value.copyOrMove);
 				r.match!((Cancelled c) {
 					receiver.setDone();
 				}, (Exception e) {
 					receiver.setError(e);
-				}, (Result!(T).Value v) {
+				}, (ref Result!(T).Value v) {
 					static if (is(typeof(v) == Completed)) {
 						receiver.setValue();
 					} else {
-						receiver.setValue(v);
+						receiver.setValue(v.copyOrMove);
 					}
 				});
 			} else static if (is(ReturnType!Fun == void)) {
 				static if (isExpandable)
 					fun(value.expand);
 				else
-					fun(value);
+					fun(value.copyOrMove);
 				receiver.setValue();
 			} else {
 				static if (isExpandable)
 					auto r = fun(value.expand);
 				else
-					auto r = fun(value);
-				receiver.setValue(r);
+					auto r = fun(value.copyOrMove);
+				receiver.setValue(r.copyOrMove);
 			}
 		}
 	}

@@ -79,6 +79,7 @@ struct ThrowingNullReceiver(T) {
 }
 
 void setValueOrError(Receiver)(auto ref Receiver receiver) @safe {
+	pragma(inline, true)
 	import std.traits;
 	static if (hasFunctionAttributes!(receiver.setValue, "nothrow")) {
 		receiver.setValue();
@@ -93,12 +94,14 @@ void setValueOrError(Receiver)(auto ref Receiver receiver) @safe {
 
 void setValueOrError(Receiver, T)(auto ref Receiver receiver,
                                   auto ref T value) @safe {
+	pragma(inline, true)
 	import std.traits;
+	import concurrency.utils;
 	static if (hasFunctionAttributes!(receiver.setValue, "nothrow")) {
-		receiver.setValue(value);
+		receiver.setValue(value.copyOrMove);
 	} else {
 		try {
-			receiver.setValue(value);
+			receiver.setValue(value.copyOrMove);
 		} catch (Exception e) {
 			receiver.setError(e);
 		}

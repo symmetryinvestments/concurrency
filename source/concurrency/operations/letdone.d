@@ -2,6 +2,7 @@ module concurrency.operations.letdone;
 
 import concurrency.sender;
 import concepts;
+import concurrency.utils;
 
 auto letDone(Sender, Fun)(Sender sender, Fun fun) {
    	import concurrency.utils;
@@ -102,7 +103,7 @@ struct LetDoneReceiver(Value, Receiver) {
         }
     } else {
         void setValue(Value value) @safe {
-            receiver.setValue(value);
+            receiver.setValue(value.copyOrMove);
         }
     }
 

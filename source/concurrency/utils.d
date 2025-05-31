@@ -138,3 +138,12 @@ auto dynamicLoadRaw(alias fun)() nothrow @trusted @nogc {
 	} else
 		static assert(false, "platform not supported");
 }
+
+auto copyOrMove(T)(ref T source) @trusted nothrow @nogc {
+	pragma(inline, true);
+	import std.algorithm : move;
+	static if (__traits(compiles, {return source; }))
+		return source;
+	else
+		return source.move;
+}
