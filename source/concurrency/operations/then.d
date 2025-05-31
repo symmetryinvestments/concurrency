@@ -5,7 +5,6 @@ import concurrency.receiver;
 import concurrency.sender;
 import concurrency.stoptoken;
 import concurrency.utils;
-import concepts;
 
 auto then(Sender, Fun)(Sender sender, Fun fun) {
 	static assert(isThreadSafeFunction!Fun);
@@ -88,7 +87,7 @@ private struct ThenReceiver(Receiver, Value, Fun) {
 	mixin ForwardExtensionPoints!receiver;
 }
 
-struct ThenSender(Sender, Fun) if (models!(Sender, isSender)) {
+struct ThenSender(Sender, Fun) {
 	import std.traits : ReturnType;
 	static if (is(ReturnType!fun == Result!T, T))
 		alias Value = T;

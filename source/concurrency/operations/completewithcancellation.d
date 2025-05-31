@@ -3,7 +3,6 @@ module concurrency.operations.completewithcancellation;
 import concurrency;
 import concurrency.receiver;
 import concurrency.sender;
-import concepts;
 import std.traits;
 
 auto completeWithCancellation(Sender)(Sender sender) {
@@ -27,7 +26,7 @@ private struct CompleteWithCancellationReceiver(Receiver) {
 	mixin ForwardExtensionPoints!receiver;
 }
 
-struct CompleteWithCancellationSender(Sender) if (models!(Sender, isSender)) {
+struct CompleteWithCancellationSender(Sender) {
 	static assert(
 		is(Sender.Value == void),
 		"Sender must produce void to be able to complete with cancellation."

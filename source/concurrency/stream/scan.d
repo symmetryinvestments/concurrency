@@ -2,12 +2,10 @@ module concurrency.stream.scan;
 
 import concurrency.stream.stream;
 import concurrency.sender : OpType;
-import concepts;
 import concurrency.utils : isThreadSafeFunction;
 
 /// Applies an accumulator to each value from the source
-auto scan(Stream, Fun, Seed)(Stream stream, scope Fun scanFn, Seed seed)
-		if (models!(Stream, isStream)) {
+auto scan(Stream, Fun, Seed)(Stream stream, scope Fun scanFn, Seed seed) {
 	static assert(isThreadSafeFunction!Fun);
 	alias Properties = StreamProperties!Stream;
 	return fromStreamOp!(

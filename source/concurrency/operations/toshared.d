@@ -4,7 +4,6 @@ import concurrency.receiver;
 import concurrency.sender;
 import concurrency.stoptoken;
 import concurrency.scheduler : NullScheduler;
-import concepts;
 import std.traits;
 
 /// Wraps a Sender in a SharedSender. A SharedSender allows many receivers to connect to the same underlying Sender, forwarding the same termination call to each receiver.
@@ -27,8 +26,7 @@ enum ResetLogic {
 	alwaysReset
 }
 
-class SharedSender(Sender, Scheduler, ResetLogic resetLogic)
-		if (models!(Sender, isSender)) {
+class SharedSender(Sender, Scheduler, ResetLogic resetLogic) {
 	import std.traits : ReturnType;
 	import std.sumtype : match;
 	alias Props = Properties!(Sender);

@@ -5,7 +5,6 @@ import concurrency.receiver;
 import concurrency.sender;
 import concurrency.stoptoken;
 import concurrency.utils;
-import concepts;
 import std.traits;
 
 auto withScheduler(Sender, Scheduler)(Sender sender, Scheduler scheduler) {
@@ -41,7 +40,7 @@ private struct WithSchedulerReceiver(Receiver, Value, Scheduler) {
 	mixin ForwardExtensionPoints!receiver;
 }
 
-struct WithSchedulerSender(Sender, Scheduler) { //if (models!(Sender, isSender)) {
+struct WithSchedulerSender(Sender, Scheduler) {
 	alias Value = Sender.Value;
 	Sender sender;
 	Scheduler scheduler;

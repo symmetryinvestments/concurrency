@@ -17,7 +17,6 @@ import std.typecons : Nullable;
 class Nursery {
 	import concurrency.sender : isSender, OperationalStateBase;
 	import core.sync.mutex : Mutex;
-	import concepts;
 
 	alias Value = void;
 	private {
@@ -124,8 +123,6 @@ class Nursery {
 	}
 
 	void run(Sender)(Sender sender) @trusted shared {
-		import concepts;
-		static assert(models!(Sender, isSender));
 		import std.typecons : Nullable;
 		import core.atomic : atomicOp, atomicLoad;
 		import concurrency.sender : connectHeap;

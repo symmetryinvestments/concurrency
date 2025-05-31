@@ -4,7 +4,6 @@ import concurrency;
 import concurrency.receiver;
 import concurrency.sender;
 import concurrency.stoptoken;
-import concepts;
 import std.traits;
 import concurrency.utils : isThreadSafeFunction;
 
@@ -74,7 +73,7 @@ private struct STReceiver(Receiver, Value, Fun) {
 	mixin ForwardExtensionPoints!receiver;
 }
 
-struct STSender(Sender, Fun) if (models!(Sender, isSender)) {
+struct STSender(Sender, Fun) {
 	alias Value = ReturnType!fun;
 	Sender sender;
 	Fun fun;

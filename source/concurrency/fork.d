@@ -2,7 +2,6 @@ module concurrency.fork;
 
 import concurrency.sender;
 import concurrency.executor;
-import concepts;
 
 // TODO: fork is an scheduler :)
 // therefor the Function fun could be a `then` continuation

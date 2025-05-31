@@ -4,7 +4,6 @@ import concurrency;
 import concurrency.receiver;
 import concurrency.sender;
 import concurrency.stoptoken;
-import concepts;
 import std.traits;
 
 auto on(Sender, Scheduler)(Sender sender, Scheduler scheduler) {

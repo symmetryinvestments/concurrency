@@ -2,10 +2,9 @@ module concurrency.stream.tolist;
 
 import concurrency.stream.stream;
 import concurrency.sender : OpType;
-import concepts;
 
 /// toList collects all the stream's values and emits the array as a Sender
-auto toList(Stream)(Stream stream) if (models!(Stream, isStream)) {
+auto toList(Stream)(Stream stream) {
 	alias Properties = StreamProperties!Stream;
 	static assert(is(Properties.Value == void),
 	              "sender must produce void for toList to work");

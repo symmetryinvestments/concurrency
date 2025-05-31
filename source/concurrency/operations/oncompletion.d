@@ -5,7 +5,6 @@ import concurrency.receiver;
 import concurrency.sender;
 import concurrency.stoptoken;
 import concurrency.utils;
-import concepts;
 
 /// runs a side-effect whenever the underlying sender completes with value or cancellation
 auto onCompletion(Sender, SideEffect)(Sender sender, SideEffect effect) {
@@ -42,7 +41,7 @@ private struct OnCompletionReceiver(Value, SideEffect, Receiver) {
 	mixin ForwardExtensionPoints!receiver;
 }
 
-struct OnCompletionSender(Sender, SideEffect) if (models!(Sender, isSender)) {
+struct OnCompletionSender(Sender, SideEffect) {
 	alias Value = Sender.Value;
 	Sender sender;
 	SideEffect effect;

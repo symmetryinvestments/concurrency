@@ -1,10 +1,8 @@
 module concurrency.stream.flatmapconcat;
 
 import concurrency.stream.stream : isStream;
-import concepts;
 
-auto flatMapConcat(Stream, Fun)(Stream stream, Fun fun)
-		if (models!(Stream, isStream)) {
+auto flatMapConcat(Stream, Fun)(Stream stream, Fun fun) {
 	import concurrency.stream.stream : fromStreamOp, StreamProperties;
 	import concurrency.utils : isThreadSafeFunction;
 	import concurrency.stream.flatmapbase;

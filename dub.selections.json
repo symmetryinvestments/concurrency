@@ -1,7 +1,6 @@
 {
 	"fileVersion": 1,
 	"versions": {
-		"concepts": "0.1.0",
 		"unit-threaded": "2.2.0"
 	}
 }

@@ -2,11 +2,9 @@ module concurrency.stream.slide;
 
 import concurrency.stream.stream;
 import concurrency.sender : OpType;
-import concepts;
 
 /// slides a window over a stream, emitting all items in the window as an array. The array is reused so you must duplicate if you want to access it beyond the stream.
-auto slide(Stream)(Stream stream, size_t window, size_t step = 1)
-		if (models!(Stream, isStream)) {
+auto slide(Stream)(Stream stream, size_t window, size_t step = 1) {
 	import std.traits : ReturnType;
 	alias Properties = StreamProperties!Stream;
 	static assert(!is(Properties.ElementType == void),

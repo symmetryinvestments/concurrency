@@ -3,7 +3,6 @@ module concurrency.stream.stream;
 import concurrency.stoptoken;
 import concurrency.receiver;
 import concurrency.sender : isSender, OpType;
-import concepts;
 import std.traits : hasFunctionAttributes;
 
 /// A Stream is anything that has a `.collect` function that accepts a callable and returns a Sender.
@@ -25,7 +24,7 @@ void checkStream(T)() {
 		alias Sender = ReturnType!(T.collect!(DG));
 	else
 		alias Sender = ReturnType!(T.collect);
-	static assert(models!(Sender, isSender));
+	static assert(isSender!(Sender));
 }
 
 enum isStream(T) = is(typeof(checkStream!T));
@@ -40,8 +39,7 @@ interface StreamObjectBase(T) {
 }
 
 /// A class extending from StreamObjectBase that wraps any Stream
-class StreamObjectImpl(Stream) : StreamObjectBase!(Stream.ElementType)
-		if (models!(Stream, isStream)) {
+class StreamObjectImpl(Stream) : StreamObjectBase!(Stream.ElementType) {
 	import concurrency.receiver : ReceiverObjectBase;
 	private Stream stream;
 	this(Stream stream) {
@@ -57,8 +55,7 @@ class StreamObjectImpl(Stream) : StreamObjectBase!(Stream.ElementType)
 }
 
 /// Converts any Stream to a polymorphic StreamObject
-StreamObjectBase!(Stream.ElementType) toStreamObject(Stream)(Stream stream)
-		if (models!(Stream, isStream)) {
+StreamObjectBase!(Stream.ElementType) toStreamObject(Stream)(Stream stream) {
 	return new StreamObjectImpl!(Stream)(stream);
 }
 

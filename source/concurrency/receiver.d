@@ -1,7 +1,5 @@
 module concurrency.receiver;
 
-import concepts;
-
 /// checks that T is a Receiver
 void checkReceiver(T)() {
 	T t = T.init;
@@ -38,7 +36,6 @@ interface ReceiverObjectBase(T) {
 	import concurrency.stoptoken : StopToken;
 	import concurrency.scheduler : SchedulerObjectBase;
 	import concurrency.ioscheduler : IOSchedulerObjectBase;
-	static assert(models!(ReceiverObjectBase!T, isReceiver));
 	static if (is(T == void))
 		void setValue() @safe;
 	else

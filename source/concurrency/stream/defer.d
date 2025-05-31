@@ -2,11 +2,10 @@ module concurrency.stream.defer;
 
 import concurrency.sender : isSender;
 import concurrency.stream.stream;
-import concepts;
 import std.traits : ReturnType;
 
 // Creates a stream of the values resulted by the Senders returned by Fun.
-auto deferStream(Fun)(Fun fun) if (models!(ReturnType!Fun, isSender)) {
+auto deferStream(Fun)(Fun fun) {
 	import concurrency.utils : isThreadSafeCallable;
 	static assert(isThreadSafeCallable!Fun);
 	alias Sender = ReturnType!Fun;

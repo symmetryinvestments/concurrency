@@ -4,14 +4,13 @@ import concurrency;
 import concurrency.receiver;
 import concurrency.sender;
 import concurrency.stoptoken;
-import concepts;
 import std.traits;
 
 IESender!Sender ignoreError(Sender)(Sender sender) {
 	return IESender!Sender(sender);
 }
 
-struct IESender(Sender) if (models!(Sender, isSender)) {
+struct IESender(Sender) {
 	alias Value = Sender.Value;
 	Sender sender;
 	auto connect(Receiver)(return Receiver receiver) @safe return scope {

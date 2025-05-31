@@ -4,7 +4,6 @@ import concurrency;
 import concurrency.receiver;
 import concurrency.sender;
 import concurrency.stoptoken;
-import concepts;
 import std.traits;
 
 auto repeat(Sender)(Sender sender) {
@@ -64,7 +63,7 @@ private struct RepeatOp(Receiver, Sender) {
 	}
 }
 
-struct RepeatSender(Sender) if (models!(Sender, isSender)) {
+struct RepeatSender(Sender) {
 	alias Value = Sender.Value;
 	Sender sender;
 	auto connect(Receiver)(return Receiver receiver) @safe return scope {

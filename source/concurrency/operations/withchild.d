@@ -4,7 +4,6 @@ import concurrency;
 import concurrency.receiver;
 import concurrency.sender;
 import concurrency.stoptoken;
-import concepts;
 import std.traits;
 import concurrency.utils : spin_yield, casWeak;
 
@@ -14,8 +13,7 @@ WithChildSender!(SenderParent, SenderChild) withChild(
 	return WithChildSender!(SenderParent, SenderChild)(a, b);
 }
 
-struct WithChildSender(SenderParent, SenderChild)
-		if (models!(SenderParent, isSender) && models!(SenderChild, isSender)) {
+struct WithChildSender(SenderParent, SenderChild) {
 	import concurrency.operations.whenall;
 	alias Value = WhenAllSender!(SenderChild, SenderParent).Value;
 	SenderParent a;

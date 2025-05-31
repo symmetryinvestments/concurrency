@@ -4,7 +4,6 @@ import concurrency.stoptoken;
 import concurrency.sender;
 import concurrency.thread;
 import concurrency.utils;
-import concepts;
 import std.sumtype;
 
 bool isMainThread() @trusted {
@@ -164,7 +163,6 @@ auto syncWait(Sender)(scope auto ref Sender sender) @trusted {
 private
 Result!(Sender.Value) syncWaitImpl(Sender)(scope auto ref Sender sender,
                                            ref shared StopSource stopSource) @safe {
-	static assert(models!(Sender, isSender));
 	import concurrency.signal;
 	import core.stdc.signal : SIGTERM, SIGINT;
 

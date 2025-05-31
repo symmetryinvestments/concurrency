@@ -6,7 +6,6 @@ import concurrency;
 import concurrency.receiver;
 import concurrency.sender;
 import concurrency.stoptoken;
-import concepts;
 
 auto forwardOn(Sender, Scheduler)(Sender sender, Scheduler scheduler) {
 	return ForwardOnSender!(Sender, Scheduler)(sender, scheduler);
@@ -38,7 +37,7 @@ private struct ForwardOnReceiver(Receiver, Value, Scheduler) {
 	mixin ForwardExtensionPoints!receiver;
 }
 
-struct ForwardOnSender(Sender, Scheduler) if (models!(Sender, isSender)) {
+struct ForwardOnSender(Sender, Scheduler) {
 	alias Value = Sender.Value;
 	Sender sender;
 	Scheduler scheduler;

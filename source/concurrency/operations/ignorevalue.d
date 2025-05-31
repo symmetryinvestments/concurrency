@@ -3,7 +3,6 @@ module concurrency.operations.ignorevalue;
 import concurrency;
 import concurrency.receiver;
 import concurrency.sender;
-import concepts;
 
 /// ignores the value and returns void
 auto ignoreValue(Sender)(Sender sender) {
@@ -33,7 +32,7 @@ private struct IgnoreValueReceiver(Value, Receiver) {
 	mixin ForwardExtensionPoints!receiver;
 }
 
-struct IgnoreValueSender(Sender) if (models!(Sender, isSender)) {
+struct IgnoreValueSender(Sender) {
 	alias Value = void;
 	Sender sender;
 	auto connect(Receiver)(return Receiver receiver) @safe return scope {

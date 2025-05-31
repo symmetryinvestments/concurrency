@@ -2,11 +2,9 @@ module concurrency.stream.sample;
 
 import concurrency.stream.stream;
 import concurrency.sender : OpType;
-import concepts;
 
 /// Forwards the latest value from the base stream every time the trigger stream produces a value. If the base stream hasn't produces a (new) value the trigger is ignored
-auto sample(StreamBase, StreamTrigger)(StreamBase base, StreamTrigger trigger)
-		if (models!(StreamBase, isStream) && models!(StreamTrigger, isStream)) {
+auto sample(StreamBase, StreamTrigger)(StreamBase base, StreamTrigger trigger) {
 	alias PropertiesBase = StreamProperties!StreamBase;
 	alias PropertiesTrigger = StreamProperties!StreamTrigger;
 	static assert(

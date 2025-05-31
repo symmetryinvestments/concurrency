@@ -3,7 +3,6 @@ module concurrency.operations.completewitherror;
 import concurrency;
 import concurrency.receiver;
 import concurrency.sender;
-import concepts;
 import std.traits;
 
 auto completeWithError(Sender)(Sender sender, Throwable t) {
@@ -50,7 +49,7 @@ private struct CompleteWithErrorReceiver(Receiver) {
 	mixin ForwardExtensionPoints!receiver;
 }
 
-struct CompleteWithErrorSender(Sender) if (models!(Sender, isSender)) {
+struct CompleteWithErrorSender(Sender) {
 	alias Value = Sender.Value;
 	Sender sender;
 	Throwable t;

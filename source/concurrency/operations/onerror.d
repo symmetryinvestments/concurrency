@@ -5,7 +5,6 @@ import concurrency.receiver;
 import concurrency.sender;
 import concurrency.stoptoken;
 import concurrency.utils;
-import concepts;
 
 /// runs a side-effect whenever the underlying sender errors
 auto onError(Sender, SideEffect)(Sender sender, SideEffect effect) {
@@ -50,7 +49,7 @@ private struct OnErrorReceiver(Value, SideEffect, Receiver) {
 	mixin ForwardExtensionPoints!receiver;
 }
 
-struct OnErrorSender(Sender, SideEffect) if (models!(Sender, isSender)) {
+struct OnErrorSender(Sender, SideEffect) {
 	alias Value = Sender.Value;
 	Sender sender;
 	SideEffect effect;

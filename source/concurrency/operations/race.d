@@ -5,7 +5,6 @@ import concurrency.receiver;
 import concurrency.sender;
 import concurrency.stoptoken;
 import concurrency.utils : spin_yield, casWeak;
-import concepts;
 import std.traits;
 
 /// Runs both Senders and propagates the value of whoever completes first
@@ -111,10 +110,7 @@ private struct RaceOp(Receiver, Senders...) {
 
 import std.meta : allSatisfy, ApplyRight;
 
-struct RaceSender(Senders...)
-		if ((Senders.length > 1
-				    && allSatisfy!(ApplyRight!(models, isSender), Senders))
-			    || (models!(ArrayElement!(Senders[0]), isSender))) {
+struct RaceSender(Senders...) {
 	alias Value = Result!(Senders);
 	Senders senders;
 	bool noDropouts; // if true then we fail the moment one contender does, otherwise we keep running until one finishes

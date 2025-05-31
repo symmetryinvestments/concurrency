@@ -2,7 +2,6 @@ module concurrency.operations.letvalue;
 
 import concurrency.sender;
 import concurrency.utils;
-import concepts;
 
 auto letValue(Sender, Fun)(Sender sender, Fun fun) {
    	import concurrency.utils;
@@ -11,7 +10,7 @@ auto letValue(Sender, Fun)(Sender sender, Fun fun) {
     return LetValue!(Sender, Fun)(sender, fun);
 }
 
-struct LetValue(Sender, Fun) if (models!(Sender, isSender)) {
+struct LetValue(Sender, Fun) {
     import std.traits : ReturnType;
     alias FinalSender = ReturnType!(Fun);
     alias Value = FinalSender.Value;

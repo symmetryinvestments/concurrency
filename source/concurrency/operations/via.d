@@ -5,7 +5,6 @@ import concurrency.receiver;
 import concurrency.sender;
 import concurrency.stoptoken;
 import concurrency.utils;
-import concepts;
 import std.traits;
 
 auto via(SenderA, SenderB)(SenderA a, SenderB b) {
@@ -70,8 +69,7 @@ private struct ViaBReceiver(SenderA, ValueB, Receiver) {
 	mixin ForwardExtensionPoints!receiver;
 }
 
-struct ViaSender(SenderA, SenderB)
-		if (models!(SenderA, isSender) && models!(SenderB, isSender)) {
+struct ViaSender(SenderA, SenderB) {
 	import std.meta : Filter, AliasSeq;
 	SenderA senderA;
 	SenderB senderB;

@@ -3,7 +3,6 @@ module concurrency.stream.throttling;
 import concurrency.stream.stream;
 import concurrency.sender : OpType;
 import concurrency.stoptoken;
-import concepts;
 import core.time : Duration;
 import core.atomic : MemoryOrder;
 
@@ -48,7 +47,7 @@ auto throttling(
 	Stream,
 	ThrottleEmitLogic emitLogic,
 	ThrottleTimerLogic timerLogic
-)(Stream stream, Duration dur) if (models!(Stream, isStream)) {
+)(Stream stream, Duration dur) {
 	alias Properties = StreamProperties!Stream;
 	return fromStreamOp!(
 		Properties.ElementType, Properties.Value,

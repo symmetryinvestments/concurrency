@@ -6,7 +6,6 @@ import concurrency.sender;
 import concurrency.stoptoken;
 import concurrency.utils : spin_yield, casWeak;
 import concurrency.operations.race : RaceSender;
-import concepts;
 import std.traits;
 
 /// Runs both Senders and propagates the value of whoever completes first

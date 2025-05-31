@@ -5,7 +5,6 @@ import concurrency.receiver;
 import concurrency.sender;
 import concurrency.stoptoken;
 import concurrency.utils;
-import concepts;
 import std.traits;
 
 auto stopOn(Sender)(Sender sender, shared StopToken stopToken) {
@@ -43,7 +42,7 @@ private struct StopOnReceiver(Receiver, Value) {
 	mixin ForwardExtensionPoints!receiver;
 }
 
-struct StopOn(Sender) if (models!(Sender, isSender)) {
+struct StopOn(Sender) {
 	alias Value = Sender.Value;
 	Sender sender;
 	shared StopToken stopToken;

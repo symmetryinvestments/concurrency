@@ -2,10 +2,8 @@ module concurrency.stream.filter;
 
 import concurrency.stream.stream;
 import concurrency.sender : OpType;
-import concepts;
 
-auto filter(Stream, Fun)(Stream stream, Fun fun)
-		if (models!(Stream, isStream)) {
+auto filter(Stream, Fun)(Stream stream, Fun fun) {
 	alias Properties = StreamProperties!Stream;
 	return fromStreamOp!(Properties.ElementType, Properties.Value,
 	                     FilterStreamOp!(Stream, Fun))(stream, fun);

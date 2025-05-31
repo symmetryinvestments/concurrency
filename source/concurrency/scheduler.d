@@ -2,7 +2,6 @@ module concurrency.scheduler;
 
 import concurrency.sender : SenderObjectBase, isSender;
 import core.time : Duration;
-import concepts;
 import std.typecons : Nullable, nullable;
 
 void checkScheduler(T)() {

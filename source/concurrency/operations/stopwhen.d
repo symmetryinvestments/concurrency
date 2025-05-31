@@ -5,7 +5,6 @@ import concurrency.receiver;
 import concurrency.sender;
 import concurrency.stoptoken;
 import concurrency.utils : spin_yield, casWeak;
-import concepts;
 import std.traits;
 
 /// stopWhen cancels the source when the trigger completes normally. If the either source or trigger completes with cancellation or with an error, the first one is propagates after both are completed.
@@ -54,8 +53,7 @@ private struct StopWhenOp(Receiver, Sender, Trigger) {
 	}
 }
 
-struct StopWhenSender(Sender, Trigger)
-		if (models!(Sender, isSender) && models!(Trigger, isSender)) {
+struct StopWhenSender(Sender, Trigger) {
 	alias Value = Sender.Value;
 	Sender sender;
 	Trigger trigger;

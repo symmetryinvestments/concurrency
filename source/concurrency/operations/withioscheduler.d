@@ -5,7 +5,6 @@ import concurrency.receiver;
 import concurrency.sender;
 import concurrency.stoptoken;
 import concurrency.utils;
-import concepts;
 import std.traits;
 
 auto withIOScheduler(Sender, IOScheduler)(Sender sender, IOScheduler ioScheduler) {
@@ -40,7 +39,7 @@ private struct WithIOSchedulerReceiver(Receiver, Value, IOScheduler) {
 	mixin ForwardExtensionPoints!receiver;
 }
 
-struct WithIOSchedulerSender(Sender, IOScheduler) { //if (models!(Sender, isSender)) {
+struct WithIOSchedulerSender(Sender, IOScheduler) {
 	alias Value = Sender.Value;
 	Sender sender;
 	IOScheduler ioScheduler;

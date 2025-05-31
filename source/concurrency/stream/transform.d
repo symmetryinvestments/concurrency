@@ -5,10 +5,8 @@ import concurrency.sender : OpType;
 import concurrency.receiver : ForwardExtensionPoints;
 import std.traits : ReturnType;
 import concurrency.utils : isThreadSafeFunction;
-import concepts;
 
-auto transform(Stream, Fun)(Stream stream, Fun fun)
-		if (models!(Stream, isStream)) {
+auto transform(Stream, Fun)(Stream stream, Fun fun) {
 	static assert(isThreadSafeFunction!Fun);
 	alias Properties = StreamProperties!Stream;
 	return fromStreamOp!(ReturnType!Fun, Properties.Value,

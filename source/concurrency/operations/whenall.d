@@ -4,7 +4,6 @@ import concurrency;
 import concurrency.receiver;
 import concurrency.sender;
 import concurrency.stoptoken;
-import concepts;
 import std.traits;
 import concurrency.utils : spin_yield, casWeak, copyOrMove;
 
@@ -174,11 +173,7 @@ private struct WhenAllOp(Receiver, Senders...) {
 
 import std.meta : allSatisfy, ApplyRight;
 
-struct WhenAllSender(Senders...)
-		{ /*if ((Senders.length > 1
-				    && allSatisfy!(ApplyRight!(models, isSender), Senders)
-					)
-			    || (models!(ElementType!(Senders[0]), isSender))) {*/
+struct WhenAllSender(Senders...) {
 	alias Result = WhenAllResult!(Senders);
 	static if (hasMember!(Result, "values"))
 		alias Value = typeof(Result.values);

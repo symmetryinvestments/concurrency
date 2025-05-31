@@ -4,7 +4,6 @@ import concurrency;
 import concurrency.receiver;
 import concurrency.sender;
 import concurrency.stoptoken;
-import concepts;
 import std.traits;
 
 // TODO: return scope?
@@ -96,7 +95,7 @@ struct SSOp(Receiver, Sender) {
 	}
 }
 
-struct SSSender(Sender) if (models!(Sender, isSender)) {
+struct SSSender(Sender) {
 	alias Value = Sender.Value;
 	Sender sender;
 	shared StopSource* stopSource;

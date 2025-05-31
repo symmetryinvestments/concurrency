@@ -3,7 +3,6 @@ module concurrency.thread;
 import concurrency.executor;
 import concurrency.scheduler;
 import concurrency.sender;
-import concepts;
 import core.sync.semaphore : Semaphore;
 import concurrency.scheduler : Timer;
 import core.time : Duration;

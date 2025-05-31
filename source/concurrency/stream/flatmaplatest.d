@@ -1,10 +1,8 @@
 module concurrency.stream.flatmaplatest;
 
 import concurrency.stream.stream : isStream;
-import concepts;
 
-auto flatMapLatest(Stream, Fun)(Stream stream, Fun fun)
-		if (models!(Stream, isStream)) {
+auto flatMapLatest(Stream, Fun)(Stream stream, Fun fun) {
 	import concurrency.stream.stream : fromStreamOp, StreamProperties;
 	import concurrency.utils : isThreadSafeFunction;
 	import concurrency.stream.flatmapbase;

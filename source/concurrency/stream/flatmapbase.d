@@ -6,7 +6,6 @@ import concurrency.receiver : ForwardExtensionPoints;
 import concurrency.stoptoken : StopToken;
 import std.traits : ReturnType;
 import concurrency.utils : isThreadSafeFunction;
-import concepts;
 import core.sync.semaphore : Semaphore;
 
 enum OnOverlap {
@@ -18,7 +17,6 @@ template FlatMapBaseStreamOp(Stream, Fun, OnOverlap overlap) {
 	static assert(isThreadSafeFunction!Fun);
 	alias Properties = StreamProperties!Stream;
 	alias InnerSender = ReturnType!Fun;
-	static assert(models!(InnerSender, isSender), "Fun must produce a Sender");
 	alias DG = CollectDelegate!(InnerSender.Value);
 	struct FlatMapBaseStreamOp(Receiver) {
 		alias State = .State!(Properties.Sender.Value, InnerSender.Value,

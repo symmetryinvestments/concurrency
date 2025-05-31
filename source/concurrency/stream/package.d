@@ -17,7 +17,6 @@ public import concurrency.stream.defer;
 public import concurrency.stream.flatmapconcat;
 public import concurrency.stream.flatmaplatest;
 import concurrency.sender : isSender, OpType;
-import concepts;
 import std.traits : hasFunctionAttributes;
 
 /*
@@ -226,8 +225,7 @@ auto intervalStream(Duration duration, bool emitAtStart = false) {
 	return IntervalStream(duration, emitAtStart);
 }
 
-auto via(Stream, Sender)(Stream stream, Sender sender)
-		if (models!(Sender, isSender) && models!(Stream, isStream)) {
+auto via(Stream, Sender)(Stream stream, Sender sender) {
 	alias Properties = StreamProperties!Stream;
 	alias DG = Properties.DG;
 	static struct ViaStreamOp(Receiver) {

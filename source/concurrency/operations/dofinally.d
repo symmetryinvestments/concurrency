@@ -5,7 +5,6 @@ import concurrency.receiver;
 import concurrency.sender;
 import concurrency.stoptoken;
 import concurrency.utils;
-import concepts;
 
 /// runs a side-effect whenever the underlying sender completes
 auto doFinally(Sender, SideEffect)(Sender sender, SideEffect effect) {
@@ -43,7 +42,7 @@ private struct DoFinallyReceiver(Value, SideEffect, Receiver) {
 	mixin ForwardExtensionPoints!receiver;
 }
 
-struct DoFinallySender(Sender, SideEffect) if (models!(Sender, isSender)) {
+struct DoFinallySender(Sender, SideEffect) {
 	alias Value = Sender.Value;
 	Sender sender;
 	SideEffect effect;

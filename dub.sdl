@@ -3,7 +3,6 @@ description "concurrency library"
 authors "skoppe"
 copyright "Copyright © 2021, skoppe"
 license "MIT"
-dependency "concepts" version="~>0.1.0"
 lflags "--export-dynamic-symbol=concurrency_getLocalThreadExecutor" "--export-dynamic-symbol=concurrency_globalStopSourcePointer" platform="posix"
 
 configuration "default" {

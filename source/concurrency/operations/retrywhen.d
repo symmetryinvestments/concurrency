@@ -5,14 +5,9 @@ import concurrency.operations.via;
 import concurrency.receiver;
 import concurrency.sender;
 import concurrency.stoptoken;
-import concepts;
 import std.traits;
 
-enum isRetryWhenLogic(T) =
-	models!(typeof(T.init.failure(Exception.init)), isSender);
-
-auto retryWhen(Sender, Logic)(Sender sender, Logic logic)
-		if (isRetryWhenLogic!Logic) {
+auto retryWhen(Sender, Logic)(Sender sender, Logic logic) {
 	return RetryWhenSender!(Sender, Logic)(sender, logic);
 }
 
@@ -119,8 +114,7 @@ private struct RetryWhenOp(Sender, Receiver, Logic) {
 	}
 }
 
-struct RetryWhenSender(Sender, Logic) 
-	if (models!(Sender, isSender) && isRetryWhenLogic!Logic) {
+struct RetryWhenSender(Sender, Logic) {
 	alias Value = Sender.Value;
 	Sender sender;
 	Logic logic;

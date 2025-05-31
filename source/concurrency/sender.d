@@ -1,6 +1,5 @@
 module concurrency.sender;
 
-import concepts;
 import std.traits : ReturnType, isCallable;
 import core.time : Duration;
 import concurrency.utils;
@@ -340,7 +339,7 @@ class SenderObjectImpl(Sender) : SenderObjectBase!(Sender.Value) {
 }
 
 /// Converts any Sender to a polymorphic SenderObject
-auto toSenderObject(Sender)(Sender sender) if (models!(Sender, isSender)) {
+auto toSenderObject(Sender)(Sender sender) {
 	static if (is(Sender : SenderObjectBase!(Sender.Value))) {
 		return sender;
 	} else

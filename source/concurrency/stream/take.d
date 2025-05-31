@@ -4,10 +4,9 @@ import concurrency.stream.stream;
 import concurrency.sender : OpType;
 import concurrency.receiver : ForwardExtensionPoints;
 import concurrency.stoptoken : StopSource;
-import concepts;
 
 /// takes the first n values from a stream or until cancelled
-auto take(Stream)(Stream stream, size_t n) if (models!(Stream, isStream)) {
+auto take(Stream)(Stream stream, size_t n) {
 	alias Properties = StreamProperties!Stream;
 	import std.exception : enforce;
 	enforce(n > 0, "cannot take 0");
