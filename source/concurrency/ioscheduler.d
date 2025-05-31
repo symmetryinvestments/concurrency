@@ -32,10 +32,13 @@ struct Client {
 /// polymorphic IOScheduler
 interface IOSchedulerObjectBase {
 	import std.socket : socket_t;
-	// TODO: read/write/close aren't just for sockets really
-	SenderObjectBase!(ubyte[]) read(socket_t fd, return ubyte[] buffer, long offset = 0) @safe;
+	SenderObjectBase!(ubyte[]) recv(socket_t fd, long len = 0) @safe;
+	SenderObjectBase!(ubyte[]) recv(socket_t fd, return ubyte[] buffer, long len = 0) @safe;
+	// TODO: read/write aren't just for sockets really
+	SenderObjectBase!(ubyte[]) read(socket_t fd, return ubyte[] buffer, long len = 0) @safe;
 	SenderObjectBase!(Client) accept(socket_t fd) @safe;
 	SenderObjectBase!(socket_t) connect(socket_t fd, return string address, ushort port) @safe;
+	SenderObjectBase!(int) send(socket_t fd, return const(ubyte)[] buffer) @safe;
 	SenderObjectBase!(int) write(socket_t fd, return const(ubyte)[] buffer, long offset = 0) @safe;
 	SenderObjectBase!(void) close(socket_t fd) @safe;
 }
@@ -46,13 +49,22 @@ struct NullIOScheduler {
 
 	string errorMsg;
 
-	ValueSender!(ubyte[]) read(socket_t fd, return ubyte[] buffer, long offset = 0) @safe {
+	ValueSender!(ubyte[]) recv(socket_t fd, long len = 0) @safe {
+		throw new Exception(errorMsg);
+	}
+	ValueSender!(ubyte[]) recv(socket_t fd, return ubyte[] buffer, long len = 0) @safe {
+		throw new Exception(errorMsg);
+	}
+	ValueSender!(ubyte[]) read(socket_t fd, return ubyte[] buffer, long len = 0) @safe {
 		throw new Exception(errorMsg);
 	}
 	ValueSender!(Client) accept(socket_t fd) @safe {
 		throw new Exception(errorMsg);
 	}
 	ValueSender!(socket_t) connect(socket_t fd, return string address, ushort port) @safe {
+		throw new Exception(errorMsg);
+	}
+	ValueSender!(int) send(socket_t fd, return const(ubyte)[] buffer) @safe {
 		throw new Exception(errorMsg);
 	}
 	ValueSender!(int) write(socket_t fd, return const(ubyte)[] buffer, long offset = 0) @safe {
@@ -70,8 +82,14 @@ class IOSchedulerObject(S) : IOSchedulerObjectBase {
 		this.scheduler = scheduler;
 	}
 
-	SenderObjectBase!(ubyte[]) read(socket_t fd, return ubyte[] buffer, long offset = 0) @safe {
-		return scheduler.read(fd, buffer, offset).toSenderObject();
+	SenderObjectBase!(ubyte[]) recv(socket_t fd, long len = 0) @safe {
+		return scheduler.recv(fd, len).toSenderObject();
+	}
+	SenderObjectBase!(ubyte[]) recv(socket_t fd, return ubyte[] buffer, long len = 0) @safe {
+		return scheduler.recv(fd, buffer, len).toSenderObject();
+	}
+	SenderObjectBase!(ubyte[]) read(socket_t fd, return ubyte[] buffer, long len = 0) @safe {
+		return scheduler.read(fd, buffer, len).toSenderObject();
 	}
 	SenderObjectBase!(Client) accept(socket_t fd) @safe {
 		return scheduler.accept(fd).toSenderObject();
@@ -80,6 +98,9 @@ class IOSchedulerObject(S) : IOSchedulerObjectBase {
 	SenderObjectBase!(socket_t) connect(socket_t fd, return string address, ushort port) @trusted {
 		string adr = address;
 		return scheduler.connect(fd, adr, port).toSenderObject();
+	}
+	SenderObjectBase!(int) send(socket_t fd, return const(ubyte)[] buffer) @safe {
+		return scheduler.send(fd, buffer).toSenderObject();
 	}
 	SenderObjectBase!(int) write(socket_t fd, return const(ubyte)[] buffer, long offset = 0) @safe {
 		return scheduler.write(fd, buffer, offset).toSenderObject();

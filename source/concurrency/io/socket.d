@@ -122,3 +122,47 @@ ushort getPort(socket_t socket) @trusted {
 
     return ntohs(sin.sin_port);
 }
+
+socket_t[2] socketPair() @trusted {
+    import core.sys.posix.sys.socket;
+    import std.socket : SocketOSException;
+
+    version (Posix)
+    {
+        int[2] socks;
+        enum SOCK_NONBLOCK = 0x800;
+
+        if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0, socks) == -1)
+            throw new SocketOSException("Unable to create socket pair");
+
+        return cast(socket_t[2])socks;
+    }
+    // else version (Windows)
+    // {
+    //     // We do not have socketpair() on Windows, just manually create a
+    //     // pair of sockets connected over some localhost port.
+    //     Socket[2] result;
+
+    //     import core.sys.windows.windows;
+
+    //     socket_t sock = cast(socket_t) socket(AF_INET, SOCK_STREAM, 0);
+    //     uint nonblocking_long = 1;
+    //     if (ioctlsocket(sock, FIONBIO, &nonblocking_long) == SOCKET_ERROR)
+    //         throw new Exception("ioctlsocket failed");
+
+
+    //     auto listener = new TcpSocket();
+    //     listener.setOption(SocketOptionLevel.SOCKET, SocketOption.REUSEADDR, true);
+    //     listener.bind(new InternetAddress(INADDR_LOOPBACK, InternetAddress.PORT_ANY));
+    //     auto addr = listener.localAddress;
+    //     listener.listen(1);
+
+    //     result[0] = new TcpSocket(addr);
+    //     result[1] = listener.accept();
+
+    //     listener.close();
+    //     return result;
+    // }
+    else
+        static assert(false);
+}

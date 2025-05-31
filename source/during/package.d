@@ -443,6 +443,57 @@ struct Uring
         return submitAndWait(want, cast(sigset_t*)null);
     }
 
+    int addRingBuffer(ushort entries) @trusted
+    in (payload !is null, "Uring hasn't been initialized yet")
+    in (payload.bufferRings.length < (ushort.max-1), "Too many buffer rings")
+    {
+        ushort index = cast(ushort)payload.bufferRings.length;
+        auto p = malloc(BufferRing.sizeof * (index+1));
+        if (_expect(p is null, false)) return -errno;
+        foreach(i; 0..index)
+            (cast(shared(BufferRing)*)p)[i] = payload.bufferRings[i];
+        payload.bufferRings = (cast(shared(BufferRing)*)p)[0..(index+1)];
+
+        auto res = payload.bufferRings[index].setup(this, entries, index, 0);
+        if (res < 0)
+            return res;
+
+        return index;
+    }
+
+    void putRingBuffers(ubyte[][] buffers, ushort group) @safe
+    in (payload !is null, "Uring hasn't been initialized yet")
+    in (payload.bufferRings.length >= group, "Invalid buffer group")
+    {
+        // TODO: need to test the size
+        foreach(buffer; buffers)
+            payload.bufferRings[group].put(buffer);
+        
+        // payload.bufferRings[group].flush();
+    }
+
+    void putRingBuffer(ubyte[] buffer, ushort group) @safe
+    in (payload !is null, "Uring hasn't been initialized yet")
+    in (payload.bufferRings.length >= group, "Invalid buffer group")
+    {
+        payload.bufferRings[group].put(buffer);        
+    }
+
+    ManagedBuffer getRegisteredBuffer(ushort group, ushort bufferIndex, uint len) @safe
+    in (payload !is null, "Uring hasn't been initialized yet")
+    in (payload.bufferRings.length >= group, "Invalid buffer group")
+    {
+        return payload.bufferRings[group].buffer(bufferIndex, len);
+    }
+
+    // TODO: how does this work with multiple groups?
+    // do we want the async io operation to specify the group?
+    // probably as an overload, but if left unspecified we need
+    // to determine which group to use.
+    ushort getActiveRingBufferGroup() @safe {
+        return payload.activeBufferRing;
+    }
+
     /**
      * Register single buffer to be mapped into the kernel for faster buffered operations.
      *
@@ -1691,6 +1742,142 @@ ref SubmissionEntry prepSocket(return ref SubmissionEntry entry,
     return entry;
 }
 
+// in 6.12 we could use IOU_PBUF_RING_INC in flags to enable incremental buffer consumption
+int setup(ref shared BufferRing bring, ref Uring ring, ushort entries, ushort bufferGroup, uint flags) @trusted {
+
+    bring.group = bufferGroup;
+    bring.entries = entries;
+    bring.desc = cast(shared)ring.payload;
+    bring.tailPrep = 0;
+    bring.tailCommit = 0;
+
+    return bring.register();
+}
+
+int register(ref shared BufferRing ring) @trusted {
+	size_t ring_size = ring.entries * io_uring_buf.sizeof;
+
+	ring.bring = cast(shared(io_uring_buf_ring)*)mmap(null, ring_size, PROT_READ | PROT_WRITE,
+			MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+
+	if (ring.bring == MAP_FAILED) {
+        ring.bring = null;
+        return -errno;
+	}
+
+	io_uring_buf_reg reg;
+
+	reg.ring_addr = cast(ulong)cast(void*)ring.bring;
+	reg.ring_entries = ring.entries;
+	reg.bgid = ring.group;
+
+    int lret = io_uring_register(ring.desc.fd, RegisterOpCode.REGISTER_PBUF_RING, cast(void*)&reg, 1);
+
+	if (lret < 0) {
+        munmap(cast(void*)ring.bring, ring_size);
+        ring.bring = null;
+        return -errno;
+	}
+
+	return 0;
+}
+
+struct BufferRing
+{
+    io_uring_buf_ring* bring;
+    ushort group;
+    ushort entries;
+    UringDesc* desc;
+    ushort tailPrep;
+    ushort tailCommit;
+
+    nothrow @nogc:
+
+    private io_uring_buf[] buffers() @trusted pure shared {
+        return (cast(io_uring_buf*)bring)[0..entries];
+    }
+
+    void put(ubyte[] buffer) @safe pure shared
+    {
+        import core.atomic : atomicOp, atomicFetchAdd;
+
+        // The put operation can be called by multiple threads and we want to
+        // avoid advancing the ring buffer whenever another thread is still
+        // prepping the buffer fields.
+        //
+        // We do this by employing two counters: a prep and commit one. The first
+        // one allows threads to get allocated buffers to write to.
+        // The second one is used to detect when the local thread is faster to commit
+        // than another, which is still prepping.
+
+        auto prepOffset = tailPrep.atomicOp!"+="(ushort(1));
+
+        ushort index = prepOffset & cast(ushort)(entries-1);
+        auto buf = &buffers[index];
+
+        buf.addr = cast(ulong)buffer.ptr;
+        buf.len = cast(uint)buffer.length;
+        buf.bid = index;
+
+        auto tailOffset = tailCommit.atomicOp!"+="(ushort(1));
+
+        if (tailOffset < prepOffset) {
+            // There is another operation that hasn't yet completed prepping.
+            // We avoid advancing the kernel ring buffer and let the
+            // other operation do that.
+            return;
+        }
+
+        auto incr = cast(ushort)(tailOffset - prepOffset + 1);
+        bring.tail.atomicFetchAdd!(MemoryOrder.rel)(incr);
+    }
+
+    int available() @safe shared
+    {
+        io_uring_buf_status status = io_uring_buf_status(group);
+        int r = head(status);
+        if (_expect(r < 0, false)) return -errno;
+        return bring.tail - status.head;
+    }
+
+    int head(ref io_uring_buf_status status) @trusted shared
+    {
+        return io_uring_register(desc.fd, RegisterOpCode.REGISTER_PBUF_STATUS, &status, 1);
+    }
+
+    ManagedBuffer buffer(ushort index, uint len) @trusted shared
+    {
+        auto bufferDesc = buffers[index];
+        auto buffer = (cast(ubyte*)bufferDesc.addr)[0..bufferDesc.len];
+
+        return ManagedBuffer(&this, buffer, len);
+    }
+}
+
+struct ManagedBuffer
+{
+    private {
+        shared(BufferRing)* ring;
+        ubyte[] buffer;
+        uint len;
+    }
+
+    ~this() @trusted nothrow @nogc scope {
+        if (ring) {
+            ring.put(buffer);
+        }
+    }
+
+    @disable this(ref return scope typeof(this) rhs);
+    @disable this(this);
+
+    // TODO: would be great if we can control that the return value
+    // isn't escaped.
+    ubyte[] data() @safe pure nothrow {
+        return buffer[0..len];
+    }
+}
+
 private:
 
 // uring cleanup
@@ -1721,14 +1908,25 @@ struct UringDesc
     CompletionQueue cq;
 
     iovec[] regBuffers;
+    shared (BufferRing)[] bufferRings;
+    ushort activeBufferRing;
 
     ~this() @trusted
     {
+        if (bufferRings) free(cast(void*)&bufferRings[0]);
         if (regBuffers) free(cast(void*)&regBuffers[0]);
         if (sq.ring) munmap(sq.ring, sq.ringSize);
         if (sq.sqes) munmap(cast(void*)&sq.sqes[0], sq.sqes.length * SubmissionEntry.sizeof);
         if (cq.ring && cq.ring != sq.ring) munmap(cq.ring, cq.ringSize);
         close(fd);
+    }
+
+    private auto returnBuffer(ubyte[] buffer, ushort group) shared {
+        bufferRings[group].put(buffer);
+    }
+
+    private auto refreshRingBuffers() {
+        // TODO: unsure what this is?
     }
 
     private auto mapRings() @trusted
@@ -1833,7 +2031,6 @@ struct SubmissionQueue
     void flushTail() @safe pure
     {
         pragma(inline, true);
-        // debug printf("SQ updating tail: %d\n", localTail);
         atomicStore!(MemoryOrder.rel)(*ktail, localTail);
     }
 

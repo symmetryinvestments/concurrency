@@ -6,7 +6,17 @@ import concurrency.data.queue.mpsc;
 import concurrency.stoptoken;
 import concurrency.receiver : setErrno, setValueOrError;
 import during;
-import core.stdc.errno : ECANCELED;
+import core.stdc.errno : ECANCELED, ENOBUFS;
+
+private auto smallestNthPowerOfTwo(T)(T t) {
+    import core.bitop;
+    import std.math;
+    
+    if (t.isPowerOf2)
+        return t;
+
+    return (1 << bsr(t)+1);
+}
 
 /// IOUring IO context. Used to schedule IO operations and supports Timers.
 ///
@@ -43,7 +53,7 @@ struct IOUringContext {
     private this(uint size) @trusted {
         // TODO: look into `IORING_SETUP_SQPOLL` for fast submission
         import core.sys.linux.sys.eventfd;
-        io.setup(size, 
+        auto res = io.setup(size, 
             SetupFlags.SINGLE_ISSUER
             // | SetupFlags.DEFER_TASKRUN
             // | SetupFlags.COOP_TASKRUN
@@ -54,6 +64,33 @@ struct IOUringContext {
         timers = new MPSCQueue!(Timer);
         wheels.initialize();
         threadId = thisThreadID;
+        needsWakeup = true;
+        res = setupBuffers(size.smallestNthPowerOfTwo);
+        if (res != 0) {
+            import std.exception : ErrnoException;
+            throw new ErrnoException("iouring failed", -res);
+        }
+    }
+
+    private int setupBuffers(uint size) {
+        assert(size < ushort.max);
+        int res = io.addRingBuffer(cast(ushort)size);
+        if (res < 0)
+            return res;
+
+        ushort group = cast(ushort)res;
+        ubyte[][] bufs;
+        bufs.length = size;
+        foreach(i; 0..size) {
+            bufs[i] = new ubyte[4 * 1024];
+        }
+        io.putRingBuffers(bufs, group);
+
+        return 0;
+    }
+
+    private bool hasSQPOLL() @safe nothrow {
+        return false;
     }
 
     static auto construct(uint size) @safe {
@@ -85,6 +122,7 @@ struct IOUringContext {
     private ref assumeThreadSafe() @trusted nothrow shared {
         return cast()this;
     }
+
     // TODO: can this be make @safe?
     // otherwise it might have to be made @system perhaps?
     // we are taking a pointer to a ref item, which likely
@@ -104,7 +142,8 @@ struct IOUringContext {
                 with (assumeThreadSafe) {
                     if (!io.full) {
                         submitItem(&item);
-                        io.flush();
+                        if (hasSQPOLL)
+                            io.flush();
                         return true;
                     }
                 }
@@ -313,7 +352,7 @@ struct RunSender(Sender) {
     alias Value = Sender.Value;
     IOUringContext* context;
     Sender sender;
-    auto connect(Receiver)(return Receiver receiver) @safe return scope {
+    auto connect(Receiver)(return Receiver receiver) @trusted return scope {
         // ensure NRVO
         auto op = RunOp!(Sender, Receiver)(context, sender, receiver);
         return op;
@@ -438,6 +477,19 @@ private struct CancellableOperation(Operation) {
 
         cb.dispose();
 
+        // TODO: is this the best place to put this logic?
+        // e.g. do we always know the error required growing ring buffer?
+        // or should this be made into a policy somehow?
+        if (entry.res == -ENOBUFS) {
+            // TODO: we can grow buffers and retry, just uncomment
+            // auto r = context.assumeThreadSafe.growRingBuffers();
+            // if (r != 0) {
+                operation.complete(entry);
+            // } else
+                // start();
+            return;
+        }
+
         auto token = operation.receiver.getStopToken();
         if (entry.res == -ECANCELED || token.isStopRequested()) {
             operation.receiver.setDone();
@@ -496,8 +548,17 @@ struct IOUringScheduler {
     import std.socket : socket_t;
     shared (IOUringContext)* context;
 
-    auto read(socket_t fd, ubyte[] buffer, long offset = 0) @safe nothrow @nogc {
-        return ReadSender(context, fd, buffer, offset);
+    // TODO for sockets we should probably use recv/send and for files read/write :shrug:
+    auto recv(socket_t fd, uint len = 0) @safe nothrow @nogc {
+        return RecvRegisteredBufferSender(context, fd, len);
+    }
+
+    auto recv(socket_t fd, ubyte[] buffer, long len = 0) @safe nothrow @nogc {
+        return ReadSender(context, fd, buffer, len);
+    }
+
+    auto read(socket_t fd, ubyte[] buffer, long len = 0) @safe nothrow @nogc {
+        return ReadSender(context, fd, buffer, len);
     }
 
     auto accept(socket_t fd) @safe nothrow @nogc {
@@ -525,6 +586,50 @@ struct IOUringScheduler {
     auto scheduleAfter(Duration duration) @safe nothrow @nogc {
         import concurrency.scheduler : ScheduleAfterSender;
         return ScheduleAfterSender!(IOUringTimer)(IOUringTimer(context), duration);
+    }
+}
+
+struct RecvRegisteredBufferSender {
+    import std.socket : socket_t;
+    alias Value = ManagedBuffer;
+    shared IOUringContext* context;
+    socket_t fd;
+    uint len;
+    auto connect(Receiver)(return Receiver receiver) @trusted return scope {
+        // ensure NRVO
+        auto op = CancellableOperation!(RecvRegisteredBufferOperation!Receiver)(
+            context,
+            RecvRegisteredBufferOperation!(Receiver)(cast(Uring*)&(context.io), fd, len, receiver)
+        );
+        return op;
+    }
+}
+
+struct RecvRegisteredBufferOperation(Receiver) {
+    import std.socket : socket_t;
+    Uring* context;
+    socket_t fd;
+    uint len;
+    Receiver receiver;
+    ushort group;
+    void submit(ref SubmissionEntry entry) @safe nothrow {
+        group = context.getActiveRingBufferGroup();
+        entry.prepRecv(fd, group, len);
+    }
+    void complete(const ref CompletionEntry entry) @safe nothrow {
+        import std.algorithm : move;
+        if (entry.res > 0) {
+            // TODO: this assert, if triggered, breaks the program
+            assert(entry.flags & CQEFlags.BUFFER, "Huh?");
+            ushort bufferIndex = cast(ushort)(entry.flags >> CQE_BUFFER_SHIFT);
+
+            auto buffer = context.getRegisteredBuffer(group, bufferIndex, entry.res);
+            receiver.setValueOrError(buffer);
+        } else if (entry.res == 0) {
+            receiver.setDone();
+        } else {
+            receiver.setErrno("Read failed", -entry.res);
+        }
     }
 }
 

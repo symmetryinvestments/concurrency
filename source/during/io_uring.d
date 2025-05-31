@@ -1431,8 +1431,11 @@ enum RegisterOpCode : uint
     UNREGISTER_RING_FDS = 21,
 
     /* register ring based provide buffer group */
-    REGISTER_PBUF_RING       = 22, /// `IORING_REGISTER_PBUF_RING` (from Linux 5.19)
-    UNREGISTER_PBUF_RING     = 23, /// `IORING_UNREGISTER_PBUF_RING` (from Linux 5.19)
+    REGISTER_PBUF_RING = 22, /// `IORING_REGISTER_PBUF_RING` (from Linux 5.19)
+    UNREGISTER_PBUF_RING = 23, /// `IORING_UNREGISTER_PBUF_RING` (from Linux 5.19)
+
+    /* return status information for a buffer group */
+	REGISTER_PBUF_STATUS = 26,
 }
 
 /* io-wq worker categories */
@@ -1606,6 +1609,13 @@ struct io_uring_getevents_arg
     uint    sigmask_sz;
     uint    pad;
     ulong   ts;
+}
+
+/* argument for IORING_REGISTER_PBUF_STATUS */
+struct io_uring_buf_status {
+	uint buf_group;
+	uint head;
+	uint[8] resv;
 }
 
 @system:

@@ -83,3 +83,49 @@ unittest {
         .toSenderObject
         .syncWait().value.shouldThrow;
 }
+
+@safe
+@("buffer.ring.recv.unconnected")
+unittest {
+    import concurrency.io.socket;
+    import concurrency.sender;
+    import std.socket;
+    import std.exception : ErrnoException;
+
+    auto fd = listenTcp("127.0.0.1", 0);
+    auto io = IOContext.construct(16);
+
+    io.run(
+        recvAsync(fd, 1024)
+    ).syncWait().assumeOk.shouldThrowWithMessage!(ErrnoException)("Read failed (Transport endpoint is not connected)");
+
+    // TODO: This required closeSocket is not very friendly
+    // would rather have a socket that is movable and closes
+    // when going out of scope.
+	closeSocket(fd);
+}
+
+@safe
+@("buffer.ring.recv.pair")
+unittest {
+    import concurrency.io.socket;
+
+    auto fds = socketPair();
+    auto io = IOContext.construct(16);
+    ubyte[] buffer = [1,2,3,4];
+
+    import during : ManagedBuffer;
+
+    auto result = io.run(
+        whenAll(
+            recvAsync(fds[0], 4).then((ManagedBuffer b) => b.data.dup),
+            sendAsync(fds[1], buffer),
+        )
+    ).syncWait().value;
+
+    result[0].should == buffer;
+
+	
+	closeSocket(fds[0]);
+	closeSocket(fds[1]);
+}

@@ -1,6 +1,7 @@
 module concurrency.io;
 
 import concurrency.io.iouring;
+import during : ManagedBuffer;
 import concurrency.ioscheduler : Client;
 
 import std.socket : socket_t;
@@ -8,8 +9,28 @@ import std.socket : socket_t;
 version (linux)
     alias IOContext = IOUringContext;
 
-auto readAsync(socket_t fd, ubyte[] buffer, long offset = 0) @safe nothrow @nogc {
-    return ReadAsyncSender(fd, buffer, offset);
+auto recvAsync(socket_t fd, uint len = 0) @safe nothrow @nogc {
+    return RecvAsyncRegisteredBufferSender(fd, len);
+}
+
+struct RecvAsyncRegisteredBufferSender {
+    alias Value = ManagedBuffer;
+    socket_t fd;
+    uint len;
+    auto connect(Receiver)(return Receiver receiver) @safe return scope {
+        // ensure NRVO
+        auto op = receiver.getIOScheduler().recv(fd, len).connect(receiver);
+        return op;
+    }
+}
+
+auto recvAsync(socket_t fd, ubyte[] buffer, long len = 0) @safe nothrow @nogc {
+    return ReadAsyncSender(fd, buffer, len);
+}
+
+// TODO: read should be used for file descriptors
+auto readAsync(socket_t fd, ubyte[] buffer, long len = 0) @safe nothrow @nogc {
+    return ReadAsyncSender(fd, buffer, len);
 }
 
 struct ReadAsyncSender {
@@ -55,6 +76,11 @@ struct ConnectAsyncSender {
     }
 }
 
+auto sendAsync(socket_t fd, const(ubyte)[] buffer) @safe nothrow @nogc {
+    return WriteAsyncSender(fd, buffer, 0);
+}
+
+// TODO: write should be used for file descriptors
 auto writeAsync(socket_t fd, const(ubyte)[] buffer, long offset = 0) @safe nothrow @nogc {
     return WriteAsyncSender(fd, buffer, offset);
 }
