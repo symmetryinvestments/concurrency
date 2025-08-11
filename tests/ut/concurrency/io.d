@@ -51,7 +51,7 @@ unittest {
 }
 
 @safe
-@("acceptAsync.connectAsync")
+@("acceptAsync.connectAsync.basic")
 unittest {
     import concurrency.io.socket;
     auto fd = listenTcp("127.0.0.1", 0);
@@ -82,4 +82,29 @@ unittest {
     acceptAsync(cast(socket_t)0)
         .toSenderObject
         .syncWait().value.shouldThrow;
+}
+
+@safe
+@("acceptAsync.connectAsync.fiber")
+unittest {
+    import concurrency.io.socket;
+    import concurrency.fiber;
+
+    auto io = IOContext.construct(12);
+    io.run(fiber({
+        auto fd = listenTcp("127.0.0.1", 0);
+        auto socket = tcpSocket();
+        auto port = fd.getPort();
+
+        auto result = whenAll(
+            acceptAsync(fd),
+            connectAsync(socket, "127.0.0.1", port),
+        ).yield();
+
+        auto client = result[0];
+
+        closeSocket(client.fd);
+        closeSocket(socket);
+        closeSocket(fd);
+    })).syncWait.assumeOk;
 }

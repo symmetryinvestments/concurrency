@@ -21,5 +21,6 @@ int main(string[] args) {
 		"concurrency.stoptoken",
 		"ut.concurrency.stoptoken",
 		"ut.concurrency.io",
+		"ut.concurrency.fiber",
 	);
 }
