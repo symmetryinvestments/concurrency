@@ -94,10 +94,11 @@ struct LetValueOp(Sender, Fun, Receiver) {
             return localFun();
         }
     } else {
-        void next(Sender.Value value, Receiver receiver) @trusted nothrow {
+        void next(ref Sender.Value value, Receiver receiver) @trusted nothrow {
             import concurrency.sender : emplaceOperationalState;
+            import std.algorithm : move;
 
-            this.value = value;
+            this.value = value.move();
             try {
                 auto sender = nextSender();
                 opB.emplaceOperationalState(sender, receiver);
@@ -124,8 +125,8 @@ struct LetValueReceiver(Value, Receiver) {
             next(receiver);
         }
     } else {
-        void delegate(Value, Receiver) @trusted nothrow next;
-        void setValue(Value value) @safe nothrow {
+        void delegate(ref Value, Receiver) @trusted nothrow next;
+        void setValue(ref Value value) @safe nothrow {
             next(value, receiver);
         }
     }

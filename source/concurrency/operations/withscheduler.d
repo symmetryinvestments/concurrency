@@ -40,7 +40,7 @@ private struct WithSchedulerReceiver(Receiver, Value, Scheduler) {
 	mixin ForwardExtensionPoints!receiver;
 }
 
-struct WithSchedulerSender(Sender, Scheduler) if (models!(Sender, isSender)) {
+struct WithSchedulerSender(Sender, Scheduler) {//if (models!(Sender, isSender)) {
 	alias Value = Sender.Value;
 	Sender sender;
 	Scheduler scheduler;

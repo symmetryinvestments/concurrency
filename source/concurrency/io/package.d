@@ -97,6 +97,23 @@ struct WriteAsyncSender {
     }
 }
 
+// TODO: write should be used for file descriptors
+auto sendAsync(socket_t fd, const(ubyte)[] buffer, long offset = 0) @safe nothrow @nogc {
+    return SendAsyncSender(fd, buffer, offset);
+}
+
+struct SendAsyncSender {
+    alias Value = int;
+    socket_t fd;
+    const(ubyte)[] buffer;
+    long offset;
+    auto connect(Receiver)(return Receiver receiver) @safe return scope {
+        // ensure NRVO
+        auto op = receiver.getIOScheduler().send(fd, buffer, offset).connect(receiver);
+        return op;
+    }
+}
+
 auto closeAsync(socket_t fd) @safe nothrow @nogc {
     return CloseAsyncSender(fd);
 }
@@ -107,6 +124,19 @@ struct CloseAsyncSender {
     auto connect(Receiver)(return Receiver receiver) @safe return scope {
         // ensure NRVO
         auto op = receiver.getIOScheduler().close(fd).connect(receiver);
+        return op;
+    }
+}
+
+auto nopAsync() @safe nothrow @nogc {
+    return NopAsyncSender();
+}
+
+struct NopAsyncSender {
+    alias Value = int;
+    auto connect(Receiver)(return Receiver receiver) @safe return scope {
+        // ensure NRVO
+        auto op = receiver.getIOScheduler().nop().connect(receiver);
         return op;
     }
 }

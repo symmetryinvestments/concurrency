@@ -39,7 +39,7 @@ private struct WithIOSchedulerReceiver(Receiver, Value, IOScheduler) {
 	mixin ForwardExtensionPoints!receiver;
 }
 
-struct WithIOSchedulerSender(Sender, IOScheduler) if (models!(Sender, isSender)) {
+struct WithIOSchedulerSender(Sender, IOScheduler) {//if (models!(Sender, isSender)) {
 	alias Value = Sender.Value;
 	Sender sender;
 	IOScheduler ioScheduler;

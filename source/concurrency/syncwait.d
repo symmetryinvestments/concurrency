@@ -40,12 +40,16 @@ package struct SyncWaitReceiver2(Value) {
 		void setValue() nothrow @safe {
 			state.worker.stop();
 		}
-
-	else
+	else {
+		void setValue(ref Value value) nothrow @trusted {
+			state.result = value;
+			state.worker.stop();
+		}
 		void setValue(Value value) nothrow @trusted {
 			state.result = value;
 			state.worker.stop();
 		}
+	}
 
 	auto getStopToken() nothrow @safe @nogc {
 		return stopSource.token();
@@ -58,12 +62,6 @@ package struct SyncWaitReceiver2(Value) {
 }
 
 struct Cancelled {
-}
-
-template isA(T) {
-	bool isA(S)(ref S s) if (isSumType!S) {
-		return std.sumtype.match!((ref T t) => true, x => false)(s);
-	}
 }
 
 struct Completed {
@@ -79,27 +77,29 @@ struct Result(T) {
 	alias V = SumType!(Cancelled, Exception, Value);
 	
 	V result;
-	this(P)(P p) {
-		result = p;
+	this(P)(auto ref P p) {
+		import std.algorithm;
+		result = p.move();
 	}
 
 	bool isCancelled() {
-		return result.isA!Cancelled;
+		return result.has!Cancelled;
 	}
 
 	bool isError() {
-		return result.isA!Exception;
+		return result.has!Exception;
 	}
 
 	bool isOk() {
-		return result.isA!Value;
+		return result.has!Value;
 	}
 
 	auto value() {
+		import std.algorithm;
 		static if (is(T == void))
 			alias valueHandler = (Completed c) {};
 		else
-			alias valueHandler = (T t) => t;
+			alias valueHandler = (ref T t) => t.move;
 
 		return std.sumtype.match!(valueHandler, function T(Cancelled C) {
 			throw new Exception("Cancelled");
@@ -136,7 +136,7 @@ auto syncWait(Sender)(auto ref Sender sender,
 	return syncWaitImpl(sender, stopSource);
 }
 
-auto syncWait(Sender)(auto scope ref Sender sender) @trusted {
+auto syncWait(Sender)(auto ref scope Sender sender) @trusted {
 	import concurrency.signal : globalStopSource;
 	shared StopSource childStopSource;
 	shared parentStopToken = globalStopSource.token();
@@ -159,9 +159,9 @@ auto syncWait(Sender)(auto scope ref Sender sender) @trusted {
 }
 
 private
-Result!(Sender.Value) syncWaitImpl(Sender)(auto scope ref Sender sender,
+Result!(Sender.Value) syncWaitImpl(Sender)(auto ref scope Sender sender,
                                            ref shared StopSource stopSource) @safe {
-	static assert(models!(Sender, isSender));
+//	static assert(models!(Sender, isSender));
 	import concurrency.signal;
 	import core.stdc.signal : SIGTERM, SIGINT;
 

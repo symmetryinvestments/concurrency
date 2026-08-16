@@ -50,13 +50,14 @@ struct IOUringContext {
     private bool dirtyTimers;
     private ulong nextTimer;
     private shared bool needsWakeup;
+    private uint capacity;
     private this(uint size) @trusted {
         // TODO: look into `IORING_SETUP_SQPOLL` for fast submission
         import core.sys.linux.sys.eventfd;
         auto res = io.setup(size, 
             SetupFlags.SINGLE_ISSUER
-            // | SetupFlags.DEFER_TASKRUN
-            // | SetupFlags.COOP_TASKRUN
+            | SetupFlags.DEFER_TASKRUN
+            | SetupFlags.COOP_TASKRUN
             // | SetupFlags.SQPOLL
             );
         event = eventfd(0, EFD_CLOEXEC);
@@ -70,6 +71,7 @@ struct IOUringContext {
             import std.exception : ErrnoException;
             throw new ErrnoException("iouring failed", -res);
         }
+        this.capacity = size;
     }
 
     private int setupBuffers(uint size) {
@@ -191,7 +193,8 @@ struct IOUringContext {
             atomicStore!(MemoryOrder.raw)(needsWakeup, true);
             pending.append(requests.popAll());
         }
-
+        import std.stdio;
+        debug writeln("Dropped: ", io.overflow);
         return 0;
     }
 
@@ -264,6 +267,10 @@ struct IOUringContext {
         import std.datetime.systime : Clock;
 
         auto nextTriggerOpt = timeUntilNextTimer();
+        import std.stdio;
+        auto cap = io.capacity;
+        if (cap != this.capacity)
+            debug writeln("Submit ", this.capacity - cap);
 
         if (!nextTriggerOpt.isNull) {
             // next timer is in 0 msecs
@@ -309,6 +316,10 @@ struct IOUringContext {
     }
 
     private void popCompleted() @safe nothrow {
+        import std.stdio;
+        auto len = io.length();
+        if (len > 0)
+            debug writeln("Completed: ",len);
         // TODO: to reduce latency, would it help to run submit and complete in a loop?
         while (!io.empty()) {
             auto entry = io.front();
@@ -577,6 +588,10 @@ struct IOUringScheduler {
         return CloseSender(context, fd);
     }
 
+    auto nop() @safe nothrow @nogc {
+        return NopSender(context);
+    }
+
     auto schedule() @safe nothrow @nogc {
         import concurrency.scheduler : ScheduleAfterSender;
         import core.time : msecs;
@@ -798,6 +813,43 @@ struct WriteOperation(Receiver) {
             receiver.setDone();
         } else {
             receiver.setErrno("Write failed", -entry.res);
+        }
+    }
+}
+
+struct SendSender {
+    import std.socket : socket_t;
+    alias Value = int;
+    shared IOUringContext* context;
+    socket_t fd;
+    const(ubyte)[] buffer;
+    long offset;
+    auto connect(Receiver)(return Receiver receiver) @safe return scope {
+        // ensure NRVO
+        auto op = CancellableOperation!(SendOperation!Receiver)(
+            context,
+            SendOperation!(Receiver)(fd, buffer, offset, receiver)
+        );
+        return op;
+    }
+}
+
+struct SendOperation(Receiver) {
+    import std.socket : socket_t;
+    socket_t fd;
+    const(ubyte)[] buffer;
+    long offset;
+    Receiver receiver;
+    void submit(ref SubmissionEntry entry) @safe nothrow {
+        entry.prepSend(fd, buffer, offset);
+    }
+    void complete(const ref CompletionEntry entry) @safe nothrow {
+        if (entry.res > 0) {
+            receiver.setValueOrError(entry.res);
+        } else if (entry.res == 0) {
+            receiver.setDone();
+        } else {
+            receiver.setErrno("Send failed", -entry.res);
         }
     }
 }

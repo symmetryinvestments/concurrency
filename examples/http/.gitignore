@@ -1,0 +1,17 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/iouring
+iouring.so
+iouring.dylib
+iouring.dll
+iouring.a
+iouring.lib
+iouring-test-*
+*.exe
+*.pdb
+*.o
+*.obj
+*.lst
+*.png

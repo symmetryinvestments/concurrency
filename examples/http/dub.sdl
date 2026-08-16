@@ -1,0 +1,7 @@
+name "http"
+description "A minimal D application."
+authors "Sebastiaan Koppe"
+copyright "Copyright © 2024, Sebastiaan Koppe"
+license "MIT"
+dependency "concurrency" path="../.."
+dependency "iopipe" version="~>0.2.5"

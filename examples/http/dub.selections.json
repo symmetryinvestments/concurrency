@@ -1,0 +1,9 @@
+{
+	"fileVersion": 1,
+	"versions": {
+		"concepts": "0.1.0",
+		"concurrency": {"path":"../.."},
+		"iopipe": "0.2.5",
+		"unit-threaded": "2.2.3"
+	}
+}

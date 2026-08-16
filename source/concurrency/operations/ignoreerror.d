@@ -11,7 +11,7 @@ IESender!Sender ignoreError(Sender)(Sender sender) {
 	return IESender!Sender(sender);
 }
 
-struct IESender(Sender) if (models!(Sender, isSender)) {
+struct IESender(Sender) {//if (models!(Sender, isSender)) {
 	alias Value = Sender.Value;
 	Sender sender;
 	auto connect(Receiver)(return Receiver receiver) @safe return scope {

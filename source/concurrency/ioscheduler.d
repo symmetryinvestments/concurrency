@@ -41,11 +41,12 @@ interface IOSchedulerObjectBase {
 	SenderObjectBase!(int) send(socket_t fd, return const(ubyte)[] buffer) @safe;
 	SenderObjectBase!(int) write(socket_t fd, return const(ubyte)[] buffer, long offset = 0) @safe;
 	SenderObjectBase!(void) close(socket_t fd) @safe;
+	SenderObjectBase!(int) nop() @safe;
 }
 
 struct NullIOScheduler {
 	import std.socket : socket_t;
-	import concurrency.sender : ValueSender;
+	import concurrency.sender : ValueSender, VoidSender;
 
 	string errorMsg;
 
@@ -71,6 +72,9 @@ struct NullIOScheduler {
 		throw new Exception(errorMsg);
 	}
 	ValueSender!(void) close(socket_t fd) @safe {
+		throw new Exception(errorMsg);
+	}
+	ValueSender!int nop() @safe {
 		throw new Exception(errorMsg);
 	}
 }
@@ -107,6 +111,9 @@ class IOSchedulerObject(S) : IOSchedulerObjectBase {
 	}
 	SenderObjectBase!(void) close(socket_t fd) @safe {
 		return scheduler.close(fd).toSenderObject();
+	}
+	SenderObjectBase!(int) nop() @safe {
+		return scheduler.nop().toSenderObject();
 	}
 }
 

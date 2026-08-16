@@ -135,9 +135,10 @@ struct ValueSender(T) {
 	static if (!is(T == void))
 		T value;
 	Op!Receiver connect(Receiver)(return Receiver receiver) @safe {
+		import std.algorithm : move;
 		// ensure NRVO
 		static if (!is(T == void))
-			auto op = Op!(Receiver)(receiver, value);
+			auto op = Op!(Receiver)(receiver, value.move);
 		else
 			auto op = Op!(Receiver)(receiver);
 		return op;

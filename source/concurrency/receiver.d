@@ -93,6 +93,7 @@ void setValueOrError(Receiver)(auto ref Receiver receiver) @safe {
 
 void setValueOrError(Receiver, T)(auto ref Receiver receiver,
                                   auto ref T value) @safe {
+	import std.algorithm : move;
 	import std.traits;
 	static if (hasFunctionAttributes!(receiver.setValue, "nothrow")) {
 		receiver.setValue(value);

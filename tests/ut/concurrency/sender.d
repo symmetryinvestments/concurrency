@@ -374,3 +374,15 @@ unittest {
 	shared S s;
 	defer(s).syncWait().value.should == 1;
 }
+
+@("movable") @safe
+unittest {
+	static struct S {
+		@disable
+		this(this);
+		@disable
+		this(ref return scope typeof(this) rhs);
+	}
+	ValueSender!S s;
+	s.syncWait();
+}
