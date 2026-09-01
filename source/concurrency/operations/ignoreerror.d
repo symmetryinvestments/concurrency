@@ -38,8 +38,12 @@ private struct IEReceiver(Value, Receiver) {
 		receiver.setDone();
 	}
 
-	void setError(Throwable e) @safe nothrow {
-		receiver.setDone();
+	void setError(Throwable t) @safe nothrow {
+		if (auto e = cast(Exception) t) {
+			receiver.setDone();
+		} else {
+			receiver.setError(t);
+		}
 	}
 
 	mixin ForwardExtensionPoints!receiver;

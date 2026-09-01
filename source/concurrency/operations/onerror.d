@@ -31,7 +31,7 @@ private struct OnErrorReceiver(Value, SideEffect, Receiver) {
 		receiver.setDone();
 	}
 
-	void setError(Throwable t) @safe nothrow {
+	void setError(Throwable t) @trusted nothrow {
 		if (auto e = cast(Exception) t) {
 			try
 				sideEffect(e);
@@ -40,6 +40,10 @@ private struct OnErrorReceiver(Value, SideEffect, Receiver) {
 					return Throwable.chainTogether(e2, e);
 				}());
 				return;
+			}
+			catch (Throwable t) {
+	        	import concurrency.error : clone;
+				return receiver.setError(t.clone);
 			}
 		}
 

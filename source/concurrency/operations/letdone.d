@@ -76,11 +76,15 @@ struct LetDoneOp(Sender, Fun, Receiver) {
 
     void next(Receiver receiver) @trusted nothrow {
         import concurrency.sender : emplaceOperationalState;
+        import concurrency.error : clone;
         try {
             auto sender = nextSender();
             opB.emplaceOperationalState(sender, receiver);
         } catch (Exception e) {
             receiver.setError(e);
+            return;
+        } catch (Throwable t) {
+            receiver.setError(t.clone);
             return;
         }
         opB.start();

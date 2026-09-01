@@ -81,10 +81,13 @@ struct LetValueOp(Sender, Fun, Receiver) {
 
             try {
                 auto sender = nextSender();
+                assert(opB == OpB.init);
                 opB.emplaceOperationalState(sender, receiver);
             } catch (Exception e) {
-                receiver.setError(e);
-                return;
+                return receiver.setError(e);
+            } catch (Throwable t) {
+                import concurrency.error : clone;
+                return receiver.setError(t.clone);
             }
             opB.start();
         }
@@ -101,10 +104,13 @@ struct LetValueOp(Sender, Fun, Receiver) {
             this.value = value.move();
             try {
                 auto sender = nextSender();
+                assert(opB == OpB.init);
                 opB.emplaceOperationalState(sender, receiver);
             } catch (Exception e) {
-                receiver.setError(e);
-                return;
+                return receiver.setError(e);
+            } catch (Throwable t) {
+                import concurrency.error : clone;
+                return receiver.setError(t.clone);
             }
             opB.start();
         }

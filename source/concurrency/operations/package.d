@@ -29,3 +29,4 @@ public import concurrency.operations.ignorevalue;
 public import concurrency.operations.dofinally;
 public import concurrency.operations.letvalue;
 public import concurrency.operations.letdone;
+public import concurrency.operations.mapresult;

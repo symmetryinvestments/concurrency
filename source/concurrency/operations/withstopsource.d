@@ -83,10 +83,10 @@ struct SSOp(Receiver, Sender) {
 
 		try {
 			op = sender.connect(SSReceiver!(Receiver, Sender.Value)(receiver, &state));
-		} catch (Exception e) {
+		} catch (Throwable t) {
 			state.left.dispose();
 			state.right.dispose();
-			throw e;
+			throw t;
 		}
 	}
 

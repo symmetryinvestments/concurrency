@@ -49,7 +49,8 @@ private struct OnResultReceiver(Value, SideEffect, Receiver) {
 					return Throwable.chainTogether(e2, e);
 				}());
 			} catch (Throwable t) {
-				return receiver.setError(t);
+        		import concurrency.error : clone;
+				return receiver.setError(t.clone);
 			}
 		}
 

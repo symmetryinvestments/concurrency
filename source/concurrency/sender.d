@@ -169,11 +169,12 @@ struct JustFromSender(Fun) {
 		void start() @trusted nothrow {
 			import std.traits : hasFunctionAttributes;
 			static if (hasFunctionAttributes!(Fun, "nothrow")) {
+				// TODO: should we catch Throwable here?
 				set();
 			} else {
 				try {
 					set();
-				} catch (Exception e) {
+				} catch (Throwable e) {
 					receiver.setError(e);
 				}
 			}
@@ -587,15 +588,12 @@ struct PromiseSenderOp(T, Receiver) {
 			// This means that when it completes we are the only one
 			// calling the receiver's termination functions.
 			cb.dispose();
-			value.match!((Sender.ValueRep v) {
-				try {
-					static if (is(Sender.Value == void))
-						receiver.setValue();
-					else
-						receiver.setValue(v);
-				} catch (Exception e) {
-					receiver.setError(e);
-				}
+			value.match!((Sender.ValueRep v) @trusted {
+				import concurrency.receiver : setValueOrError;
+				static if (is(Sender.Value == void))
+					receiver.setValueOrError();
+				else
+					receiver.setValueOrError(v);
 			}, (Throwable e) {
 				receiver.setError(e);
 			}, (Sender.Done d) {

@@ -56,7 +56,7 @@ private struct RetryReceiver(Receiver, Sender, Logic) {
 		receiver.setDone();
 	}
 
-	void setError(Throwable e) @safe nothrow {
+	void setError(Throwable e) @trusted nothrow {
 		if (logic.failure(e))
 			receiver.setError(e);
 		else {
@@ -67,6 +67,9 @@ private struct RetryReceiver(Receiver, Sender, Logic) {
 				sender.connectHeap(this).start();
 			} catch (Exception e) {
 				receiver.setError(e);
+			} catch (Throwable t) {
+        		import concurrency.error : clone;
+				receiver.setError(t.clone);
 			}
 		}
 	}

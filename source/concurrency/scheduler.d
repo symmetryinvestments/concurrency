@@ -83,7 +83,7 @@ struct SchedulerAdapter(Worker) {
 				try {
 					worker.schedule(
 						cast(VoidDelegate) () => receiver.setValueOrError());
-				} catch (Exception e) {
+				} catch (Throwable e) {
 					receiver.setError(e);
 				}
 			}
@@ -162,7 +162,7 @@ struct ScheduleAfterOp(Worker, Receiver) {
 		try {
 			timer.userdata = cast(void delegate(TimerTrigger) @safe shared nothrow) &trigger;
 			worker.addTimer(timer);
-		} catch (Exception e) {
+		} catch (Throwable e) {
 			receiver.setError(e);
 			return;
 		}
@@ -171,7 +171,7 @@ struct ScheduleAfterOp(Worker, Receiver) {
 			if (has(Flags.stop)) {
 				try {
 					worker.cancelTimer(timer);
-				} catch (Exception e) {} // TODO: what to do here?
+				} catch (Throwable e) {} // TODO: what to do here?
 			}
 
 			if (has(Flags.triggered)) {
@@ -205,7 +205,7 @@ struct ScheduleAfterOp(Worker, Receiver) {
 			if (!has(Flags.triggered)) {
 				try {
 					worker.cancelTimer(timer);
-				} catch (Exception e) {} // TODO: what to do here?
+				} catch (Throwable e) {} // TODO: what to do here?
 			}
 		}
 	}

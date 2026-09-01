@@ -54,10 +54,16 @@ private struct RepeatOp(Receiver, Sender) {
 			reset();
 		} catch (Exception e) {
 			receiver.setError(e);
+		} catch (Throwable t) {
+	        import concurrency.error : clone;
+			receiver.setError(t.clone());
 		}
 	}
 
 	private void reset() @trusted scope {
+		if (receiver.getStopToken().isStopRequested) {
+			return receiver.setDone();
+		}
 		import concurrency.sender : emplaceOperationalState;
 		op.emplaceOperationalState(sender, RepeatReceiver!(Receiver)(receiver, &reset));
 		op.start();

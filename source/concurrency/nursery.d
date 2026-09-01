@@ -110,7 +110,7 @@ class Nursery {
 				} else {
 					try {
 						localReceiver.setValue();
-					} catch (Exception e) {
+					} catch (Throwable e) {
 						localReceiver.setError(e);
 					}
 				}

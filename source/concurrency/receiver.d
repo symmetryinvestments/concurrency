@@ -78,7 +78,7 @@ struct ThrowingNullReceiver(T) {
 		}
 }
 
-void setValueOrError(Receiver)(auto ref Receiver receiver) @safe {
+void setValueOrError(Receiver)(auto ref Receiver receiver) @trusted {
 	import std.traits;
 	static if (hasFunctionAttributes!(receiver.setValue, "nothrow")) {
 		receiver.setValue();
@@ -87,12 +87,15 @@ void setValueOrError(Receiver)(auto ref Receiver receiver) @safe {
 			receiver.setValue();
 		} catch (Exception e) {
 			receiver.setError(e);
+		} catch (Throwable t) {
+	        import concurrency.error : clone;
+			receiver.setError(t.clone);
 		}
 	}
 }
 
 void setValueOrError(Receiver, T)(auto ref Receiver receiver,
-                                  auto ref T value) @safe {
+                                  auto ref T value) @trusted {
 	import std.algorithm : move;
 	import std.traits;
 	static if (hasFunctionAttributes!(receiver.setValue, "nothrow")) {
@@ -102,15 +105,20 @@ void setValueOrError(Receiver, T)(auto ref Receiver receiver,
 			receiver.setValue(value);
 		} catch (Exception e) {
 			receiver.setError(e);
+		} catch (Throwable t) {
+	        import concurrency.error : clone;
+			receiver.setError(t.clone);
 		}
 	}
 }
 
-void setErrno(Receiver)(ref Receiver receiver, string msg, int n) @safe nothrow {
+void setErrno(Receiver)(ref Receiver receiver, string msg, int n) @trusted nothrow {
     import std.exception : ErrnoException;
 	try {
 		receiver.setError(new ErrnoException(msg, n));
 	} catch (Exception e) {
+		receiver.setError(e);
+	} catch (Throwable e) {
 		receiver.setError(e);
 	}
 }

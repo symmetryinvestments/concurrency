@@ -77,8 +77,8 @@ void main() @safe
 
     import std.range : repeat;
 
-    shared fd = listenTcp("127.0.0.1", 8888, 3200);
-    handler(fd).repeat(2).whenAll().syncWait().assumeOk();
+    shared fd = listenTcp("127.0.0.1", 8888, 4800);
+    handler(fd).repeat(8).whenAll().syncWait().assumeOk();
 }
 
 // Almost at a million
@@ -124,13 +124,13 @@ auto handler() @safe {
 
 auto handler(shared socket_t fd) @safe {
     import concurrency.thread;
-    import concurrency.operations : then, via, letValue, withStopToken;
+    import concurrency.operations : then, via, letValue, withStopToken, mapResult;
     import concurrency : just;
 
     return just(fd)
         .via(ThreadSender())
-        .withStopToken((shared StopToken token, shared socket_t fd) {
-            auto io = IOContext.construct(512);
+        .withStopToken((shared StopToken token, shared socket_t fd) @trusted {
+            auto io = IOContext.construct(1024);
             import concurrency.operations;
 
             auto peer = acceptAsync(fd)
@@ -138,7 +138,17 @@ auto handler(shared socket_t fd) @safe {
                     return Peer(client);
                 })
                 .letValue((ref Peer peer) { return peer.handleConnection(); })
-                .ignoreError
+                .mapResult((Result!void result) @trusted {
+                    return result.match!(
+                        (Completed c) => result,
+                        (Exception e) {
+                            import std.stdio;
+                            writeln(e);
+                            return Result!(void)(Completed());
+                        },
+                        (Cancelled c) => Result!(void)(Completed()),
+                    );
+                })
                 .repeat;
 
             import std.range : repeat;
@@ -149,9 +159,14 @@ auto handler(shared socket_t fd) @safe {
             cb.register(token, () shared {
                 childStopSource.stop();
             });
-            io.run(whenAll(peer.repeat(256).array)).syncWait(childStopSource);
+            auto result = io.run(whenAll(peer.repeat(512).array)).syncWait(childStopSource);
+            //io.run(peer).syncWait(childStopSource);
             import std.stdio;
-            writeln("Done");
+            result.match!(
+                (Cancelled c) => writeln("Cancelled"),
+                (Exception e) => writeln(e),
+                (Completed c) => writeln("Done")
+            );
         });
 }
 

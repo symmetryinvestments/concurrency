@@ -245,8 +245,8 @@ package struct LocalThreadWorker {
 	void stop() nothrow @trusted {
 		try {
 			executor.queue.push(new WorkNode(WorkItem(StopSignal())));
-		} catch (Exception e) {
-			assert(false, e.msg);
+		} catch (Throwable t) {
+			assert(false, t.msg);
 		}
 	}
 

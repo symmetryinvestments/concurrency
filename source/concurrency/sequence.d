@@ -61,7 +61,7 @@ struct RangeSequenceOp(Range, Receiver) {
                     recv);
                 op.start();
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             receiver.setError(e);
         }
     }
@@ -770,7 +770,7 @@ struct FlattenSenderReceiver(Sender, Receiver) {
             import concurrency.sender : emplaceOperationalState;
             op.op2.emplaceOperationalState(s, op.receiver);
             op.op2.start();
-        } catch (Exception e) {
+        } catch (Throwable e) {
             op.receiver.setError(e);
         }
     }

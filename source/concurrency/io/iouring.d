@@ -83,8 +83,14 @@ struct IOUringContext {
         ushort group = cast(ushort)res;
         ubyte[][] bufs;
         bufs.length = size;
+
+        // TODO: deallocate memory when context is stopped.
+        //import core.stdc.stdlib;
+        import core.sys.linux.sys.mman;
+
+    	auto memory = cast(ubyte*)mmap(null, 4 * 1024 * size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
         foreach(i; 0..size) {
-            bufs[i] = new ubyte[4 * 1024];
+            bufs[i] = memory[i * 4 * 1024 .. (i+1) * 4 * 1024];
         }
         io.putRingBuffers(bufs, group);
 
@@ -269,8 +275,8 @@ struct IOUringContext {
         auto nextTriggerOpt = timeUntilNextTimer();
         import std.stdio;
         auto cap = io.capacity;
-        if (cap != this.capacity)
-            debug writeln("Submit ", this.capacity - cap);
+//        if (cap != this.capacity)
+//            debug writeln("Submit ", this.capacity - cap);
 
         if (!nextTriggerOpt.isNull) {
             // next timer is in 0 msecs
@@ -318,8 +324,8 @@ struct IOUringContext {
     private void popCompleted() @safe nothrow {
         import std.stdio;
         auto len = io.length();
-        if (len > 0)
-            debug writeln("Completed: ",len);
+//        if (len > 0)
+//            debug writeln("Completed: ",len);
         // TODO: to reduce latency, would it help to run submit and complete in a loop?
         while (!io.empty()) {
             auto entry = io.front();
@@ -643,6 +649,8 @@ struct RecvRegisteredBufferOperation(Receiver) {
         } else if (entry.res == 0) {
             receiver.setDone();
         } else {
+            import std.stdio;
+            debug writeln("Read failed ", fd, " ", len, " ", group);
             receiver.setErrno("Read failed", -entry.res);
         }
     }
