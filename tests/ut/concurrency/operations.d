@@ -1037,3 +1037,91 @@ unittest {
 		.isError
 		.should == true;
 }
+
+@("mapResult.done.value") @safe
+unittest {
+	DoneSender()
+		.mapResult((Result!void r) {
+			return r.match!(
+				(Completed c) => Result!int(1),
+				(Cancelled c) => Result!int(2),
+				(Exception c) => Result!int(3),
+			);
+		})
+		.syncWait.value
+		.should == 2;
+}
+
+@("mapResult.value.value") @safe
+unittest {
+	just(42)
+		.mapResult((Result!int r) {
+			return r.match!(
+				(int c) => Result!string("value"),
+				(Cancelled c) => Result!string("cancelled"),
+				(Exception c) => Result!string("error"),
+			);
+		})
+		.syncWait.value
+		.should == "value";
+}
+
+@("mapResult.error.value") @safe
+unittest {
+	ThrowingSender()
+		.mapResult((Result!void r) {
+			return r.match!(
+				(Completed c) => Result!string("completed"),
+				(Cancelled c) => Result!string("cancelled"),
+				(Exception c) => Result!string("error"),
+			);
+		})
+		.syncWait.value
+		.should == "error";
+}
+
+
+@("mapResult.error.cancelled") @safe
+unittest {
+	ThrowingSender()
+		.mapResult((Result!void r) {
+			return r.match!(
+				(Completed c) => Result!string("completed"),
+				(Cancelled c) => Result!string("cancelled"),
+				(Exception c) => Result!string(Cancelled()),
+			);
+		})
+		.syncWait
+		.isCancelled
+		.shouldBeTrue;
+}
+
+@("mapResult.value.error") @safe
+unittest {
+	just(42)
+		.mapResult((Result!int r) {
+			return r.match!(
+				(int c) => Result!int(new Exception("test")),
+				(Cancelled c) => Result!int(1),
+				(Exception c) => Result!int(2),
+			);
+		})
+		.syncWait
+		.isError
+		.shouldBeTrue;
+}
+
+@("mapResult.value.cancelled") @safe
+unittest {
+	just(42)
+		.mapResult((Result!int r) {
+			return r.match!(
+				(int c) => Result!int(Cancelled()),
+				(Cancelled c) => Result!int(1),
+				(Exception c) => Result!int(2),
+			);
+		})
+		.syncWait
+		.isCancelled
+		.shouldBeTrue;
+}
