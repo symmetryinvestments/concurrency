@@ -199,8 +199,7 @@ struct IOUringContext {
             atomicStore!(MemoryOrder.raw)(needsWakeup, true);
             pending.append(requests.popAll());
         }
-        import std.stdio;
-        debug writeln("Dropped: ", io.overflow);
+
         return 0;
     }
 
@@ -563,11 +562,17 @@ private struct IOUringTimer {
 struct IOUringScheduler {
     import core.time : Duration;
     import std.socket : socket_t;
+    import concurrency.io.socket : Socket;
+
     shared (IOUringContext)* context;
 
     // TODO for sockets we should probably use recv/send and for files read/write :shrug:
     auto recv(socket_t fd, uint len = 0) @safe nothrow @nogc {
         return RecvRegisteredBufferSender(context, fd, len);
+    }
+
+    auto send(socket_t fd, const(ubyte)[] buffer) @safe nothrow @nogc {
+        return SendSender(context, fd, buffer);
     }
 
     auto recv(socket_t fd, ubyte[] buffer, long len = 0) @safe nothrow @nogc {
@@ -724,8 +729,9 @@ struct AcceptOperation(Receiver) {
     }
     void complete(const ref CompletionEntry entry) @safe nothrow {
         import std.socket : socket_t;
+        import concurrency.io.socket : Socket;
         if (entry.res >= 0) {
-            receiver.setValueOrError(Client(cast(socket_t)entry.res, addr, addrlen));
+            receiver.setValueOrError(Client(Socket(cast(socket_t)entry.res), addr, addrlen));
         } else {
             receiver.setErrno("Accept failed", -entry.res);
         }
@@ -734,7 +740,8 @@ struct AcceptOperation(Receiver) {
 
 struct ConnectSender {
     import std.socket : socket_t;
-    alias Value = socket_t;
+
+    alias Value = void;
     shared IOUringContext* context;
     socket_t fd;
     string address;
@@ -751,6 +758,7 @@ struct ConnectSender {
 
 struct ConnectOperation(Receiver) {
     import core.sys.posix.sys.socket;
+    import concurrency.io.socket : Socket;
     import std.socket : socket_t;
     version(Windows) {
         import core.sys.windows.windows;
@@ -781,7 +789,7 @@ struct ConnectOperation(Receiver) {
     }
     void complete(const ref CompletionEntry entry) @safe nothrow {
         if (entry.res >= 0) {
-            receiver.setValueOrError(cast(socket_t)entry.res);
+            receiver.setValue();
         } else {
             receiver.setErrno("Connect failed", -entry.res);
         }
@@ -826,30 +834,32 @@ struct WriteOperation(Receiver) {
 }
 
 struct SendSender {
+    import concurrency.io.socket : Socket;
     import std.socket : socket_t;
+
     alias Value = int;
     shared IOUringContext* context;
     socket_t fd;
     const(ubyte)[] buffer;
-    long offset;
     auto connect(Receiver)(return Receiver receiver) @safe return scope {
         // ensure NRVO
         auto op = CancellableOperation!(SendOperation!Receiver)(
             context,
-            SendOperation!(Receiver)(fd, buffer, offset, receiver)
+            SendOperation!(Receiver)(fd, buffer, receiver)
         );
         return op;
     }
 }
 
 struct SendOperation(Receiver) {
+    import concurrency.io.socket : Socket;
     import std.socket : socket_t;
+
     socket_t fd;
     const(ubyte)[] buffer;
-    long offset;
     Receiver receiver;
     void submit(ref SubmissionEntry entry) @safe nothrow {
-        entry.prepSend(fd, buffer, offset);
+        entry.prepSend(fd, buffer);
     }
     void complete(const ref CompletionEntry entry) @safe nothrow {
         if (entry.res > 0) {

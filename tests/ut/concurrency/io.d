@@ -54,23 +54,17 @@ unittest {
 @("acceptAsync.connectAsync")
 unittest {
     import concurrency.io.socket;
-    auto fd = listenTcp("127.0.0.1", 0);
+    auto serverSocket = listenTcp("127.0.0.1", 0);
     auto socket = tcpSocket();
-    auto port = fd.getPort();
+    auto port = serverSocket.getPort();
     auto io = IOContext.construct(12);
 
     auto result = io.run(
         whenAll(
-            acceptAsync(fd),
+            acceptAsync(serverSocket),
             connectAsync(socket, "127.0.0.1", port),
         )
     ).syncWait().assumeOk;
-
-    auto client = result[0];
-
-	closeSocket(client.fd);
-	closeSocket(socket);
-	closeSocket(fd);
 }
 
 @safe
@@ -78,13 +72,14 @@ unittest {
 unittest {
     import concurrency.io.socket;
     import concurrency.sender;
-    import std.socket;
-    acceptAsync(cast(socket_t)0)
+
+    auto socket = Socket();
+
+    acceptAsync(socket)
         .toSenderObject
         .syncWait().value.shouldThrow;
 }
-/+
-not working due to non-copyable managedbuffer
+
 @safe
 @("buffer.ring.recv.unconnected")
 unittest {
@@ -93,17 +88,12 @@ unittest {
     import std.socket;
     import std.exception : ErrnoException;
 
-    auto fd = listenTcp("127.0.0.1", 0);
+    auto socket = listenTcp("127.0.0.1", 0);
     auto io = IOContext.construct(16);
 
     io.run(
-        recvAsync(fd, 1024)
+        recvAsync(socket, 1024)
     ).syncWait().assumeOk.shouldThrowWithMessage!(ErrnoException)("Read failed (Transport endpoint is not connected)");
-
-    // TODO: This required closeSocket is not very friendly
-    // would rather have a socket that is movable and closes
-    // when going out of scope.
-	closeSocket(fd);
 }
 
 @safe
@@ -111,7 +101,7 @@ unittest {
 unittest {
     import concurrency.io.socket;
 
-    auto fds = socketPair();
+    auto sockets = socketPair();
     auto io = IOContext.construct(16);
     ubyte[] buffer = [1,2,3,4];
 
@@ -119,15 +109,40 @@ unittest {
 
     auto result = io.run(
         whenAll(
-            recvAsync(fds[0], 4).then((ManagedBuffer b) => b.data.dup),
-            sendAsync(fds[1], buffer),
+            recvAsync(sockets.a, 4).then((ref ManagedBuffer b) => b.data.dup),
+            sendAsync(sockets.b, buffer),
         )
     ).syncWait().value;
 
     result[0].should == buffer;
-
-	
-	closeSocket(fds[0]);
-	closeSocket(fds[1]);
 }
-+/
+
+@safe
+@("server.client")
+unittest {
+    import concurrency.io.socket;
+    import concurrency.ioscheduler : Client;
+    import std.socket : socket_t;
+    import during : ManagedBuffer;
+
+    auto fd = listenTcp("127.0.0.1", 0);
+    auto socket = tcpSocket();
+    auto port = fd.getPort();
+    auto io = IOContext.construct(12);
+
+    auto result = io.run(
+        whenAll(
+            acceptAsync(fd)
+                .letValue((ref Client client) {
+                    return recvAsync(client.socket);
+                })
+                .then((ref ManagedBuffer b) {
+                    b.data.should == [0,1,2,3];
+                }),
+            connectAsync(socket, "127.0.0.1", port)
+                .letValue(() {
+                    return sendAsync(socket, [0,1,2,3]);
+                })
+        )
+    ).syncWait().assumeOk;
+}

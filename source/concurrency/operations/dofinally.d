@@ -24,7 +24,7 @@ private struct DoFinallyReceiver(Value, SideEffect, Receiver) {
 		}
 
 	else
-		void setValue(Value value) @safe {
+		void setValue(ref Value value) @safe {
 			sideEffect();
 			receiver.setValue(value);
 		}
@@ -42,7 +42,7 @@ private struct DoFinallyReceiver(Value, SideEffect, Receiver) {
 	mixin ForwardExtensionPoints!receiver;
 }
 
-struct DoFinallySender(Sender, SideEffect) if (models!(Sender, isSender)) {
+struct DoFinallySender(Sender, SideEffect) { //if (models!(Sender, isSender)) {
 	alias Value = Sender.Value;
 	Sender sender;
 	SideEffect effect;

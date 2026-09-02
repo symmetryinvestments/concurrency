@@ -45,6 +45,9 @@ private struct ThenReceiver(Receiver, Value, Fun) {
 			fun(Value.init.expand);
 		});
 		void setValue(Value value) @safe {
+			return setValue(value);
+		}
+		void setValue(ref Value value) @safe {
 			static if (is(ReturnType!Fun == Result!T, T)) {
 				static if (isExpandable)
 					auto r = fun(value.expand);
@@ -88,7 +91,7 @@ private struct ThenReceiver(Receiver, Value, Fun) {
 	mixin ForwardExtensionPoints!receiver;
 }
 
-struct ThenSender(Sender, Fun) if (models!(Sender, isSender)) {
+struct ThenSender(Sender, Fun) { //if (models!(Sender, isSender)) {
 	import std.traits : ReturnType;
 	static if (is(ReturnType!fun == Result!T, T))
 		alias Value = T;

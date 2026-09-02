@@ -42,11 +42,13 @@ package struct SyncWaitReceiver2(Value) {
 		}
 	else {
 		void setValue(ref Value value) nothrow @trusted {
-			state.result = value;
+			import std.algorithm : move;
+			state.result = value.move;
 			state.worker.stop();
 		}
 		void setValue(Value value) nothrow @trusted {
-			state.result = value;
+			import std.algorithm : move;
+			state.result = value.move;
 			state.worker.stop();
 		}
 	}

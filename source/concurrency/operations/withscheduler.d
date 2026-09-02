@@ -20,6 +20,9 @@ private struct WithSchedulerReceiver(Receiver, Value, Scheduler) {
 		}
 	} else {
 		void setValue(Value value) @safe {
+			setValue(value);
+		}
+		void setValue(ref Value value) @safe {
 			receiver.setValue(value);
 		}
 	}

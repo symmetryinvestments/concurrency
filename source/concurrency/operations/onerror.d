@@ -22,10 +22,14 @@ private struct OnErrorReceiver(Value, SideEffect, Receiver) {
 			receiver.setValue();
 		}
 
-	else
+	else {
 		void setValue(Value value) @safe {
+			setValue(value);
+		}
+		void setValue(ref Value value) @safe {
 			receiver.setValue(value);
 		}
+	}
 
 	void setDone() @safe nothrow {
 		receiver.setDone();
@@ -53,7 +57,7 @@ private struct OnErrorReceiver(Value, SideEffect, Receiver) {
 	mixin ForwardExtensionPoints!receiver;
 }
 
-struct OnErrorSender(Sender, SideEffect) if (models!(Sender, isSender)) {
+struct OnErrorSender(Sender, SideEffect) { //if (models!(Sender, isSender)) {
 	alias Value = Sender.Value;
 	Sender sender;
 	SideEffect effect;

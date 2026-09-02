@@ -95,7 +95,12 @@ void setValueOrError(Receiver)(auto ref Receiver receiver) @trusted {
 }
 
 void setValueOrError(Receiver, T)(auto ref Receiver receiver,
-                                  auto ref T value) @trusted {
+                                  T value) @trusted {
+	return setValueOrError(receiver, value);
+}
+
+void setValueOrError(Receiver, T)(auto ref Receiver receiver,
+                                  ref T value) @trusted {
 	import std.algorithm : move;
 	import std.traits;
 	static if (hasFunctionAttributes!(receiver.setValue, "nothrow")) {

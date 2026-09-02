@@ -1,7 +1,30 @@
 module concurrency.io.socket;
 import std.socket : socket_t;
 
-auto tcpSocket() @trusted {
+struct Socket {
+    private {
+        socket_t fd_;
+    }
+
+    ~this() @trusted nothrow @nogc scope {
+        if (fd_ != socket_t.init) {
+            closeSocket(fd_);
+        }
+    }
+
+    @disable this(ref return scope typeof(this) rhs);
+    @disable this(this);
+
+    package(concurrency) socket_t fd() @safe nothrow @nogc scope {
+        return fd_;
+    }
+}
+
+auto tcpSocket() @safe {
+    return Socket(rawTCPSocket());
+}
+
+auto rawTCPSocket() @trusted {
     import std.socket : socket_t;
     version(Windows) {
         import core.sys.windows.windows;
@@ -56,7 +79,7 @@ auto listenTcp(string address = "", ushort port = 0, int backlog = 128) @trusted
     }
     import core.stdc.errno;
 
-    socket_t sock = tcpSocket();
+    socket_t sock = rawTCPSocket();
 
     sockaddr_in addr;
     addr.sin_family = AF_INET;
@@ -85,7 +108,7 @@ auto listenTcp(string address = "", ushort port = 0, int backlog = 128) @trusted
         throw new Exception("listen");
     }
 
-    return sock;
+    return Socket(sock);
 }
 
 auto closeSocket(socket_t sock) @trusted {
@@ -95,6 +118,10 @@ auto closeSocket(socket_t sock) @trusted {
         closesocket(sock);
     } else
         close(sock);
+}
+
+ushort getPort(ref Socket socket) @safe {
+    return getPort(socket.fd);
 }
 
 ushort getPort(socket_t socket) @trusted {
@@ -117,13 +144,18 @@ ushort getPort(socket_t socket) @trusted {
 
     sockaddr_in sin;
     socklen_t nameLen = sin.sizeof;
-    if (Socket.ERROR == getsockname(socket, cast(sockaddr*)&sin, &nameLen))
+    if (std.socket.Socket.ERROR == getsockname(socket, cast(sockaddr*)&sin, &nameLen))
         throw new SocketOSException("Unable to obtain local socket address");
 
     return ntohs(sin.sin_port);
 }
 
-socket_t[2] socketPair() @trusted {
+struct SocketPair {
+    Socket a;
+    Socket b;
+}
+
+SocketPair socketPair() @trusted {
     import core.sys.posix.sys.socket;
     import std.socket : SocketOSException;
 
@@ -135,7 +167,7 @@ socket_t[2] socketPair() @trusted {
         if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0, socks) == -1)
             throw new SocketOSException("Unable to create socket pair");
 
-        return cast(socket_t[2])socks;
+        return SocketPair(Socket(cast(socket_t)socks[0]), Socket(cast(socket_t)socks[1]));
     }
     // else version (Windows)
     // {

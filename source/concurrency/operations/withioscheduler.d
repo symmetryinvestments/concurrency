@@ -20,6 +20,9 @@ private struct WithIOSchedulerReceiver(Receiver, Value, IOScheduler) {
 		}
 	} else {
 		void setValue(Value value) @safe {
+			setValue(value);
+		}
+		void setValue(ref Value value) @safe {
 			receiver.setValue(value);
 		}
 	}

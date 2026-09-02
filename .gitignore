@@ -1,7 +1,9 @@
 .dub
 docs.json
 __dummy.html
-docs/
+docs/*
+!docs/adr/
+!docs/adr/**
 /concurrency
 concurrency.so
 concurrency.dylib

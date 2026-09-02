@@ -56,14 +56,15 @@ private template WhenAllResult(Senders...) if (Senders.length > 1) {
 	static if (ValueTypes.length > 0) {
 		struct WhenAllResult {
 			Values values;
-			void setValue(T)(T t, size_t index) @trusted {
+			void setValue(T)(ref T t, size_t index) @trusted {
+				import std.algorithm : move;
 				switch (index) {
 					foreach (idx, I; Indexes) {
 						case idx:
 							static if (ValueTypes.length == 1)
-								values = t;
+								values = t.move;
 							else static if (is(typeof(values[I - 1]) == T))
-								values[I - 1] = t;
+								values[I - 1] = t.move;
 							return;
 					}
 
@@ -221,8 +222,11 @@ private struct WhenAllReceiver(Receiver, InnerValue, Value) {
 		return (state >> 3) == atomicLoad(this.state.senderCount);
 	}
 
-	static if (!is(InnerValue == void))
+	static if (!is(InnerValue == void)) {
 		void setValue(InnerValue value) @safe {
+			return setValue(value);
+		}
+		void setValue(ref InnerValue value) @safe {
 			with (state.bitfield.lock(Flags.value_produced, Counter.tick)) {
 				bool last = isLast(newState);
 				state.value.setValue(value, senderIndex);
@@ -231,8 +235,7 @@ private struct WhenAllReceiver(Receiver, InnerValue, Value) {
 					process(newState);
 			}
 		}
-
-	else
+	} else
 		void setValue() @safe {
 			with (state.bitfield.update(Flags.value_produced, Counter.tick)) {
 				bool last = isLast(newState);
@@ -265,7 +268,7 @@ private struct WhenAllReceiver(Receiver, InnerValue, Value) {
 		}
 	}
 
-	private void process(size_t newState) {
+	private void process(size_t newState) @safe {
 		state.cb.dispose();
 
 		if (state.receiver.getStopToken().isStopRequested)

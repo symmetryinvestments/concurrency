@@ -4,6 +4,7 @@ import concurrency.sender : SenderObjectBase, isSender;
 import core.time : Duration;
 import concepts;
 import std.typecons : Nullable, nullable;
+import concurrency.io.socket : Socket;
 
 void checkIOScheduler(T)() {
 	import concurrency.sender : checkSender;
@@ -17,14 +18,13 @@ void checkIOScheduler(T)() {
 enum isIOScheduler(T) = is(typeof(checkIOScheduler!T));
 
 struct Client {
-	import std.socket : socket_t;
 	version(Windows) {
 		import core.sys.windows.windows : sockaddr, socklen_t;
 	} else version(Posix) {
 		import core.sys.posix.sys.socket : sockaddr, socklen_t;
 	}
 
-	socket_t fd;
+	Socket socket;
 	sockaddr addr;
 	socklen_t addrlen;
 }
@@ -37,7 +37,7 @@ interface IOSchedulerObjectBase {
 	// TODO: read/write aren't just for sockets really
 	SenderObjectBase!(ubyte[]) read(socket_t fd, return ubyte[] buffer, long len = 0) @safe;
 	SenderObjectBase!(Client) accept(socket_t fd) @safe;
-	SenderObjectBase!(socket_t) connect(socket_t fd, return string address, ushort port) @safe;
+	SenderObjectBase!(void) connect(socket_t fd, return string address, ushort port) @safe;
 	SenderObjectBase!(int) send(socket_t fd, return const(ubyte)[] buffer) @safe;
 	SenderObjectBase!(int) write(socket_t fd, return const(ubyte)[] buffer, long offset = 0) @safe;
 	SenderObjectBase!(void) close(socket_t fd) @safe;
@@ -59,10 +59,10 @@ struct NullIOScheduler {
 	ValueSender!(ubyte[]) read(socket_t fd, return ubyte[] buffer, long len = 0) @safe {
 		throw new Exception(errorMsg);
 	}
-	ValueSender!(Client) accept(socket_t fd) @safe {
+	SenderObjectBase!(Client) accept(socket_t fd) @safe {
 		throw new Exception(errorMsg);
 	}
-	ValueSender!(socket_t) connect(socket_t fd, return string address, ushort port) @safe {
+	ValueSender!(void) connect(socket_t fd, return string address, ushort port) @safe {
 		throw new Exception(errorMsg);
 	}
 	ValueSender!(int) send(socket_t fd, return const(ubyte)[] buffer) @safe {
@@ -99,7 +99,7 @@ class IOSchedulerObject(S) : IOSchedulerObjectBase {
 		return scheduler.accept(fd).toSenderObject();
 	}
 	// TODO: is trusted because of scope string address
-	SenderObjectBase!(socket_t) connect(socket_t fd, return string address, ushort port) @trusted {
+	SenderObjectBase!(void) connect(socket_t fd, return string address, ushort port) @trusted {
 		string adr = address;
 		return scheduler.connect(fd, adr, port).toSenderObject();
 	}

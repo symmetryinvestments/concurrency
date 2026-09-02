@@ -3,80 +3,80 @@ module concurrency.io;
 import concurrency.io.iouring;
 import during : ManagedBuffer;
 import concurrency.ioscheduler : Client;
+import concurrency.io.socket : Socket;
 
 import std.socket : socket_t;
 
 version (linux)
     alias IOContext = IOUringContext;
 
-auto recvAsync(socket_t fd, uint len = 0) @safe nothrow @nogc {
-    return RecvAsyncRegisteredBufferSender(fd, len);
+auto recvAsync(ref Socket socket, uint len = 0) @safe nothrow @nogc {
+    return RecvAsyncRegisteredBufferSender(&socket, len);
 }
 
 struct RecvAsyncRegisteredBufferSender {
     alias Value = ManagedBuffer;
-    socket_t fd;
+    Socket* socket;
     uint len;
     auto connect(Receiver)(return Receiver receiver) @safe return scope {
         // ensure NRVO
-        auto op = receiver.getIOScheduler().recv(fd, len).connect(receiver);
+        auto op = receiver.getIOScheduler().recv(socket.fd, len).connect(receiver);
         return op;
     }
 }
 
-auto recvAsync(socket_t fd, ubyte[] buffer, long len = 0) @safe nothrow @nogc {
-    return ReadAsyncSender(fd, buffer, len);
+auto recvAsync(ref Socket socket, ubyte[] buffer, long len = 0) @safe nothrow @nogc {
+    return ReadAsyncSender(&socket, buffer, len);
 }
 
 // TODO: read should be used for file descriptors
-auto readAsync(socket_t fd, ubyte[] buffer, long len = 0) @safe nothrow @nogc {
-    return ReadAsyncSender(fd, buffer, len);
+auto readAsync(ref Socket socket, ubyte[] buffer, long len = 0) @safe nothrow @nogc {
+    return ReadAsyncSender(&socket, buffer, len);
 }
 
 struct ReadAsyncSender {
     alias Value = ubyte[];
-    socket_t fd;
+    Socket* socket;
     ubyte[] buffer;
     long offset;
     auto connect(Receiver)(return Receiver receiver) @safe return scope {
         // ensure NRVO
-        auto op = receiver.getIOScheduler().read(fd, buffer, offset).connect(receiver);
+        auto op = receiver.getIOScheduler().read(socket.fd, buffer, offset).connect(receiver);
         return op;
     }
 }
 
-auto acceptAsync(socket_t fd) @safe nothrow @nogc {
-    return AcceptAsyncSender(fd);
+auto acceptAsync(ref Socket socket) @safe nothrow @nogc {
+    return AcceptAsyncSender(&socket);
 }
 
 struct AcceptAsyncSender {
     alias Value = Client;
-    socket_t fd;
+    Socket* socket;
     auto connect(Receiver)(return Receiver receiver) @safe return scope {
         // ensure NRVO
-        auto op = receiver.getIOScheduler().accept(fd).connect(receiver);
+        auto op = receiver.getIOScheduler().accept(socket.fd).connect(receiver);
         return op;
     }
 }
 
-auto connectAsync(socket_t fd, string address, ushort port) @safe nothrow @nogc {
-    return ConnectAsyncSender(fd, address, port);
+auto connectAsync(ref Socket socket, string address, ushort port) @safe nothrow @nogc {
+    return ConnectAsyncSender(&socket, address, port);
 }
 
 struct ConnectAsyncSender {
-    import std.socket : socket_t;
-    alias Value = socket_t;
-    socket_t fd;
+    alias Value = void;
+    Socket* socket;
     string address;
     ushort port;
     auto connect(Receiver)(return Receiver receiver) @safe return scope {
         // ensure NRVO
-        auto op = receiver.getIOScheduler().connect(fd, address, port).connect(receiver);
+        auto op = receiver.getIOScheduler().connect(socket.fd, address, port).connect(receiver);
         return op;
     }
 }
 
-auto sendAsync(socket_t fd, const(ubyte)[] buffer) @safe nothrow @nogc {
+auto writeAsync(socket_t fd, const(ubyte)[] buffer) @safe nothrow @nogc {
     return WriteAsyncSender(fd, buffer, 0);
 }
 
@@ -98,18 +98,17 @@ struct WriteAsyncSender {
 }
 
 // TODO: write should be used for file descriptors
-auto sendAsync(socket_t fd, const(ubyte)[] buffer, long offset = 0) @safe nothrow @nogc {
-    return SendAsyncSender(fd, buffer, offset);
+auto sendAsync(ref Socket socket, const(ubyte)[] buffer) @safe nothrow @nogc {
+    return SendAsyncSender(&socket, buffer);
 }
 
 struct SendAsyncSender {
     alias Value = int;
-    socket_t fd;
+    Socket* socket;
     const(ubyte)[] buffer;
-    long offset;
     auto connect(Receiver)(return Receiver receiver) @safe return scope {
         // ensure NRVO
-        auto op = receiver.getIOScheduler().send(fd, buffer, offset).connect(receiver);
+        auto op = receiver.getIOScheduler().send(socket.fd, buffer).connect(receiver);
         return op;
     }
 }

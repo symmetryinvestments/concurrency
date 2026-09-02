@@ -11,10 +11,11 @@ struct Peer {
     import std.socket : socket_t;
     import concurrency.operations : letValue, letDone, repeat, ignoreValue, ignoreError;
 
-    socket_t fd;
+    Client client;
 
-    this (Client client) @safe {
-        this.fd = client.fd;
+    this (ref Client client) @safe {
+        import std.algorithm;
+        this.client = client.move;
     }
 
     auto handleConnection() @safe {
@@ -26,7 +27,7 @@ struct Peer {
         // internal queue is getting empty/full. This need to properly wrap the socket
         // to ensure it can handover leftover data between phases.
 
-        return recvAsync(fd)
+        return recvAsync(client.socket)
             .letValue(&handleRead)
             .repeat()
             .ignoreError()
@@ -36,7 +37,8 @@ struct Peer {
             // afterwhich things get cancelled.
 
             // needs to be letFinally ??
-            .letDone(&handleClose);
+            ;
+            //.letDone(&handleClose);
             // Or do a letError here to catch any peer closes and close anyway
             // Alternatively readAsync (and writeAsync) should handle the peer closing
             // and call setDone
@@ -55,11 +57,11 @@ struct Peer {
 
         import std.string : representation;
         string response = "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 3\r\nConnection: keep-alive\r\n\r\nfoo";
-        return sendAsync(fd, response.representation).ignoreValue;
+        return sendAsync(client.socket, response.representation).ignoreValue;
     }
 
     auto handleClose() @safe {
-        return closeAsync(fd);
+        //return closeAsync(client.socket);
     }
 }
 
@@ -77,15 +79,15 @@ void main() @safe
 
     import std.range : repeat;
 
-    shared fd = listenTcp("127.0.0.1", 8888, 4800);
-    handler(fd).repeat(8).whenAll().syncWait().assumeOk();
+    auto socket = listenTcp("127.0.0.1", 8888, 4800);
+    handler(socket).repeat(8).whenAll().syncWait().assumeOk();
 }
 
 // Almost at a million
 // one IO enter syscall was blocked
 // I suspect the wakeup not being done correctly.
 
-
+/+
 auto handler() @safe {
     import concurrency.thread;
     import concurrency.operations : then;
@@ -121,20 +123,21 @@ auto handler() @safe {
     // });
     // io.run(peer).syncWait.assumeOk;
 }
++/
 
-auto handler(shared socket_t fd) @safe {
+auto handler(ref Socket socket) @safe {
     import concurrency.thread;
     import concurrency.operations : then, via, letValue, withStopToken, mapResult;
     import concurrency : just;
 
-    return just(fd)
+    return just(&socket)
         .via(ThreadSender())
-        .withStopToken((shared StopToken token, shared socket_t fd) @trusted {
+        .withStopToken((shared StopToken token, Socket* socket) @trusted {
             auto io = IOContext.construct(1024);
             import concurrency.operations;
 
-            auto peer = acceptAsync(fd)
-                .then((Client client) { 
+            auto peer = acceptAsync(*socket)
+                .then((ref Client client) { 
                     return Peer(client);
                 })
                 .letValue((ref Peer peer) { return peer.handleConnection(); })

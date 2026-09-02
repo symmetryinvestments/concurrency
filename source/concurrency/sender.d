@@ -61,8 +61,10 @@ void checkSender(T)() @safe {
 		static if (is(T.Value == void))
 			void setValue() @safe {}
 
-		else
+		else {
+			void setValue(ref T.Value) @safe {}
 			void setValue(T.Value) @safe {}
+		}
 
 		void setDone() @safe nothrow {}
 
