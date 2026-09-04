@@ -1,9 +1,10 @@
 module concurrency.io;
 
 import concurrency.io.iouring;
-import during : ManagedBuffer;
 import concurrency.ioscheduler : Client;
 import concurrency.io.socket : Socket;
+
+public import concurrency.io.buffer : ManagedBuffer, ManagedBufferView, view;
 
 import std.socket : socket_t;
 

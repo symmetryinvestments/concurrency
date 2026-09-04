@@ -24,6 +24,7 @@ import core.sys.posix.sys.types;
 import core.sys.posix.sys.uio;
 import std.algorithm.comparison : among;
 import std.traits : Unqual;
+import concurrency.io.buffer : ManagedBuffer;
 
 nothrow @nogc:
 
@@ -1797,7 +1798,7 @@ struct BufferRing
         return (cast(io_uring_buf*)bring)[0..entries];
     }
 
-    void put(ubyte[] buffer) @safe pure shared
+    void put(scope ubyte[] buffer) @safe pure shared @nogc
     {
         import core.atomic : atomicOp, atomicFetchAdd;
 
@@ -1850,31 +1851,7 @@ struct BufferRing
         auto bufferDesc = buffers[index];
         auto buffer = (cast(ubyte*)bufferDesc.addr)[0..bufferDesc.len];
 
-        return ManagedBuffer(&this, buffer, len);
-    }
-}
-
-struct ManagedBuffer
-{
-    private {
-        shared(BufferRing)* ring;
-        ubyte[] buffer;
-        uint len;
-    }
-
-    ~this() @trusted nothrow @nogc scope {
-        if (ring) {
-            ring.put(buffer);
-        }
-    }
-
-    @disable this(ref return scope typeof(this) rhs);
-    @disable this(this);
-
-    // TODO: would be great if we can control that the return value
-    // isn't escaped.
-    ubyte[] data() @safe pure nothrow {
-        return buffer[0..len];
+        return ManagedBuffer.adopt(&put, buffer, len);
     }
 }
 

@@ -617,6 +617,8 @@ struct IOUringScheduler {
 
 struct RecvRegisteredBufferSender {
     import std.socket : socket_t;
+    import concurrency.io.buffer : ManagedBuffer;
+
     alias Value = ManagedBuffer;
     shared IOUringContext* context;
     socket_t fd;

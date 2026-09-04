@@ -92,7 +92,7 @@ unittest {
     auto io = IOContext.construct(16);
 
     io.run(
-        recvAsync(socket, 1024)
+        recvAsync(socket, 1024).then((ref ManagedBuffer buffer) {})
     ).syncWait().assumeOk.shouldThrowWithMessage!(ErrnoException)("Read failed (Transport endpoint is not connected)");
 }
 
@@ -100,16 +100,15 @@ unittest {
 @("buffer.ring.recv.pair")
 unittest {
     import concurrency.io.socket;
+    import concurrency.io : ManagedBuffer;
 
     auto sockets = socketPair();
     auto io = IOContext.construct(16);
     ubyte[] buffer = [1,2,3,4];
 
-    import during : ManagedBuffer;
-
     auto result = io.run(
         whenAll(
-            recvAsync(sockets.a, 4).then((ref ManagedBuffer b) => b.data.dup),
+            recvAsync(sockets.a, 4).then((ref ManagedBuffer b) => b.view.data.dup),
             sendAsync(sockets.b, buffer),
         )
     ).syncWait().value;
@@ -122,8 +121,8 @@ unittest {
 unittest {
     import concurrency.io.socket;
     import concurrency.ioscheduler : Client;
+    import concurrency.io : ManagedBuffer;
     import std.socket : socket_t;
-    import during : ManagedBuffer;
 
     auto fd = listenTcp("127.0.0.1", 0);
     auto socket = tcpSocket();
@@ -137,7 +136,7 @@ unittest {
                     return recvAsync(client.socket);
                 })
                 .then((ref ManagedBuffer b) {
-                    b.data.should == [0,1,2,3];
+                    b.view.data.should == [0,1,2,3];
                 }),
             connectAsync(socket, "127.0.0.1", port)
                 .letValue(() {
