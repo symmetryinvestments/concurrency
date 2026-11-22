@@ -3,6 +3,32 @@
 <img src="https://github.com/symmetryinvestments/concurrency/workflows/build/badge.svg"/>&nbsp;<img src="https://img.shields.io/badge/ldc%201.37.0+%20-supported-brightgreen"/>&nbsp;<img src="https://img.shields.io/badge/dmd%202.107.1+%20-supported-brightgreen"/>
 Provides various primitives useful for structured concurrency and async tasks.
 
+## Development with Nix
+
+The repository includes a pinned Nix flake with Dub, GNU binutils, and both
+supported D compilers. The default development shell uses LDC:
+
+```sh
+nix develop
+```
+
+Select a compiler explicitly with one of the named shells:
+
+```sh
+nix develop .#ldc
+nix develop .#dmd
+```
+
+Inside either shell, build the library and run the test suite with:
+
+```sh
+dub build
+dub -c=unittest-release
+```
+
+If flakes are not enabled in your Nix configuration, add
+`--extra-experimental-features "nix-command flakes"` to the `nix` commands.
+
 ## Senders/Receivers
 
 A Sender is a lazy Task (in the general sense of the word). It needs to be connected to a Receiver and then started before it will (eventually) call one of the three receiver methods exactly once: `setValue`, `setDone`, `setError`.
