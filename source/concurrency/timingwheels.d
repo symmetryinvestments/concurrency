@@ -128,6 +128,7 @@ struct ListElement(T) {
 	ulong scheduled_at;
 	ushort position = 0xffff;
 	TimerCommand command;
+	shared int terminal;
 	ListElement!T* prev, next;
 	void setScheduledAt(Duration dur) @system {
 		scheduled_at = dur.split!"hnsecs".hnsecs;
@@ -256,7 +257,6 @@ struct TimingWheels(T) {
 
 		if (timer.position != 0xffff)
 		    return false;
-
 		size_t level_index = 0;
 		long t = ticks;
 		long s = 1; // width of the slot in ticks on level
@@ -296,9 +296,30 @@ struct TimingWheels(T) {
 		debug(timingwheels)
 			safe_tracef("cancel timer, l:%d, s:%d", level_index, slot_index);
 		dl_unlink(timer, &levels[level_index].slots[slot_index].head);
+		timer.position = 0xffff;
+		timer.next = null;
+		timer.prev = null;
 		totalTimers--;
 
 		return true;
+	}
+
+	/// Detach every scheduled timer and return them as a linear list.
+	void clear(ref ListElement!T* head) {
+		head = null;
+		for (int l = 0; l <= LEVEL_MAX; l++)
+			for (int s = 0; s < SLOTS; s++)
+				while (levels[l].slots[s].head) {
+					auto timer = levels[l].slots[s].head;
+					dl_unlink(timer, &levels[l].slots[s].head);
+					timer.position = 0xffff;
+					timer.prev = null;
+					timer.next = head;
+					if (head !is null)
+						head.prev = timer;
+					head = timer;
+					totalTimers--;
+				}
 	}
 
 	/// Number of ticks to rotate wheels until internal wheel 'now'

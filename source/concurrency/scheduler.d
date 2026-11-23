@@ -118,30 +118,34 @@ struct SchedulerAdapter(Worker) {
 }
 
 struct ScheduleAfterOp(Worker, Receiver) {
-	import std.traits : ReturnType;
-	import concurrency.bitfield : SharedBitField;
 	import concurrency.stoptoken : StopCallback;
 	import concurrency.receiver : setValueOrError;
+	import core.atomic : cas, atomicLoad, MemoryOrder;
 
-	enum Flags {
-		locked = 0x0,
-		stop = 0x1,
-		triggered = 0x2,
-		setup = 0x4,
+	enum Terminal : size_t {
+		pending,
+		triggered,
+		canceled,
+		stopped,
+		error,
+		completed,
 	}
+	enum size_t terminalMask = 0x7;
+	enum size_t setupBit = 0x8;
+	enum size_t addedBit = 0x10;
 
 	Worker worker;
 	Receiver receiver;
 	Timer timer;
 	shared StopCallback stopCb;
-	shared SharedBitField!Flags flags;
+	shared size_t state;
+	static assert(typeof(state).sizeof == size_t.sizeof);
 	@disable
 	this(ref return scope typeof(this) rhs);
 	@disable
 	this(this);
-
-    @disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
-    @disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
+	@disable void opAssign(typeof(this) rhs) nothrow @safe @nogc;
+	@disable void opAssign(ref typeof(this) rhs) nothrow @safe @nogc;
 
 	this(return Worker worker, Duration dur, return Receiver receiver) @trusted scope {
 		this.worker = worker;
@@ -149,65 +153,124 @@ struct ScheduleAfterOp(Worker, Receiver) {
 		this.timer.setScheduledAt(dur);
 	}
 
-	// ~this() @safe scope {}
 	void start() @trusted scope nothrow {
 		if (receiver.getStopToken().isStopRequested) {
-			receiver.setDone();
+			claim(Terminal.stopped);
+			publishSetup(false, null);
 			return;
 		}
 
 		auto token = receiver.getStopToken();
 		stopCb.register(token, cast(void delegate() nothrow @safe shared) &stop);
 
+		bool added;
+		Throwable failure;
 		try {
 			timer.userdata = cast(void delegate(TimerTrigger) @safe shared nothrow) &trigger;
 			worker.addTimer(timer);
+			added = true;
 		} catch (Throwable e) {
-			receiver.setError(e);
-			return;
+			failure = e;
+			claim(Terminal.error);
 		}
 
-		with (flags.add(Flags.setup)) {
-			if (has(Flags.stop)) {
-				try {
-					worker.cancelTimer(timer);
-				} catch (Throwable e) {} // TODO: what to do here?
-			}
+		publishSetup(added, failure);
+	}
 
-			if (has(Flags.triggered)) {
-				receiver.setValueOrError();
-			}
+	private bool claim(Terminal cause) @trusted nothrow {
+		auto expected = state.atomicLoad!(MemoryOrder.acq);
+		while (terminal(expected) == Terminal.pending) {
+			auto desired = withTerminal(expected, cause);
+			if ((&state).cas!(MemoryOrder.acq_rel, MemoryOrder.acq)(expected, desired))
+				return true;
 		}
+		return false;
+	}
+
+	private void publishSetup(bool timerAdded, Throwable failure) @trusted nothrow {
+		auto expected = state.atomicLoad!(MemoryOrder.acq);
+		size_t desired;
+		do {
+			desired = expected | setupBit | (timerAdded ? addedBit : 0);
+		} while (!(&state).cas!(MemoryOrder.acq_rel, MemoryOrder.acq)(expected, desired));
+
+		auto cause = terminal(state.atomicLoad!(MemoryOrder.acq));
+		if (cause == Terminal.stopped && timerAdded) {
+			try {
+				worker.cancelTimer(timer);
+			} catch (Throwable e) {}
+		}
+		complete(cause, failure);
 	}
 
 	private void trigger(TimerTrigger cause) @trusted nothrow {
-		with (flags.add(Flags.triggered)) {
-			if (!has(Flags.setup))
-				return;
-			stopCb.dispose();
-			final switch (cause) {
-				case TimerTrigger.cancel:
-					receiver.setDone();
-					break;
-				case TimerTrigger.trigger:
-					receiver.setValueOrError();
-					break;
-			}
+		final switch (cause) {
+			case TimerTrigger.trigger:
+				if (!claim(Terminal.triggered))
+					return;
+				break;
+			case TimerTrigger.cancel:
+				if (!claim(Terminal.canceled))
+					return;
+				break;
 		}
+		auto snapshot = state.atomicLoad!(MemoryOrder.acq);
+		if (snapshot & setupBit)
+			complete(terminal(snapshot), null);
 	}
 
 	private void stop() @trusted nothrow {
-		with (flags.add(Flags.stop)) {
-			if (!has(Flags.setup)) {
-				return;
-			}
-
-			if (!has(Flags.triggered)) {
+		if (!claim(Terminal.stopped))
+			return;
+		auto snapshot = state.atomicLoad!(MemoryOrder.acq);
+		if (snapshot & setupBit) {
+			if (snapshot & addedBit) {
 				try {
 					worker.cancelTimer(timer);
-				} catch (Throwable e) {} // TODO: what to do here?
+				} catch (Throwable e) {}
 			}
+			complete(Terminal.stopped, null);
 		}
+	}
+
+	private void complete(Terminal cause, Throwable failure) @trusted nothrow {
+		if (cause == Terminal.pending || cause == Terminal.completed)
+			return;
+		auto expected = state.atomicLoad!(MemoryOrder.acq);
+		while (terminal(expected) == cause) {
+			auto desired = withTerminal(expected, Terminal.completed);
+			if ((&state).cas!(MemoryOrder.acq_rel, MemoryOrder.acq)(expected, desired))
+				goto won;
+		}
+		return;
+
+	won:
+		stopCb.dispose();
+		final switch (cause) {
+			case Terminal.triggered:
+				receiver.setValueOrError();
+				break;
+			case Terminal.canceled:
+			case Terminal.stopped:
+				receiver.setDone();
+				break;
+			case Terminal.error:
+				assert(failure !is null);
+				receiver.setError(failure);
+				break;
+			case Terminal.pending:
+			case Terminal.completed:
+				assert(false);
+		}
+	}
+
+	private static Terminal terminal(size_t value) pure nothrow @safe @nogc {
+		return cast(Terminal)(value & terminalMask);
+	}
+
+	private static size_t withTerminal(size_t value, Terminal cause)
+		pure nothrow @safe @nogc {
+		return (value & ~terminalMask) | cause;
 	}
 }
 

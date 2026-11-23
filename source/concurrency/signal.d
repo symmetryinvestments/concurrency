@@ -3,20 +3,25 @@ module concurrency.signal;
 import concurrency.stoptoken;
 
 ref shared(StopSource) globalStopSource() @trusted {
-	import core.atomic : atomicLoad, cas;
+	import core.atomic : atomicLoad, atomicStore, cas, MemoryOrder;
 
-	if (globalSourcePtr.atomicLoad is null) {
+	auto source = globalSourcePtr.atomicLoad!(MemoryOrder.acq);
+	if (source is null) {
 		auto ptr = getGlobalStopSourcePointer();
-
-		shared StopSource* empty = null;
-		if (ptr.cas(empty, &globalSource)) {
-			setupCtrlCHandler(globalSource);
-			globalSourcePtr = &globalSource;
-		} else
-			globalSourcePtr = (*ptr).atomicLoad;
+		source = (*ptr).atomicLoad!(MemoryOrder.acq);
+		if (source is null) {
+			shared StopSource* empty = null;
+			if (ptr.cas(empty, &globalSource)) {
+				source = &globalSource;
+				setupCtrlCHandler(globalSource);
+			} else {
+				source = (*ptr).atomicLoad!(MemoryOrder.acq);
+			}
+		}
+		globalSourcePtr.atomicStore!(MemoryOrder.rel)(source);
 	}
 
-	return *globalSourcePtr;
+	return *source;
 }
 
 /// Sets the stopSource to be called when receiving an interrupt

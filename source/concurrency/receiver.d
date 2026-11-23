@@ -104,10 +104,16 @@ void setValueOrError(Receiver, T)(auto ref Receiver receiver,
 	import std.algorithm : move;
 	import std.traits;
 	static if (hasFunctionAttributes!(receiver.setValue, "nothrow")) {
-		receiver.setValue(value);
+		static if (__traits(compiles, receiver.setValue(value)))
+			receiver.setValue(value);
+		else
+			receiver.setValue(value.move);
 	} else {
 		try {
-			receiver.setValue(value);
+			static if (__traits(compiles, receiver.setValue(value)))
+				receiver.setValue(value);
+			else
+				receiver.setValue(value.move);
 		} catch (Exception e) {
 			receiver.setError(e);
 		} catch (Throwable t) {

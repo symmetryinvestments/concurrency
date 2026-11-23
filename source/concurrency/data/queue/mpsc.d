@@ -36,10 +36,10 @@ final class MPSCQueue(Node) {
 
 	/// returns true if first to push
 	bool push(Node* n) @safe nothrow @nogc {
-		import core.atomic : atomicExchange;
+		import core.atomic : atomicExchange, atomicStore, MemoryOrder;
 		n.next = null;
 		Node* prev = atomicExchange(&head, n);
-		prev.next = toShared(n);
+		link(prev, n);
 		return prev is &stub;
 	}
 
@@ -50,7 +50,7 @@ final class MPSCQueue(Node) {
 
 	/// returns chain with head and tail
 	Chain!Node popAll() @safe nothrow @nogc {
-		import core.atomic : atomicExchange;
+		import core.atomic : atomicExchange, atomicStore, MemoryOrder;
 
 		Node* first = atomicExchange(&head, &stub);
 		Node* last = tail;
@@ -69,10 +69,10 @@ final class MPSCQueue(Node) {
 		if (chain.head is null || chain.tail is null)
 			return false;
 
-		import core.atomic : atomicExchange;
+		import core.atomic : atomicExchange, atomicStore, MemoryOrder;
 		chain.head.next = null;
 		Node* prev = atomicExchange(&head, chain.head);
-		prev.next = toShared(chain.tail);
+		link(prev, chain.tail);
 		return prev is &stub;
 	}
 
@@ -82,14 +82,14 @@ final class MPSCQueue(Node) {
 		while (true) {
 			Node* end = this.tail;
 			shared
-			Node* next = tail.next.atomicLoad!(MemoryOrder.raw).toShared();
+			Node* next = tail.next.atomicLoad!(MemoryOrder.acq).toShared();
 			if (end is &stub) { // still pointing to stub
 				if (null is next) // no new nodes
 					return null;
 				this.tail = next
 					.toUnshared(); // at least one node was added and stub.next points to the first one
 				end = next.toUnshared();
-				next = next.next.atomicLoad!(MemoryOrder.raw);
+				next = next.next.atomicLoad!(MemoryOrder.acq);
 			}
 
 			if (next) { // if there is at least another node
@@ -100,7 +100,7 @@ final class MPSCQueue(Node) {
 			Node* start = this.head.atomicLoad!(MemoryOrder.acq);
 			if (end is start) {
 				push(&stub);
-				next = end.next.atomicLoad!(MemoryOrder.raw).toShared();
+				next = end.next.atomicLoad!(MemoryOrder.acq).toShared();
 				if (next) {
 					this.tail = toUnshared(next);
 					return end;
@@ -113,9 +113,14 @@ final class MPSCQueue(Node) {
 		import core.atomic : atomicLoad, MemoryOrder;
 		auto current = atomicLoad(tail);
 		if (current is &stub)
-			current = current.next.atomicLoad!(MemoryOrder.raw).toUnshared();
+			current = current.next.atomicLoad!(MemoryOrder.acq).toUnshared();
 		return Iterator!(Node)(current);
 	}
+}
+
+private void link(Node)(Node* prev, Node* next) @trusted nothrow @nogc {
+	import core.atomic : atomicStore, MemoryOrder;
+	atomicStore!(MemoryOrder.rel)(*cast(shared(Node*)*) &prev.next, cast(shared Node*) next);
 }
 
 struct Chain(Node) {
@@ -139,7 +144,7 @@ struct Iterator(Node) {
 
 	void popFront() @safe nothrow @nogc {
 		import core.atomic : atomicLoad, MemoryOrder;
-		head = head.next.atomicLoad!(MemoryOrder.raw).toUnshared();
+		head = head.next.atomicLoad!(MemoryOrder.acq).toUnshared();
 	}
 
 	Iterator!(Node) safe() {

@@ -1,6 +1,7 @@
 module concurrency.ioscheduler;
 
 import concurrency.sender : SenderObjectBase, isSender;
+import concurrency.io.buffer : ManagedBuffer;
 import core.time : Duration;
 import concepts;
 import std.typecons : Nullable, nullable;
@@ -8,11 +9,35 @@ import concurrency.io.socket : Socket;
 
 void checkIOScheduler(T)() {
 	import concurrency.sender : checkSender;
-	import core.time : msecs;
-	import std.traits : ReturnType;
-	alias ReadSender = ReturnType!(T.read);
+	import std.socket : socket_t;
+	T t = T.init;
+	alias RecvSender = typeof(t.recv(socket_t.init, uint.init));
+	alias RecvBufferSender = typeof(t.recv(socket_t.init, ubyte[].init, long.init));
+	alias ReadSender = typeof(t.read(socket_t.init, ubyte[].init, long.init));
+	alias AcceptSender = typeof(t.accept(socket_t.init));
+	alias ConnectSender = typeof(t.connect(socket_t.init, string.init, ushort.init));
+	alias SendSender = typeof(t.send(socket_t.init, const(ubyte[]).init));
+	alias WriteSender = typeof(t.write(socket_t.init, const(ubyte[]).init, long.init));
+	alias CloseSender = typeof(t.close(socket_t.init));
+	alias NopSender = typeof(t.nop());
+	static assert(is(RecvSender.Value == ManagedBuffer));
+	static assert(is(RecvBufferSender.Value == ubyte[]));
+	static assert(is(ReadSender.Value == ubyte[]));
+	static assert(is(AcceptSender.Value == Client));
+	static assert(is(ConnectSender.Value == void));
+	static assert(is(SendSender.Value == int));
+	static assert(is(WriteSender.Value == int));
+	static assert(is(CloseSender.Value == void));
+	static assert(is(NopSender.Value == int));
+	checkSender!RecvSender();
+	checkSender!RecvBufferSender();
 	checkSender!ReadSender();
-	// TODO: add other function checks
+	checkSender!AcceptSender();
+	checkSender!ConnectSender();
+	checkSender!SendSender();
+	checkSender!WriteSender();
+	checkSender!CloseSender();
+	checkSender!NopSender();
 }
 
 enum isIOScheduler(T) = is(typeof(checkIOScheduler!T));
@@ -32,7 +57,7 @@ struct Client {
 /// polymorphic IOScheduler
 interface IOSchedulerObjectBase {
 	import std.socket : socket_t;
-	SenderObjectBase!(ubyte[]) recv(socket_t fd, long len = 0) @safe;
+	SenderObjectBase!(ManagedBuffer) recv(socket_t fd, uint len = 0) @safe;
 	SenderObjectBase!(ubyte[]) recv(socket_t fd, return ubyte[] buffer, long len = 0) @safe;
 	// TODO: read/write aren't just for sockets really
 	SenderObjectBase!(ubyte[]) read(socket_t fd, return ubyte[] buffer, long len = 0) @safe;
@@ -50,7 +75,7 @@ struct NullIOScheduler {
 
 	string errorMsg;
 
-	ValueSender!(ubyte[]) recv(socket_t fd, long len = 0) @safe {
+	ValueSender!(ManagedBuffer) recv(socket_t fd, long len = 0) @safe {
 		throw new Exception(errorMsg);
 	}
 	ValueSender!(ubyte[]) recv(socket_t fd, return ubyte[] buffer, long len = 0) @safe {
@@ -86,8 +111,13 @@ class IOSchedulerObject(S) : IOSchedulerObjectBase {
 		this.scheduler = scheduler;
 	}
 
-	SenderObjectBase!(ubyte[]) recv(socket_t fd, long len = 0) @safe {
-		return scheduler.recv(fd, len).toSenderObject();
+	SenderObjectBase!(ManagedBuffer) recv(socket_t fd, uint len = 0) @safe {
+		static if (is(S == NullIOScheduler)) {
+			// NullIOScheduler.recv always throws and cannot erase a move-only value.
+			scheduler.recv(fd, len);
+			assert(0);
+		} else
+			return scheduler.recv(fd, len).toSenderObject();
 	}
 	SenderObjectBase!(ubyte[]) recv(socket_t fd, return ubyte[] buffer, long len = 0) @safe {
 		return scheduler.recv(fd, buffer, len).toSenderObject();
