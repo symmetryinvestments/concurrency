@@ -29,6 +29,36 @@ dub -c=unittest-release
 If flakes are not enabled in your Nix configuration, add
 `--extra-experimental-features "nix-command flakes"` to the `nix` commands.
 
+## Linux I/O contexts
+
+On Linux, `IOContext` remains the io_uring context. `EpollContext` is an
+explicit alternative; it is not selected automatically. Each context is
+one-shot and must be driven by the thread that created it, while operations
+may be submitted from other threads. Cancellation and shutdown complete
+pending operations on that driver thread.
+
+The epoll backend supports nonblocking sockets and pipes only. It permits one
+pending waiter in each direction per descriptor, completes after one syscall
+(so partial I/O is normal), and uses level-triggered readiness for retries.
+Bufferless `recv` uses fixed 4096-byte managed-buffer slots: the context
+capacity is the slot count, length zero requests a full slot, and requests
+larger than 4096 fail with `epoll managed buffer request exceeds 4096-byte
+slot`. A pool exhaustion error is reported as `epoll managed buffer pool has
+no free slots`. Slots are returned on EOF, syscall error, cancellation, and
+shutdown; a positively completed `ManagedBuffer` remains valid after its run
+and context facade have ended and may be released from another thread.
+
+Cancellation completes pending work with `setDone`. Read and receive EOF also
+complete with `setDone`; syscall failures retain their operation-specific
+`Receive failed`, `Read failed`, `Send failed`, `Write failed`, `Accept
+failed`, `Connect failed`, or `Close failed` error. Each operation performs
+one nonblocking syscall per completion attempt, so both reads and writes may
+complete with a partial result.
+
+`closeAsync` consumes its raw descriptor. Transfer ownership first with
+`closeAsync(socket.release())`; after submission, the caller must not close or
+reuse that descriptor. `Socket.release()` disables its RAII destructor close.
+
 ## Senders/Receivers
 
 A Sender is a lazy Task (in the general sense of the word). It needs to be connected to a Receiver and then started before it will (eventually) call one of the three receiver methods exactly once: `setValue`, `setDone`, `setError`.
