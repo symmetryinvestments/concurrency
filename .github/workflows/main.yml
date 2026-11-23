@@ -2,6 +2,23 @@ name: build
 on: [push]
 
 jobs:
+  asan:
+    name: LDC ASan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install LDC
+        uses: dlang-community/setup-dlang@v1.3.0
+        with:
+          compiler: ldc-latest
+
+      - name: Run ASan tests
+        env:
+          ASAN_OPTIONS: abort_on_error=1:detect_stack_use_after_return=1:strict_string_checks=1
+          LSAN_OPTIONS: suppressions=${{ github.workspace }}/lsan.supp:print_suppressions=0
+        run: dub -c=unittest-asan --compiler=ldc2
+
   test:
     name: Dub Tests
     strategy:

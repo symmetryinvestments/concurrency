@@ -11,6 +11,7 @@ configuration "default" {
 	dflags "-dip1000"
 }
 configuration "unittest" {
+	buildOptions "unittests"
 	dependency "unit-threaded" version="*"
 	targetType "executable"
 	mainSourceFile "tests/ut/ut_runner.d"
