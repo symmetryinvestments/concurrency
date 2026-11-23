@@ -1,6 +1,7 @@
 module concurrency.io;
 
 import concurrency.io.iouring;
+version(linux) public import concurrency.io.epoll : EpollContext, EpollScheduler;
 import concurrency.ioscheduler : Client;
 import concurrency.io.socket : Socket;
 
@@ -27,7 +28,19 @@ struct RecvAsyncRegisteredBufferSender {
 }
 
 auto recvAsync(ref Socket socket, ubyte[] buffer, long len = 0) @safe nothrow @nogc {
-    return ReadAsyncSender(&socket, buffer, len);
+    return RecvAsyncSender(&socket, buffer, len);
+}
+
+struct RecvAsyncSender {
+    alias Value = ubyte[];
+    Socket* socket;
+    ubyte[] buffer;
+    long offset;
+    auto connect(Receiver)(return Receiver receiver) @safe return scope {
+        // ensure NRVO
+        auto op = receiver.getIOScheduler().recv(socket.fd, buffer, offset).connect(receiver);
+        return op;
+    }
 }
 
 // TODO: read should be used for file descriptors

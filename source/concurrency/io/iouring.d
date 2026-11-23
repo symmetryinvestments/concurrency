@@ -576,11 +576,11 @@ struct IOUringScheduler {
     }
 
     auto recv(socket_t fd, ubyte[] buffer, long len = 0) @safe nothrow @nogc {
-        return ReadSender(context, fd, buffer, len);
+        return ReadSender!true(context, fd, buffer, len);
     }
 
     auto read(socket_t fd, ubyte[] buffer, long len = 0) @safe nothrow @nogc {
-        return ReadSender(context, fd, buffer, len);
+        return ReadSender!false(context, fd, buffer, len);
     }
 
     auto accept(socket_t fd) @safe nothrow @nogc {
@@ -663,7 +663,7 @@ struct RecvRegisteredBufferOperation(Receiver) {
     }
 }
 
-struct ReadSender {
+struct ReadSender(bool receive) {
     import std.socket : socket_t;
     alias Value = ubyte[];
     shared IOUringContext* context;
@@ -672,15 +672,15 @@ struct ReadSender {
     long offset;
     auto connect(Receiver)(return Receiver receiver) @safe return scope {
         // ensure NRVO
-        auto op = CancellableOperation!(ReadOperation!Receiver)(
+        auto op = CancellableOperation!(ReadOperation!(Receiver, receive))(
             context,
-            ReadOperation!(Receiver)(fd, buffer, offset, receiver)
+            ReadOperation!(Receiver, receive)(fd, buffer, offset, receiver)
         );
         return op;
     }
 }
 
-struct ReadOperation(Receiver) {
+struct ReadOperation(Receiver, bool receive) {
     import std.socket : socket_t;
     socket_t fd;
     ubyte[] buffer;
@@ -695,7 +695,10 @@ struct ReadOperation(Receiver) {
         } else if (entry.res == 0) {
             receiver.setDone();
         } else {
-            receiver.setErrno("Read failed", -entry.res);
+            static if (receive)
+                receiver.setErrno("Receive failed", -entry.res);
+            else
+                receiver.setErrno("Read failed", -entry.res);
         }
     }
 }
@@ -791,7 +794,7 @@ struct ConnectOperation(Receiver) {
     }
     void complete(const ref CompletionEntry entry) @safe nothrow {
         if (entry.res >= 0) {
-            receiver.setValue();
+            receiver.setValueOrError();
         } else {
             receiver.setErrno("Connect failed", -entry.res);
         }

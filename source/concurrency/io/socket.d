@@ -18,6 +18,13 @@ struct Socket {
     package(concurrency) socket_t fd() @safe nothrow @nogc scope {
         return fd_;
     }
+
+    /// Relinquish RAII ownership for an API that consumes the raw descriptor.
+    socket_t release() @safe nothrow @nogc scope {
+        auto result = fd_;
+        fd_ = socket_t.init;
+        return result;
+    }
 }
 
 auto tcpSocket() @safe {
