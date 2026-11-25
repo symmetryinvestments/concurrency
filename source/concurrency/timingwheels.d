@@ -123,6 +123,19 @@ private void dl_relink(L)(L* le, L** head_from, L** head_to)
 /// Each operation take O(1) time.
 ///
 
+enum TimerCommand : ushort {
+	Register = 1,
+	Cancel = 2,
+}
+
+/// An intrusive command node kept separate from the timing-wheel links.
+/// A timer can have one outstanding register and one outstanding cancel command.
+struct TimerCommandNode(Owner) {
+	TimerCommandNode* next;
+	Owner* owner;
+	TimerCommand command;
+}
+
 struct ListElement(T) {
 	T userdata;
 	ulong scheduled_at;
@@ -130,15 +143,11 @@ struct ListElement(T) {
 	TimerCommand command;
 	shared int terminal;
 	ListElement!T* prev, next;
+	TimerCommandNode!(ListElement!T) registerCommand, cancelCommand;
 	void setScheduledAt(Duration dur) @system {
 		scheduled_at = dur.split!"hnsecs".hnsecs;
 		command = TimerCommand.Register;
 	}
-}
-
-enum TimerCommand : ushort {
-	Register = 1,
-	Cancel = 2,
 }
 
 struct TimingWheels(T) {

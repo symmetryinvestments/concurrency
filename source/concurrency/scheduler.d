@@ -56,7 +56,7 @@ import concurrency.timingwheels : ListElement;
 static import concurrency.timingwheels;
 alias Timer = ListElement!(TimerDelegate);
 alias TimingWheels = concurrency.timingwheels.TimingWheels!(TimerDelegate);
-public import concurrency.timingwheels : TimerCommand;
+public import concurrency.timingwheels : TimerCommand, TimerCommandNode;
 
 auto localThreadScheduler() {
 	import concurrency.thread : LocalThreadWorker, getLocalThreadExecutor;

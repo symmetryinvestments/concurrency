@@ -6,7 +6,7 @@ import concurrency;
 import concurrency.io;
 import concurrency.ioscheduler : Client, isIOScheduler, toIOSchedulerObject;
 import concurrency.io.iouring : IOUringContext;
-import concurrency.sender : SenderObjectBase;
+import concurrency.sender : SenderObjectBase, OperationalStateBase, connectHeap;
 import concurrency.sender : DoneSender, ErrorSender;
 import concurrency.stoptoken : StopSource, StopToken;
 import concurrency.operations : race, letValue, whenAll;
@@ -468,6 +468,7 @@ unittest {
 		ubyte[8] current;
 		int detachedValues;
 		int currentValues;
+		OperationalStateBase currentOperation;
 	}
 	static struct CurrentReceiver {
 		State state;
@@ -494,9 +495,9 @@ unittest {
 				close(replacement[0]);
 			}
 			state.peer = replacement[1];
-			auto operation = state.context.scheduler.recv(cast(socket_t) state.fd,
-				state.current).connect(CurrentReceiver(state));
-			operation.start();
+			state.currentOperation = state.context.scheduler.recv(cast(socket_t) state.fd,
+				state.current).connectHeap(CurrentReceiver(state));
+			state.currentOperation.start();
 		}
 		void setDone() @safe nothrow { assert(false, "detached operation was cancelled"); }
 		void setError(Throwable) @safe nothrow { assert(false, "detached operation failed"); }
@@ -706,6 +707,7 @@ unittest {
 		Event returned;
 		ThreadID driver;
 		shared int calls;
+		shared void* operation;
 
 		this(ThreadID driver) @trusted shared {
 			this.driver = driver;
@@ -751,8 +753,14 @@ unittest {
 	auto context = EpollContext.construct(8);
 	auto state = new shared State(thisThreadID);
 	auto producer = new Thread({
-		auto operation = context.scheduler.nop()
+		import core.stdc.stdlib : malloc;
+		import std.conv : emplace;
+		auto source = context.scheduler.nop()
 			.connect(Receiver(state));
+		alias Operation = typeof(source);
+		auto operation = emplace!Operation(cast(Operation*) malloc(Operation.sizeof),
+			source.context, source.receiver);
+		state.operation = cast(shared void*) operation;
 		state.signalStarted();
 		operation.start();
 		state.signalReturned();
@@ -765,6 +773,8 @@ unittest {
 
 	context.run(just()).syncWait.assumeOk;
 	atomicLoad!(MemoryOrder.acq)(state.calls).should == 1;
+	import core.stdc.stdlib : free;
+	free(cast(void*) atomicLoad!(MemoryOrder.acq)(state.operation));
 }
 
 @("EpollContext.driver nop is queued") @trusted
@@ -784,9 +794,10 @@ unittest {
 	auto context = EpollContext.construct(8);
 	shared EpollScheduler sharedContext = cast(shared) context.scheduler;
 	auto state = new shared State;
+	auto operation = (cast() sharedContext).nop().connect(Receiver(state));
+	shared typeof(operation)* operationPtr = cast(shared typeof(operation)*) &operation;
 	context.run(justFrom(() shared @trusted {
-		auto operation = (cast() sharedContext).nop().connect(Receiver(state));
-		operation.start();
+		(cast(typeof(operation)*) operationPtr).start();
 		assert(atomicLoad!(MemoryOrder.acq)(state.calls) == 0);
 		atomicStore!(MemoryOrder.rel)(state.returned, 1);
 	})).syncWait.assumeOk;
@@ -882,6 +893,7 @@ unittest {
 			assert(thisThreadID == atomicLoad!(MemoryOrder.acq)(state.driver));
 			atomicFetchAdd!(MemoryOrder.acq_rel)(state.terminals, 1);
 			atomicFetchAdd!(MemoryOrder.acq_rel)(state.dones, 1);
+			state.signalTerminal();
 		}
 		void setError(Throwable) @safe nothrow { assert(false, "reserved nop failed"); }
 	}
@@ -905,6 +917,7 @@ unittest {
 	auto producer = new Thread({
 		auto operation = (cast() state.scheduler).nop().connect(Receiver(state));
 		operation.start();
+		state.waitTerminal();
 	}).start();
 	state.waitReserved();
 
@@ -928,7 +941,7 @@ unittest {
 	static struct Receiver {
 		shared EpollShutdownState state;
 		void setValue() @safe nothrow { assert(false); }
-		void setDone() @trusted nothrow { assert(thisThreadID == atomicLoad!(MemoryOrder.acq)(state.driver)); atomicFetchAdd!(MemoryOrder.acq_rel)(state.terminals, 1); atomicFetchAdd!(MemoryOrder.acq_rel)(state.dones, 1); }
+		void setDone() @trusted nothrow { assert(thisThreadID == atomicLoad!(MemoryOrder.acq)(state.driver)); atomicFetchAdd!(MemoryOrder.acq_rel)(state.terminals, 1); atomicFetchAdd!(MemoryOrder.acq_rel)(state.dones, 1); state.signalTerminal(); }
 		void setError(Throwable) @safe nothrow { assert(false); }
 		shared(StopToken) getStopToken() @safe nothrow { return shared(StopToken).init; }
 	}
@@ -936,7 +949,7 @@ unittest {
 	auto state = new shared EpollShutdownState;
 	auto driver = new Thread({ auto context = EpollContext.construct(8); context.pauseCommandAfterReserve(&state.reserved, &state.release); context.observeAdmissionClose(&state.closed); state.publish(&context); context.run(ThreadSender().letValue(() @trusted { state.waitStop(); return just(); })).syncWait.assumeOk; state.record(context.quiescenceSnapshot()); atomicStore!(MemoryOrder.rel)(state.finalCloseCalls, cast(int) context.closeCallCount); state.signalFinished(); }).start();
 	state.waitContext();
-	auto producer = new Thread({ auto operation = (cast() state.scheduler).close(fd).connect(Receiver(state)); operation.start(); }).start();
+	auto producer = new Thread({ auto operation = (cast() state.scheduler).close(fd).connect(Receiver(state)); operation.start(); state.waitTerminal(); }).start();
 	state.waitReserved(); state.stop(); state.waitClosed(); state.releaseProducer(); producer.join(); state.waitFinished(); driver.join();
 	atomicLoad!(MemoryOrder.acq)(state.terminals).should == 1; atomicLoad!(MemoryOrder.acq)(state.dones).should == 1;
 	atomicLoad!(MemoryOrder.acq)(state.finalCloseCalls).should == 1;
@@ -1942,6 +1955,7 @@ unittest {
 		int controlErrors;
 		int retryValues;
 		int terminals;
+		OperationalStateBase retryOperation;
 	}
 	static struct RetryReceiver {
 		State state;
@@ -1968,9 +1982,9 @@ unittest {
 			state.terminals++;
 			ubyte[] bytes = [71, 72];
 			assert(sendSocketBytes(state.peer, bytes) == bytes.length);
-			auto retry = state.context.scheduler.recv(cast(socket_t) state.contextFd,
-				state.retryStorage).connect(RetryReceiver(state));
-			retry.start();
+			state.retryOperation = state.context.scheduler.recv(cast(socket_t) state.contextFd,
+				state.retryStorage).connectHeap(RetryReceiver(state));
+			state.retryOperation.start();
 		}
 		shared(StopToken) getStopToken() @safe nothrow { return shared(StopToken).init; }
 	}
@@ -2642,7 +2656,7 @@ unittest {
 
 @("EpollScheduler managed recv uses one 4096-byte slot and returns it after release") @trusted
 unittest {
-	final class State { EpollContext* context; int fd; int peer; int completions; }
+	final class State { EpollContext* context; int fd; int peer; int completions; OperationalStateBase nextOperation; }
 	static struct SecondReceiver {
 		State state;
 		void setValue(ref ManagedBuffer buffer) @trusted nothrow { ubyte[] expected = [44, 45]; assert(buffer.view.data == expected); assert(buffer.length == expected.length); assert(buffer.capacity == 4096); buffer.releaseNow(); state.completions++; }
@@ -2652,7 +2666,7 @@ unittest {
 	}
 	static struct FirstReceiver {
 		State state;
-		void setValue(ref ManagedBuffer buffer) @trusted nothrow { ubyte[] expected = [41, 42, 43]; assert(buffer.view.data == expected); assert(buffer.length == expected.length); assert(buffer.capacity == 4096); buffer.releaseNow(); state.completions++; assert(sendSocketBytes(state.peer, [44, 45]) == 2); auto next = state.context.scheduler.recv(cast(socket_t) state.fd, 2).connect(SecondReceiver(state)); next.start(); }
+		void setValue(ref ManagedBuffer buffer) @trusted nothrow { ubyte[] expected = [41, 42, 43]; assert(buffer.view.data == expected); assert(buffer.length == expected.length); assert(buffer.capacity == 4096); buffer.releaseNow(); state.completions++; assert(sendSocketBytes(state.peer, [44, 45]) == 2); state.nextOperation = state.context.scheduler.recv(cast(socket_t) state.fd, 2).connectHeap(SecondReceiver(state)); state.nextOperation.start(); }
 		void setDone() @safe nothrow { assert(false); }
 		void setError(Throwable) @safe nothrow { assert(false); }
 		shared(StopToken) getStopToken() @safe nothrow { return shared(StopToken).init; }
@@ -2783,6 +2797,8 @@ unittest {
 	final class State {
 		EpollContext* context; int fd; int peer; ulong oldToken; Event finished;
 		int values, dones, errors, closes;
+		OperationalStateBase closeOperation;
+		OperationalStateBase nextOperation;
 		this() @trusted { finished.initialize(false, false); }
 	}
 	static struct NewReceiver {
@@ -2799,8 +2815,9 @@ unittest {
 			auto replacement = epollSocketPair();
 			if (replacement[0] != state.fd) { assert(dup2(replacement[0], state.fd) == state.fd); close(replacement[0]); }
 			close(state.peer); state.peer = replacement[1];
-			auto next = state.context.scheduler.recv(cast(socket_t) state.fd, new ubyte[8]).connect(NewReceiver(state));
-			next.start();
+			state.nextOperation = state.context.scheduler.recv(cast(socket_t) state.fd,
+				new ubyte[8]).connectHeap(NewReceiver(state));
+			state.nextOperation.start();
 			state.context.dispatchSynthetic([state.oldToken]);
 			assert(state.values == 0 && state.dones == 0 && state.errors == 0);
 			ubyte[] payload = [121, 122]; assert(sendSocketBytes(state.peer, payload) == payload.length);
@@ -2811,7 +2828,7 @@ unittest {
 	}
 	static struct FenceReceiver {
 		State state;
-		void setValue(int) @trusted { state.oldToken = state.context.registryFixture(state.fd).token; auto closeOperation = state.context.scheduler.close(cast(socket_t) state.fd).connect(CloseReceiver(state)); closeOperation.start(); }
+		void setValue(int) @trusted { state.oldToken = state.context.registryFixture(state.fd).token; state.closeOperation = state.context.scheduler.close(cast(socket_t) state.fd).connectHeap(CloseReceiver(state)); state.closeOperation.start(); }
 		void setDone() @safe nothrow { assert(false); }
 		void setError(Throwable) @safe nothrow { assert(false); }
 		shared(StopToken) getStopToken() @safe nothrow { return shared(StopToken).init; }
@@ -2898,7 +2915,7 @@ unittest {
 @("EpollScheduler received managed buffer returns once from a foreign thread") @trusted
 unittest {
 	import core.lifetime : moveEmplace;
-	final class State { EpollContext* context; int fd; int peer; ManagedBuffer* first; Event finished; Thread releaser; shared int released; int firstValues; int secondValues; this() @trusted { finished.initialize(false, false); } }
+	final class State { EpollContext* context; int fd; int peer; ManagedBuffer* first; Event finished; Thread releaser; shared int released; int firstValues; int secondValues; OperationalStateBase secondOperation; this() @trusted { finished.initialize(false, false); } }
 	static struct SecondReceiver {
 		State state;
 		void setValue(ref ManagedBuffer buffer) @trusted nothrow { ubyte[] expected = [71, 72]; assert(buffer.view.data == expected); assert(buffer.capacity == 4096); state.secondValues++; buffer.releaseNow(); state.finished.setIfInitialized(); }
@@ -2915,8 +2932,9 @@ unittest {
 			assert(state.context.fixtureFreeBuffers == 1);
 			(*state.first).releaseNow(); assert(state.context.fixtureFreeBuffers == 1);
 			ubyte[] payload = [71, 72]; assert(sendSocketBytes(state.peer, payload) == payload.length);
-			auto second = state.context.scheduler.recv(cast(socket_t) state.fd, 0).connect(SecondReceiver(state));
-			second.start();
+			state.secondOperation = state.context.scheduler.recv(cast(socket_t) state.fd,
+				0).connectHeap(SecondReceiver(state));
+			state.secondOperation.start();
 		}
 		void setDone() @safe nothrow { assert(false); }
 		void setError(Throwable) @safe nothrow { assert(false); }

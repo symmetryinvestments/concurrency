@@ -14,66 +14,60 @@ static import core.sys.posix.sys.socket;
 import std.socket : socket_t;
 import std.process : thisThreadID;
 
-private abstract class CommandAction {
-	/// True when consuming this envelope also completes its live-work unit.
-	abstract bool execute() @safe nothrow;
-	abstract void cancel() @safe nothrow;
-}
+private struct CommandHeader {
+	CommandHeader* next;
+	void* owner;
+	bool function(void*) @trusted nothrow execute;
+	void function(void*) @trusted nothrow cancel;
 
-private struct CommandEnvelope {
-	CommandAction action;
-	CommandEnvelope* next;
-}
-
-private final class NopEnvelope(Receiver) : CommandAction {
-	Receiver receiver;
-	this(return Receiver receiver) @trusted { this.receiver = receiver; }
-	override bool execute() @trusted nothrow {
-		import concurrency.receiver : setValueOrError;
-		receiver.setValueOrError(0);
-		receiver = Receiver.init;
-		return true;
-	}
-	override void cancel() @safe nothrow {
-		receiver.setDone();
-		receiver = Receiver.init;
+	void initialize(void* owner_, bool function(void*) @trusted nothrow execute_,
+		void function(void*) @trusted nothrow cancel_) @safe nothrow {
+		owner = owner_;
+		execute = execute_;
+		cancel = cancel_;
 	}
 }
 
-private final class TimerEnvelope : CommandAction {
-	import concurrency.scheduler : Timer, TimerCommand;
-	Timer* timer;
-	TimerCommand command;
-	this(Timer* timer, TimerCommand command) @safe {
-		this.timer = timer;
-		this.command = command;
-	}
-	override bool execute() @safe nothrow { return true; }
-	override void cancel() @safe nothrow {}
-}
-
-private abstract class EpollIoAction : CommandAction {
+/// Intrusive readiness action.  It deliberately contains no class reference:
+/// operations which own their action can embed this header directly.
+private struct ActionHeader {
+	void* owner;
 	int fd;
 	bool readDirection;
 	bool armed;
-	bool started;
-	abstract void retry() @trusted nothrow;
-	abstract void finishDone() @trusted nothrow;
-	abstract void finishErrno(int) @trusted nothrow;
-	abstract void finishPolicy() @trusted nothrow;
-	abstract void finishConflict() @trusted nothrow;
-	abstract void finishControl(int) @trusted nothrow;
-	// An operation retains its admission live-work unit while it is armed.
-	override bool execute() @safe nothrow { return false; }
-	override void cancel() @safe nothrow { finishDone(); }
+	void function(void*) @trusted nothrow retry;
+	void function(void*) @trusted nothrow finishDone;
+	void function(void*, int) @trusted nothrow finishErrno;
+	void function(void*) @trusted nothrow finishPolicy;
+	void function(void*) @trusted nothrow finishConflict;
+	void function(void*, int) @trusted nothrow finishControl;
+
+	void initialize(void* owner_, int fd_, bool readDirection_,
+		void function(void*) @trusted nothrow retry_,
+		void function(void*) @trusted nothrow finishDone_,
+		void function(void*, int) @trusted nothrow finishErrno_,
+		void function(void*) @trusted nothrow finishPolicy_,
+		void function(void*) @trusted nothrow finishConflict_,
+		void function(void*, int) @trusted nothrow finishControl_) @safe nothrow {
+		owner = owner_;
+		fd = fd_;
+		readDirection = readDirection_;
+		armed = false;
+		retry = retry_;
+		finishDone = finishDone_;
+		finishErrno = finishErrno_;
+		finishPolicy = finishPolicy_;
+		finishConflict = finishConflict_;
+		finishControl = finishControl_;
+	}
 }
 
 private struct EpollSlot {
 	int fd = -1;
 	ulong generation = 1;
 	uint installedMask;
-	EpollIoAction readWaiter;
-	EpollIoAction writeWaiter;
+	ActionHeader* readWaiter;
+	ActionHeader* writeWaiter;
 	bool active;
 	bool closing;
 	bool quarantined;
@@ -139,10 +133,10 @@ private final class EpollBufferPool {
 }
 
 private final class EpollContextState {
-	import concurrency.scheduler : Timer, TimerCommand, TimerTrigger, TimingWheels;
+	import concurrency.scheduler : Timer, TimerCommand, TimerCommandNode, TimerTrigger, TimingWheels;
 
-	private MPSCQueue!CommandEnvelope requests;
-	private MPSCQueue!CommandEnvelope timers;
+	private MPSCQueue!CommandHeader requests;
+	private MPSCQueue!(TimerCommandNode!Timer) timers;
 	private TimingWheels wheels;
 	private ThreadID threadId;
 	private int epollFd = -1;
@@ -152,7 +146,7 @@ private final class EpollContextState {
 	private size_t[int] fdSlots;
 	private size_t[] freeSlots;
 	private size_t[] retiredSlots;
-	private EpollIoAction[] retirements;
+	private ActionHeader*[] retirements;
 	private bool processingBatch;
 	private enum ulong wakeToken = ulong.max;
 	private enum ulong indexMask = (ulong(1) << 24) - 1;
@@ -205,8 +199,8 @@ private final class EpollContextState {
 		event.data.u64 = wakeToken;
 		if (epoll_ctl(epollFd, EPOLL_CTL_ADD, eventFd, &event) < 0)
 			throw new ErrnoException("epoll_ctl failed", errno);
-		requests = new MPSCQueue!CommandEnvelope;
-		timers = new MPSCQueue!CommandEnvelope;
+		requests = new MPSCQueue!CommandHeader;
+		timers = new MPSCQueue!(TimerCommandNode!Timer);
 		bufferPool = new EpollBufferPool(capacity);
 		wheels.initialize();
 		threadId = thisThreadID;
@@ -464,7 +458,7 @@ private final class EpollContextState {
 			"Epoll scheduler operations must start within the associated run lifetime");
 	}
 
-	private void push(CommandEnvelope* command) @trusted shared nothrow {
+	private void push(CommandHeader* command) @trusted shared nothrow {
 		if (!reserveAdmission()) {
 			rejectedAdmission();
 			return;
@@ -472,7 +466,7 @@ private final class EpollContextState {
 		addLiveWork();
 		scope(exit) releasePublication();
 		beforeCommandPublication();
-		requests.push(cast(CommandEnvelope*) command);
+		requests.push(cast(CommandHeader*) command);
 		signalIfArmed();
 		afterCommandPublication();
 	}
@@ -509,7 +503,10 @@ private final class EpollContextState {
 	}
 
 	private void enqueueTimer(Timer* timer, TimerCommand command) @trusted shared {
-		auto envelope = new CommandEnvelope(new TimerEnvelope(timer, command));
+		auto node = command == TimerCommand.Register
+			? &timer.registerCommand : &timer.cancelCommand;
+		node.owner = timer;
+		node.command = command;
 		if (!reserveAdmission()) {
 			rejectedAdmission();
 			return;
@@ -517,7 +514,7 @@ private final class EpollContextState {
 		addLiveWork();
 		scope(exit) releasePublication();
 		beforeTimerPublication();
-		timers.push(cast(CommandEnvelope*) envelope);
+		timers.push(cast(TimerCommandNode!Timer*) node);
 		signalIfArmed();
 	}
 
@@ -547,12 +544,10 @@ private final class EpollContextState {
 	private void drainCommands(bool cancel = false) @safe nothrow {
 		while (auto command = requests.pop()) {
 			if (cancel)
-				command.action.cancel();
-			else if (!command.action.execute()) {
-				command.action = null;
+				command.cancel(command.owner);
+			else if (!command.execute(command.owner)) {
 				continue;
 			}
-			command.action = null;
 			releaseLiveWork();
 		}
 	}
@@ -571,7 +566,7 @@ private final class EpollContextState {
 		return mask;
 	}
 
-	private void reconcile(size_t index, EpollIoAction affected = null,
+	private void reconcile(size_t index, ActionHeader* affected = null,
 		bool tokenChanged = false) @trusted nothrow {
 		import core.sys.linux.epoll;
 		import core.stdc.errno : errno, EPERM, ENOENT, EBADF;
@@ -618,26 +613,26 @@ private final class EpollContextState {
 				slot.quarantined = true;
 				slot.installedMask = 0;
 				if (affected !is null)
-					affected.finishControl(errno);
+					affected.finishControl(affected.owner, errno);
 				return;
 			}
 			if (affected !is null) {
-				if (errno == EPERM) affected.finishPolicy();
-				else affected.finishControl(errno);
+				if (errno == EPERM) affected.finishPolicy(affected.owner);
+				else affected.finishControl(affected.owner, errno);
 			}
 			return;
 		}
 		slot.installedMask = desired;
 	}
 
-	private void attach(EpollIoAction action) @trusted nothrow {
+	private void attach(ActionHeader* action) @trusted nothrow {
 		auto found = action.fd in fdSlots;
 		size_t index;
 		if (found is null) {
 			if (freeSlots.length) { index = freeSlots[$ - 1]; freeSlots.length--; }
 			else {
 				if (slots.length >= indexMask) {
-					action.finishPolicy();
+					action.finishPolicy(action.owner);
 					return;
 				}
 				index = slots.length;
@@ -649,22 +644,22 @@ private final class EpollContextState {
 		} else index = *found;
 		auto slot = &slots[index];
 		auto existing = action.readDirection ? slot.readWaiter : slot.writeWaiter;
-		if (existing !is null) { action.finishConflict(); return; }
+		if (existing !is null) { action.finishConflict(action.owner); return; }
 		if (action.readDirection) slot.readWaiter = action; else slot.writeWaiter = action;
 		action.armed = true;
 		reconcile(index, action);
 	}
 
-	private bool validateDescriptor(EpollIoAction action) @trusted nothrow {
+	private bool validateDescriptor(ActionHeader* action) @trusted nothrow {
 		import core.sys.posix.fcntl : fcntl, F_GETFL, O_NONBLOCK;
 		import core.sys.posix.sys.stat : fstat, stat_t, S_ISREG;
 		import core.stdc.errno : errno;
 		auto flags = fcntl(action.fd, F_GETFL);
-		if (flags < 0) { action.finishErrno(errno); return false; }
+		if (flags < 0) { action.finishErrno(action.owner, errno); return false; }
 		stat_t info;
-		if (fstat(action.fd, &info) < 0) { action.finishErrno(errno); return false; }
+		if (fstat(action.fd, &info) < 0) { action.finishErrno(action.owner, errno); return false; }
 		if ((flags & O_NONBLOCK) == 0 || S_ISREG(info.st_mode)) {
-			action.finishPolicy();
+			action.finishPolicy(action.owner);
 			return false;
 		}
 		return true;
@@ -693,8 +688,8 @@ private final class EpollContextState {
 		slot.writeWaiter = null;
 		if (read !is null) read.armed = false;
 		if (write !is null) write.armed = false;
-		if (read !is null) read.finishDone();
-		if (write !is null) write.finishDone();
+		if (read !is null) read.finishDone(read.owner);
+		if (write !is null) write.finishDone(write.owner);
 		reconcile(index);
 		invalidate(*slot);
 		fdSlots.remove(fd);
@@ -729,7 +724,7 @@ private final class EpollContextState {
 		retiredSlots.length = 0;
 	}
 
-	private void retire(EpollIoAction action) @safe nothrow {
+	private void retire(ActionHeader* action) @safe nothrow {
 		if (processingBatch)
 			retirements ~= action;
 	}
@@ -743,7 +738,7 @@ private final class EpollContextState {
 		return true;
 	}
 
-	private void detached(EpollIoAction action) @trusted nothrow {
+	private void detached(ActionHeader* action) @trusted nothrow {
 		import core.stdc.errno : EOVERFLOW;
 		auto found = action.fd in fdSlots;
 		if (found is null) return;
@@ -763,7 +758,7 @@ private final class EpollContextState {
 			slot.fd = -1;
 			slot.quarantined = true;
 			if (survivor !is null)
-				survivor.finishControl(EOVERFLOW);
+				survivor.finishControl(survivor.owner, EOVERFLOW);
 			return;
 		}
 		auto reusable = invalidate(*slot);
@@ -790,9 +785,8 @@ private final class EpollContextState {
 	private void scheduleTimers(bool cancel = false) @trusted nothrow {
 		import std.datetime.systime : Clock;
 		while (auto item = timers.pop()) {
-			auto timerEnvelope = cast(TimerEnvelope) item.action;
-			auto timer = timerEnvelope.timer;
-			auto command = timerEnvelope.command;
+			auto timer = item.owner;
+			auto command = item.command;
 			if (command == TimerCommand.Register) {
 				if (!cancel && timerIsRegistered(timer)) {
 					auto delay = (Clock.currStdTime - wheels.currStdTime(tickSize)).hnsecs;
@@ -804,7 +798,6 @@ private final class EpollContextState {
 				completeTimer(timer, 2);
 				releaseLiveWork();
 			}
-			item.action = null;
 		}
 	}
 
@@ -856,12 +849,12 @@ private final class EpollContextState {
 	}
 
 	private void cancelArmed() @trusted nothrow {
-		EpollIoAction[] pending;
+		ActionHeader*[] pending;
 		foreach (ref slot; slots) {
 			if (slot.readWaiter !is null) pending ~= slot.readWaiter;
 			if (slot.writeWaiter !is null) pending ~= slot.writeWaiter;
 		}
-		foreach (action; pending) action.finishDone();
+		foreach (action; pending) action.finishDone(action.owner);
 	}
 
 	private int drive(scope shared StopToken stopToken) @trusted nothrow {
@@ -933,8 +926,8 @@ private final class EpollContextState {
 					continue;
 				auto read = slots[index].readWaiter;
 				auto write = slots[index].writeWaiter;
-				if (read !is null) read.retry();
-				if (write !is null) write.retry();
+				if (read !is null) read.retry(read.owner);
+				if (write !is null) write.retry(write.owner);
 		}
 		processingBatch = false;
 		releaseRetirements();
@@ -1044,140 +1037,91 @@ private struct EpollNopSender {
 private struct EpollNopOp(Receiver) {
 	shared(EpollContextState) context;
 	Receiver receiver;
+	CommandHeader command;
 	@disable this(this);
 	void start() @trusted nothrow scope {
-		auto envelope = new CommandEnvelope(new NopEnvelope!Receiver(receiver));
-		receiver = Receiver.init;
-		context.push(envelope);
+		command.initialize(cast(void*) &this, &execute, &cancel);
+		context.push(&command);
 	}
+	private static bool execute(void* owner) @trusted nothrow { auto op = cast(EpollNopOp!Receiver*) owner; op.receiver.setValueOrError(0); op.receiver = Receiver.init; return true; }
+	private static void cancel(void* owner) @trusted nothrow { auto op = cast(EpollNopOp!Receiver*) owner; op.receiver.setDone(); op.receiver = Receiver.init; }
 }
 
-private final class CancelEnvelope : CommandAction {
-	EpollIoAction action;
-	this(EpollIoAction action) @safe nothrow { this.action = action; }
-	override bool execute() @safe nothrow { action.finishDone(); return true; }
-	override void cancel() @safe nothrow { action.finishDone(); }
-}
-
-private final class EpollBufferAction(Receiver, bool receiving, bool reading, bool sending) : EpollIoAction {
-	EpollContextState context;
+private struct EpollBufferAction(Receiver, bool receiving, bool reading, bool sending) {
+	ActionHeader header;
+	CommandHeader command;
+	CommandHeader cancelCommand;
+	shared(EpollContextState) context;
 	Receiver receiver;
-	ubyte[] mutableBuffer;
-	const(ubyte)[] constBuffer;
+	int fd;
+	static if (receiving || reading) ubyte[] buffer; else const(ubyte)[] buffer;
 	long offset;
 	shared StopCallback stopCallback;
 	bool terminal;
+	bool started;
 	int controlError;
 
-	this(EpollContextState context, int fd, ubyte[] buffer, long offset, Receiver receiver) @trusted {
-		this.context = context;
-		this.fd = fd;
-		this.readDirection = receiving || reading;
-		this.mutableBuffer = buffer;
-		this.offset = offset;
-		this.receiver = receiver;
+	void initialize(shared(EpollContextState) context_, int fd_, typeof(buffer) buffer_, long offset_, Receiver receiver_) @trusted nothrow {
+		context = context_; fd = fd_; buffer = buffer_; offset = offset_; receiver = receiver_;
+		header.initialize(cast(void*) &this, fd, receiving || reading, &retryHeader,
+			&finishDoneHeader, &finishErrnoHeader, &finishPolicyHeader,
+			&finishConflictHeader, &finishControlHeader);
+		command.initialize(cast(void*) &this, &executeCommand, &cancelCommandCallback);
+		cancelCommand.initialize(cast(void*) &this, &executeCancel, &cancelCancel);
 	}
-	this(EpollContextState context, int fd, const(ubyte)[] buffer, long offset, Receiver receiver) @trusted {
-		this.context = context;
-		this.fd = fd;
-		this.readDirection = false;
-		this.constBuffer = buffer;
-		this.offset = offset;
-		this.receiver = receiver;
-	}
+	private static bool executeCommand(void* owner) @trusted nothrow { return (cast(EpollBufferAction*) owner).execute(); }
+	private static void cancelCommandCallback(void* owner) @trusted nothrow { (cast(EpollBufferAction*) owner).finishDone(); }
+	private static bool executeCancel(void* owner) @trusted nothrow { (cast(EpollBufferAction*) owner).finishDone(); return true; }
+	private static void cancelCancel(void* owner) @trusted nothrow { (cast(EpollBufferAction*) owner).finishDone(); }
+	private static void retryHeader(void* owner) @trusted nothrow { (cast(EpollBufferAction*) owner).retry(); }
+	private static void finishDoneHeader(void* owner) @trusted nothrow { (cast(EpollBufferAction*) owner).finishDone(); }
+	private static void finishErrnoHeader(void* owner, int error) @trusted nothrow { (cast(EpollBufferAction*) owner).finishErrno(error); }
+	private static void finishPolicyHeader(void* owner) @trusted nothrow { (cast(EpollBufferAction*) owner).finishPolicy(); }
+	private static void finishConflictHeader(void* owner) @trusted nothrow { (cast(EpollBufferAction*) owner).finishConflict(); }
+	private static void finishControlHeader(void* owner, int error) @trusted nothrow { (cast(EpollBufferAction*) owner).finishControl(error); }
 
-	override bool execute() @trusted nothrow {
+	private bool execute() @trusted nothrow {
 		started = true;
 		auto token = receiver.getStopToken();
-		stopCallback.register(token, &(cast(shared) this).onStop);
+		stopCallback.register(token, &(cast(shared) &this).onStop);
 		if (token.isStopRequested) finishDone();
-		else if (context.validateDescriptor(this)) retry();
+		else if ((cast(EpollContextState) context).validateDescriptor(&header)) retry();
 		return false;
 	}
-	private void onStop() @trusted nothrow shared {
-		(cast(shared(EpollContextState)) context).push(new CommandEnvelope(new CancelEnvelope(cast() this)));
-	}
-	override void retry() @trusted nothrow {
+	private void onStop() @trusted nothrow shared { context.push(cast(CommandHeader*) &cancelCommand); }
+	private void retry() @trusted nothrow {
 		if (terminal) return;
 		import core.stdc.errno : errno, EINTR, EAGAIN, EWOULDBLOCK;
 		import core.sys.posix.unistd : read, write, pread, pwrite;
 		import core.sys.posix.sys.socket : recv, send;
 		ptrdiff_t result;
 		for (;;) {
-			static if (receiving)
-				result = recv(fd, mutableBuffer.ptr, mutableBuffer.length, 0);
-			else static if (reading)
-				result = offset == 0 ? read(fd, mutableBuffer.ptr, mutableBuffer.length) : pread(fd, mutableBuffer.ptr, mutableBuffer.length, offset);
-			else static if (sending)
-				result = send(fd, constBuffer.ptr, constBuffer.length, 0);
-			else
-				result = offset == 0 ? write(fd, constBuffer.ptr, constBuffer.length) : pwrite(fd, constBuffer.ptr, constBuffer.length, offset);
+			static if (receiving) result = recv(fd, buffer.ptr, buffer.length, 0);
+			else static if (reading) result = offset == 0 ? read(fd, buffer.ptr, buffer.length) : pread(fd, buffer.ptr, buffer.length, offset);
+			else static if (sending) result = send(fd, buffer.ptr, buffer.length, 0);
+			else result = offset == 0 ? write(fd, buffer.ptr, buffer.length) : pwrite(fd, buffer.ptr, buffer.length, offset);
 			if (result < 0 && errno == EINTR) continue;
 			break;
 		}
 		if (result > 0) {
-			static if (receiving || reading) finishValue(mutableBuffer[0 .. result]);
-			else finishValue(cast(int) result);
+			static if (receiving || reading) finishValue(buffer[0 .. result]); else finishValue(cast(int) result);
 		} else if (result == 0) finishDone();
-		else if (errno == EAGAIN || errno == EWOULDBLOCK) {
-			if (!armed) context.attach(this);
-		} else finishErrno(errno);
+		else if (errno == EAGAIN || errno == EWOULDBLOCK) { if (!header.armed) (cast(EpollContextState) context).attach(&header); }
+		else finishErrno(errno);
 	}
-	private void finishValue(T)(T value) @trusted nothrow {
-		if (terminal) return; terminal = true;
-		if (armed) context.detached(this);
+	private void prepareTerminal() @trusted nothrow {
+		if (header.armed) (cast(EpollContextState) context).detached(&header);
 		stopCallback.dispose();
-		if (controlError) receiver.setErrno("epoll_ctl failed", controlError);
-		else receiver.setValueOrError(value);
-		receiver = Receiver.init;
-		if (started) context.releaseLiveWork();
-		context.retire(this);
+		if (started) (cast(EpollContextState) context).releaseLiveWork();
+		(cast(EpollContextState) context).retire(&header);
 	}
-	override void finishDone() @trusted nothrow {
-		if (terminal) return; terminal = true;
-		if (armed) context.detached(this);
-		stopCallback.dispose();
-		if (controlError) receiver.setErrno("epoll_ctl failed", controlError);
-		else receiver.setDone();
-		receiver = Receiver.init;
-		if (started) context.releaseLiveWork();
-		context.retire(this);
-	}
-	override void finishErrno(int error) @trusted nothrow {
-		if (terminal) return; terminal = true;
-		if (armed) context.detached(this);
-		stopCallback.dispose();
-		static if (receiving) receiver.setErrno("Receive failed", error);
-		else static if (reading) receiver.setErrno("Read failed", error);
-		else static if (sending) receiver.setErrno("Send failed", error);
-		else receiver.setErrno("Write failed", error);
-		receiver = Receiver.init; if (started) context.releaseLiveWork();
-		context.retire(this);
-	}
-	override void finishPolicy() @trusted nothrow { finishException("epoll supports only nonblocking sockets and pipes"); }
-	override void finishConflict() @trusted nothrow {
-		finishException(readDirection ? "epoll already has a read waiter for this descriptor" : "epoll already has a write waiter for this descriptor");
-	}
-	override void finishControl(int error) @trusted nothrow {
-		if (terminal) {
-			controlError = error;
-			return;
-		}
-		terminal = true;
-		if (armed) context.detached(this);
-		stopCallback.dispose();
-		receiver.setErrno("epoll_ctl failed", error);
-		receiver = Receiver.init;
-		if (started) context.releaseLiveWork();
-		context.retire(this);
-	}
-	private void finishException(string message) @trusted nothrow {
-		if (terminal) return; terminal = true;
-		if (armed) context.detached(this);
-		stopCallback.dispose(); receiver.setError(new Exception(message)); receiver = Receiver.init;
-		if (started) context.releaseLiveWork();
-		context.retire(this);
-	}
+	private void finishValue(T)(T value) @trusted nothrow { if (terminal) return; terminal = true; prepareTerminal(); if (controlError) receiver.setErrno("epoll_ctl failed", controlError); else receiver.setValueOrError(value); }
+	private void finishDone() @trusted nothrow { if (terminal) return; terminal = true; prepareTerminal(); if (controlError) receiver.setErrno("epoll_ctl failed", controlError); else receiver.setDone(); }
+	private void finishErrno(int error) @trusted nothrow { if (terminal) return; terminal = true; prepareTerminal(); static if (receiving) receiver.setErrno("Receive failed", error); else static if (reading) receiver.setErrno("Read failed", error); else static if (sending) receiver.setErrno("Send failed", error); else receiver.setErrno("Write failed", error); }
+	private void finishPolicy() @trusted nothrow { finishException("epoll supports only nonblocking sockets and pipes"); }
+	private void finishConflict() @trusted nothrow { finishException(header.readDirection ? "epoll already has a read waiter for this descriptor" : "epoll already has a write waiter for this descriptor"); }
+	private void finishControl(int error) @trusted nothrow { if (terminal) { controlError = error; return; } terminal = true; prepareTerminal(); receiver.setErrno("epoll_ctl failed", error); }
+	private void finishException(string message) @trusted nothrow { if (terminal) return; terminal = true; prepareTerminal(); receiver.setError(new Exception(message)); }
 }
 
 private struct EpollBufferSender(ReceiverValue, bool receiving, bool reading, bool sending) {
@@ -1197,31 +1141,53 @@ private struct EpollBufferOp(Receiver, bool receiving, bool reading, bool sendin
 	static if (receiving || reading) ubyte[] buffer; else const(ubyte)[] buffer;
 	long offset;
 	Receiver receiver;
+	EpollBufferAction!(Receiver, receiving, reading, sending) action;
 	@disable this(this);
 	void start() @trusted nothrow scope {
-		static if (receiving || reading)
-			auto action = new EpollBufferAction!(Receiver, receiving, reading, sending)(cast() context, fd, buffer, offset, receiver);
-		else
-			auto action = new EpollBufferAction!(Receiver, receiving, reading, sending)(cast() context, fd, buffer, offset, receiver);
+		action.initialize(context, fd, buffer, offset, receiver);
 		receiver = Receiver.init;
-		(cast(shared(EpollContextState)) context).push(new CommandEnvelope(action));
+		context.push(&action.command);
 	}
 }
 
 extern(C) int accept4(int, core.sys.posix.sys.socket.sockaddr*,
 	core.sys.posix.sys.socket.socklen_t*, int) nothrow @nogc;
 
-private final class EpollAcceptAction(Receiver) : EpollIoAction {
-	EpollContextState context;
+private struct EpollAcceptAction(Receiver) {
+	ActionHeader header;
+	CommandHeader command;
+	CommandHeader cancelCommand;
+	shared(EpollContextState) context;
 	Receiver receiver;
+	int fd;
 	shared StopCallback stopCallback;
 	bool terminal;
+	bool started;
 	core.sys.posix.sys.socket.sockaddr_storage address;
 	core.sys.posix.sys.socket.socklen_t addressLength = address.sizeof;
-	this(EpollContextState context, int fd, Receiver receiver) @trusted { this.context = context; this.fd = fd; this.receiver = receiver; readDirection = true; }
-	override bool execute() @trusted nothrow { started = true; auto token = receiver.getStopToken(); stopCallback.register(token, &(cast(shared) this).onStop); if (token.isStopRequested) finishDone(); else if (context.validateDescriptor(this)) retry(); return false; }
-	private void onStop() @trusted nothrow shared { (cast(shared(EpollContextState)) context).push(new CommandEnvelope(new CancelEnvelope(cast() this))); }
-	override void retry() @trusted nothrow {
+
+	void initialize(shared(EpollContextState) context_, int fd_, Receiver receiver_) @trusted nothrow {
+		context = context_; fd = fd_; receiver = receiver_;
+		header.initialize(cast(void*) &this, fd, true, &retryHeader,
+			&finishDoneHeader, &finishErrnoHeader, &finishPolicyHeader,
+			&finishConflictHeader, &finishControlHeader);
+		command.initialize(cast(void*) &this, &executeCommand, &cancelCommandCallback);
+		cancelCommand.initialize(cast(void*) &this, &executeCancel, &cancelCancel);
+	}
+	private static bool executeCommand(void* owner) @trusted nothrow { return (cast(EpollAcceptAction*) owner).execute(); }
+	private static void cancelCommandCallback(void* owner) @trusted nothrow { (cast(EpollAcceptAction*) owner).finishDone(); }
+	private static bool executeCancel(void* owner) @trusted nothrow { (cast(EpollAcceptAction*) owner).finishDone(); return true; }
+	private static void cancelCancel(void* owner) @trusted nothrow { (cast(EpollAcceptAction*) owner).finishDone(); }
+	private static void retryHeader(void* owner) @trusted nothrow { (cast(EpollAcceptAction*) owner).retry(); }
+	private static void finishDoneHeader(void* owner) @trusted nothrow { (cast(EpollAcceptAction*) owner).finishDone(); }
+	private static void finishErrnoHeader(void* owner, int error) @trusted nothrow { (cast(EpollAcceptAction*) owner).finishErrno(error); }
+	private static void finishPolicyHeader(void* owner) @trusted nothrow { (cast(EpollAcceptAction*) owner).finishPolicy(); }
+	private static void finishConflictHeader(void* owner) @trusted nothrow { (cast(EpollAcceptAction*) owner).finishConflict(); }
+	private static void finishControlHeader(void* owner, int error) @trusted nothrow { (cast(EpollAcceptAction*) owner).finishControl(error); }
+
+	private bool execute() @trusted nothrow { started = true; auto token = receiver.getStopToken(); stopCallback.register(token, &(cast(shared) &this).onStop); if (token.isStopRequested) finishDone(); else if ((cast(EpollContextState) context).validateDescriptor(&header)) retry(); return false; }
+	private void onStop() @trusted nothrow shared { context.push(cast(CommandHeader*) &cancelCommand); }
+	private void retry() @trusted nothrow {
 		if (terminal) return;
 		import core.stdc.errno : errno, EINTR, EAGAIN, EWOULDBLOCK;
 		import core.sys.posix.fcntl : O_NONBLOCK, O_CLOEXEC;
@@ -1231,16 +1197,17 @@ private final class EpollAcceptAction(Receiver) : EpollIoAction {
 			import concurrency.ioscheduler : Client;
 			import concurrency.io.socket : Socket;
 			finishValue(Client(Socket(cast(socket_t) result), *cast(core.sys.posix.sys.socket.sockaddr*) &address, addressLength));
-		} else if (errno == EAGAIN || errno == EWOULDBLOCK) { if (!armed) context.attach(this); }
+		} else if (errno == EAGAIN || errno == EWOULDBLOCK) { if (!header.armed) (cast(EpollContextState) context).attach(&header); }
 		else finishErrno(errno);
 	}
-	private void finishValue(T)(T value) @trusted nothrow { if (terminal) return; terminal = true; if (armed) context.detached(this); stopCallback.dispose(); receiver.setValueOrError(value); receiver = Receiver.init; if (started) context.releaseLiveWork(); context.retire(this); }
-	override void finishDone() @trusted nothrow { if (terminal) return; terminal = true; if (armed) context.detached(this); stopCallback.dispose(); receiver.setDone(); receiver = Receiver.init; if (started) context.releaseLiveWork(); context.retire(this); }
-	override void finishErrno(int error) @trusted nothrow { if (terminal) return; terminal = true; if (armed) context.detached(this); stopCallback.dispose(); receiver.setErrno("Accept failed", error); receiver = Receiver.init; if (started) context.releaseLiveWork(); context.retire(this); }
-	override void finishPolicy() @trusted nothrow { finishException("epoll supports only nonblocking sockets and pipes"); }
-	override void finishConflict() @trusted nothrow { finishException("epoll already has a read waiter for this descriptor"); }
-	override void finishControl(int error) @trusted nothrow { finishErrno(error); }
-	private void finishException(string message) @trusted nothrow { if (terminal) return; terminal = true; if (armed) context.detached(this); stopCallback.dispose(); receiver.setError(new Exception(message)); receiver = Receiver.init; if (started) context.releaseLiveWork(); context.retire(this); }
+	private void prepareTerminal() @trusted nothrow { if (header.armed) (cast(EpollContextState) context).detached(&header); stopCallback.dispose(); if (started) (cast(EpollContextState) context).releaseLiveWork(); (cast(EpollContextState) context).retire(&header); }
+	private void finishValue(T)(T value) @trusted nothrow { if (terminal) return; terminal = true; prepareTerminal(); auto receiver_ = receiver; receiver = Receiver.init; receiver_.setValueOrError(value); }
+	private void finishDone() @trusted nothrow { if (terminal) return; terminal = true; prepareTerminal(); auto receiver_ = receiver; receiver = Receiver.init; receiver_.setDone(); }
+	private void finishErrno(int error) @trusted nothrow { if (terminal) return; terminal = true; prepareTerminal(); auto receiver_ = receiver; receiver = Receiver.init; receiver_.setErrno("Accept failed", error); }
+	private void finishPolicy() @trusted nothrow { finishException("epoll supports only nonblocking sockets and pipes"); }
+	private void finishConflict() @trusted nothrow { finishException("epoll already has a read waiter for this descriptor"); }
+	private void finishControl(int error) @trusted nothrow { finishErrno(error); }
+	private void finishException(string message) @trusted nothrow { if (terminal) return; terminal = true; prepareTerminal(); auto receiver_ = receiver; receiver = Receiver.init; receiver_.setError(new Exception(message)); }
 }
 
 private struct EpollAcceptSender {
@@ -1249,100 +1216,226 @@ private struct EpollAcceptSender {
 	auto connect(Receiver)(return Receiver receiver) @safe return scope { return EpollAcceptOp!Receiver(context, fd, receiver); }
 }
 private struct EpollAcceptOp(Receiver) {
-	shared(EpollContextState) context; int fd; Receiver receiver; @disable this(this);
-	void start() @trusted nothrow scope { auto action = new EpollAcceptAction!Receiver(cast() context, fd, receiver); receiver = Receiver.init; context.push(new CommandEnvelope(action)); }
+	shared(EpollContextState) context; int fd; Receiver receiver; EpollAcceptAction!Receiver action; @disable this(this);
+	void start() @trusted nothrow scope { action.initialize(context, fd, receiver); receiver = Receiver.init; context.push(&action.command); }
 }
 
-private final class EpollConnectAction(Receiver) : EpollIoAction {
-	EpollContextState context; Receiver receiver; shared StopCallback stopCallback; bool terminal;
+private struct EpollConnectAction(Receiver) {
+	ActionHeader header; CommandHeader command; CommandHeader cancelCommand;
+	shared(EpollContextState) context; Receiver receiver; int fd; shared StopCallback stopCallback; bool terminal; bool started;
 	core.sys.posix.netinet.in_.sockaddr_in address;
-	this(EpollContextState context, int fd, string host, ushort port, Receiver receiver) @trusted {
+	void initialize(shared(EpollContextState) context_, int fd_, string host, ushort port, Receiver receiver_) @trusted nothrow {
 		import core.sys.posix.netinet.in_ : AF_INET, htons, ntohl, htonl, inet_addr, INADDR_NONE;
 		import std.string : toStringz;
-		this.context = context; this.fd = fd; this.receiver = receiver; readDirection = false;
+		context = context_; fd = fd_; receiver = receiver_;
 		address.sin_family = AF_INET; address.sin_port = htons(port);
 		auto numeric = ntohl(inet_addr(host.toStringz()));
 		if (numeric == INADDR_NONE) address.sin_addr.s_addr = INADDR_NONE;
 		else address.sin_addr.s_addr = htonl(numeric);
+		header.initialize(cast(void*) &this, fd, false, &retryHeader,
+			&finishDoneHeader, &finishErrnoHeader, &finishPolicyHeader,
+			&finishConflictHeader, &finishControlHeader);
+		command.initialize(cast(void*) &this, &executeCommand, &cancelCommandCallback);
+		cancelCommand.initialize(cast(void*) &this, &executeCancel, &cancelCancel);
 	}
-	override bool execute() @trusted nothrow { started = true; auto token = receiver.getStopToken(); stopCallback.register(token, &(cast(shared) this).onStop); if (token.isStopRequested) finishDone(); else if (context.validateDescriptor(this)) retry(); return false; }
-	private void onStop() @trusted nothrow shared { (cast(shared(EpollContextState)) context).push(new CommandEnvelope(new CancelEnvelope(cast() this))); }
-	override void retry() @trusted nothrow {
+	private static bool executeCommand(void* owner) @trusted nothrow { return (cast(EpollConnectAction*) owner).execute(); }
+	private static void cancelCommandCallback(void* owner) @trusted nothrow { (cast(EpollConnectAction*) owner).finishDone(); }
+	private static bool executeCancel(void* owner) @trusted nothrow { (cast(EpollConnectAction*) owner).finishDone(); return true; }
+	private static void cancelCancel(void* owner) @trusted nothrow { (cast(EpollConnectAction*) owner).finishDone(); }
+	private static void retryHeader(void* owner) @trusted nothrow { (cast(EpollConnectAction*) owner).retry(); }
+	private static void finishDoneHeader(void* owner) @trusted nothrow { (cast(EpollConnectAction*) owner).finishDone(); }
+	private static void finishErrnoHeader(void* owner, int error) @trusted nothrow { (cast(EpollConnectAction*) owner).finishErrno(error); }
+	private static void finishPolicyHeader(void* owner) @trusted nothrow { (cast(EpollConnectAction*) owner).finishPolicy(); }
+	private static void finishConflictHeader(void* owner) @trusted nothrow { (cast(EpollConnectAction*) owner).finishConflict(); }
+	private static void finishControlHeader(void* owner, int error) @trusted nothrow { (cast(EpollConnectAction*) owner).finishControl(error); }
+	private bool execute() @trusted nothrow { started = true; auto token = receiver.getStopToken(); stopCallback.register(token, &(cast(shared) &this).onStop); if (token.isStopRequested) finishDone(); else if ((cast(EpollContextState) context).validateDescriptor(&header)) retry(); return false; }
+	private void onStop() @trusted nothrow shared { context.push(cast(CommandHeader*) &cancelCommand); }
+	private void retry() @trusted nothrow {
 		if (terminal) return;
 		import core.stdc.errno : errno, EINTR, EINPROGRESS, EALREADY;
 		import core.sys.posix.sys.socket : connect, getsockopt, SOL_SOCKET, SO_ERROR, socklen_t;
 		int result, error; socklen_t size = error.sizeof;
-		if (!armed) {
+		if (!header.armed) {
 			for (;;) { result = connect(fd, cast(core.sys.posix.sys.socket.sockaddr*) &address, address.sizeof); if (result < 0 && errno == EINTR) continue; break; }
 			if (result == 0) { finishValue(); return; }
-			if (errno == EINPROGRESS || errno == EALREADY) { context.attach(this); return; }
+			if (errno == EINPROGRESS || errno == EALREADY) { (cast(EpollContextState) context).attach(&header); return; }
 			finishErrno(errno); return;
 		}
 		if (getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &size) < 0) { finishErrno(errno); return; }
 		if (error == 0) finishValue(); else finishErrno(error);
 	}
-	private void finishValue() @trusted nothrow { if (terminal) return; terminal = true; if (armed) context.detached(this); stopCallback.dispose(); receiver.setValueOrError(); receiver = Receiver.init; if (started) context.releaseLiveWork(); context.retire(this); }
-	override void finishDone() @trusted nothrow { if (terminal) return; terminal = true; if (armed) context.detached(this); stopCallback.dispose(); receiver.setDone(); receiver = Receiver.init; if (started) context.releaseLiveWork(); context.retire(this); }
-	override void finishErrno(int error) @trusted nothrow { if (terminal) return; terminal = true; if (armed) context.detached(this); stopCallback.dispose(); receiver.setErrno("Connect failed", error); receiver = Receiver.init; if (started) context.releaseLiveWork(); context.retire(this); }
-	override void finishPolicy() @trusted nothrow { finishException("epoll supports only nonblocking sockets and pipes"); }
-	override void finishConflict() @trusted nothrow { finishException("epoll already has a write waiter for this descriptor"); }
-	override void finishControl(int error) @trusted nothrow { finishErrno(error); }
-	private void finishException(string message) @trusted nothrow { if (terminal) return; terminal = true; if (armed) context.detached(this); stopCallback.dispose(); receiver.setError(new Exception(message)); receiver = Receiver.init; if (started) context.releaseLiveWork(); context.retire(this); }
+	private void prepareTerminal() @trusted nothrow { if (header.armed) (cast(EpollContextState) context).detached(&header); stopCallback.dispose(); if (started) (cast(EpollContextState) context).releaseLiveWork(); (cast(EpollContextState) context).retire(&header); }
+	private void finishValue() @trusted nothrow { if (terminal) return; terminal = true; prepareTerminal(); auto receiver_ = receiver; receiver = Receiver.init; receiver_.setValueOrError(); }
+	private void finishDone() @trusted nothrow { if (terminal) return; terminal = true; prepareTerminal(); auto receiver_ = receiver; receiver = Receiver.init; receiver_.setDone(); }
+	private void finishErrno(int error) @trusted nothrow { if (terminal) return; terminal = true; prepareTerminal(); auto receiver_ = receiver; receiver = Receiver.init; receiver_.setErrno("Connect failed", error); }
+	private void finishPolicy() @trusted nothrow { finishException("epoll supports only nonblocking sockets and pipes"); }
+	private void finishConflict() @trusted nothrow { finishException("epoll already has a write waiter for this descriptor"); }
+	private void finishControl(int error) @trusted nothrow { finishErrno(error); }
+	private void finishException(string message) @trusted nothrow { if (terminal) return; terminal = true; prepareTerminal(); auto receiver_ = receiver; receiver = Receiver.init; receiver_.setError(new Exception(message)); }
 }
 private struct EpollConnectSender { alias Value = void; shared(EpollContextState) context; int fd; string address; ushort port; auto connect(Receiver)(return Receiver receiver) @safe return scope { return EpollConnectOp!Receiver(context, fd, address, port, receiver); } }
-private struct EpollConnectOp(Receiver) { shared(EpollContextState) context; int fd; string address; ushort port; Receiver receiver; @disable this(this); void start() @trusted nothrow scope { auto action = new EpollConnectAction!Receiver(cast() context, fd, address, port, receiver); receiver = Receiver.init; context.push(new CommandEnvelope(action)); } }
+private struct EpollConnectOp(Receiver) { shared(EpollContextState) context; int fd; string address; ushort port; Receiver receiver; EpollConnectAction!Receiver action; @disable this(this); void start() @trusted nothrow scope { action.initialize(context, fd, address, port, receiver); receiver = Receiver.init; context.push(&action.command); } }
 
-private final class EpollManagedRecvAction(Receiver) : EpollIoAction {
-	EpollContextState context; Receiver receiver; shared StopCallback stopCallback; bool terminal; uint length;
-	this(EpollContextState context, int fd, uint length, Receiver receiver) @trusted { this.context = context; this.fd = fd; this.length = length; this.receiver = receiver; readDirection = true; }
-	override bool execute() @trusted nothrow { started = true; if (length > EpollBufferPool.slotSize) { finishException("epoll managed buffer request exceeds 4096-byte slot"); return false; } auto token = receiver.getStopToken(); stopCallback.register(token, &(cast(shared) this).onStop); if (token.isStopRequested) finishDone(); else if (context.validateDescriptor(this)) retry(); return false; }
-	private void onStop() @trusted nothrow shared { (cast(shared(EpollContextState)) context).push(new CommandEnvelope(new CancelEnvelope(cast() this))); }
-	override void retry() @trusted nothrow {
+private struct EpollManagedRecvSender { alias Value = concurrency.io.buffer.ManagedBuffer; shared(EpollContextState) context; int fd; uint length; auto connect(Receiver)(return Receiver receiver) @safe return scope { return EpollManagedRecvOp!Receiver(context: context, fd: fd, length: length, receiver: receiver); } }
+private struct EpollManagedRecvOp(Receiver) {
+	ActionHeader header;
+	CommandHeader command;
+	CommandHeader cancelCommand;
+	shared(EpollContextState) context;
+	int fd;
+	uint length;
+	Receiver receiver;
+	shared StopCallback stopCallback;
+	bool terminal;
+	bool started;
+
+	@disable this(this);
+
+	void start() @trusted nothrow scope {
+		header.initialize(cast(void*) &this, fd, true, &retryHeader,
+			&finishDoneHeader, &finishErrnoHeader, &finishPolicyHeader,
+			&finishConflictHeader, &finishControlHeader);
+		command.initialize(cast(void*) &this, &executeCommand, &cancelCommandCallback);
+		cancelCommand.initialize(cast(void*) &this, &executeCancel, &cancelCancel);
+		context.push(&command);
+	}
+
+	private static bool executeCommand(void* owner) @trusted nothrow {
+		return (cast(EpollManagedRecvOp!Receiver*) owner).execute();
+	}
+	private static void cancelCommandCallback(void* owner) @trusted nothrow {
+		(cast(EpollManagedRecvOp!Receiver*) owner).finishDone();
+	}
+	private static bool executeCancel(void* owner) @trusted nothrow {
+		(cast(EpollManagedRecvOp!Receiver*) owner).finishDone();
+		return true;
+	}
+	private static void cancelCancel(void* owner) @trusted nothrow {
+		(cast(EpollManagedRecvOp!Receiver*) owner).finishDone();
+	}
+	private static void retryHeader(void* owner) @trusted nothrow {
+		(cast(EpollManagedRecvOp!Receiver*) owner).retry();
+	}
+	private static void finishDoneHeader(void* owner) @trusted nothrow {
+		(cast(EpollManagedRecvOp!Receiver*) owner).finishDone();
+	}
+	private static void finishErrnoHeader(void* owner, int error) @trusted nothrow {
+		(cast(EpollManagedRecvOp!Receiver*) owner).finishErrno(error);
+	}
+	private static void finishPolicyHeader(void* owner) @trusted nothrow {
+		(cast(EpollManagedRecvOp!Receiver*) owner).finishPolicy();
+	}
+	private static void finishConflictHeader(void* owner) @trusted nothrow {
+		(cast(EpollManagedRecvOp!Receiver*) owner).finishConflict();
+	}
+	private static void finishControlHeader(void* owner, int error) @trusted nothrow {
+		(cast(EpollManagedRecvOp!Receiver*) owner).finishControl(error);
+	}
+
+	private bool execute() @trusted nothrow {
+		started = true;
+		if (length > EpollBufferPool.slotSize) {
+			finishException("epoll managed buffer request exceeds 4096-byte slot");
+			return false;
+		}
+		auto token = receiver.getStopToken();
+		stopCallback.register(token, &(cast(shared) &this).onStop);
+		if (token.isStopRequested) finishDone();
+		else if ((cast(EpollContextState) context).validateDescriptor(&header)) retry();
+		// The initial command's live-work unit stays held until this operation terminates.
+		return false;
+	}
+	private void onStop() @trusted nothrow shared {
+		context.push(cast(CommandHeader*) &cancelCommand);
+	}
+	private void retry() @trusted nothrow {
 		if (terminal) return;
 		import core.stdc.errno : errno, EINTR, EAGAIN, EWOULDBLOCK;
 		import core.sys.posix.sys.socket : recv;
-		auto pool = context.managedPool(); auto base = pool.lease();
+		auto pool = (cast(EpollContextState) context).managedPool();
+		auto base = pool.lease();
 		if (base is null) { finishException("epoll managed buffer pool has no free slots"); return; }
-		ptrdiff_t result; auto requested = length == 0 ? base.length : length;
-		for (;;) { result = recv(fd, base.ptr, requested, 0); if (result < 0 && errno == EINTR) continue; break; }
+		ptrdiff_t result;
+		auto requested = length == 0 ? base.length : length;
+		for (;;) {
+			result = recv(fd, base.ptr, requested, 0);
+			if (result < 0 && errno == EINTR) continue;
+			break;
+		}
 		if (result > 0) {
 			import concurrency.io.buffer : ManagedBuffer;
 			auto sharedPool = cast(shared(EpollBufferPool)) pool;
 			ManagedBuffer.Release release = &sharedPool.release;
 			finishValue(ManagedBuffer.adopt(release, base, cast(uint) result));
-		} else { (cast(shared(EpollBufferPool)) pool).release(base); if (result == 0) finishDone(); else if (errno == EAGAIN || errno == EWOULDBLOCK) { if (!armed) context.attach(this); } else finishErrno(errno); }
+			return;
+		}
+		(cast(shared(EpollBufferPool)) pool).release(base);
+		if (result == 0) finishDone();
+		else if (errno == EAGAIN || errno == EWOULDBLOCK) {
+			if (!header.armed) (cast(EpollContextState) context).attach(&header);
+		} else finishErrno(errno);
 	}
-	private void finishValue(T)(return scope T value) @trusted nothrow { if (terminal) return; terminal = true; if (armed) context.detached(this); stopCallback.dispose(); receiver.setValueOrError(value); receiver = Receiver.init; if (started) context.releaseLiveWork(); context.retire(this); }
-	override void finishDone() @trusted nothrow { if (terminal) return; terminal = true; if (armed) context.detached(this); stopCallback.dispose(); receiver.setDone(); receiver = Receiver.init; if (started) context.releaseLiveWork(); context.retire(this); }
-	override void finishErrno(int error) @trusted nothrow { if (terminal) return; terminal = true; if (armed) context.detached(this); stopCallback.dispose(); receiver.setErrno("Receive failed", error); receiver = Receiver.init; if (started) context.releaseLiveWork(); context.retire(this); }
-	override void finishPolicy() @trusted nothrow { finishException("epoll supports only nonblocking sockets and pipes"); }
-	override void finishConflict() @trusted nothrow { finishException("epoll already has a read waiter for this descriptor"); }
-	override void finishControl(int error) @trusted nothrow { finishErrno(error); }
-	private void finishException(string message) @trusted nothrow { if (terminal) return; terminal = true; if (armed) context.detached(this); stopCallback.dispose(); receiver.setError(new Exception(message)); receiver = Receiver.init; if (started) context.releaseLiveWork(); context.retire(this); }
-}
-private struct EpollManagedRecvSender { alias Value = concurrency.io.buffer.ManagedBuffer; shared(EpollContextState) context; int fd; uint length; auto connect(Receiver)(return Receiver receiver) @safe return scope { return EpollManagedRecvOp!Receiver(context, fd, length, receiver); } }
-private struct EpollManagedRecvOp(Receiver) { shared(EpollContextState) context; int fd; uint length; Receiver receiver; @disable this(this); void start() @trusted nothrow scope { auto action = new EpollManagedRecvAction!Receiver(cast() context, fd, length, receiver); receiver = Receiver.init; context.push(new CommandEnvelope(action)); } }
-
-private final class EpollCloseAction(Receiver) : CommandAction {
-	EpollContextState context; int fd; Receiver receiver;
-	this(EpollContextState context, int fd, Receiver receiver) @trusted { this.context = context; this.fd = fd; this.receiver = receiver; }
-	override bool execute() @trusted nothrow {
-		finish(false);
-		return true;
+	private void prepareTerminal() @trusted nothrow {
+		if (header.armed) (cast(EpollContextState) context).detached(&header);
+		stopCallback.dispose();
+		if (started) (cast(EpollContextState) context).releaseLiveWork();
+		(cast(EpollContextState) context).retire(&header);
 	}
-	override void cancel() @trusted nothrow { finish(true); }
-	private void finish(bool cancelled) @trusted nothrow {
-		context.closeDescriptor(fd);
-		int error;
-		auto result = context.closeOnce(fd, error);
-		if (cancelled) receiver.setDone();
-		else if (result == 0) receiver.setValueOrError();
-		else receiver.setErrno("Close failed", error);
+	private void finishValue(T)(return scope T value) @trusted nothrow {
+		if (terminal) return;
+		terminal = true;
+		prepareTerminal();
+		auto receiver_ = receiver;
 		receiver = Receiver.init;
+		receiver_.setValueOrError(value);
+	}
+	private void finishDone() @trusted nothrow {
+		if (terminal) return;
+		terminal = true;
+		prepareTerminal();
+		auto receiver_ = receiver;
+		receiver = Receiver.init;
+		receiver_.setDone();
+	}
+	private void finishErrno(int error) @trusted nothrow {
+		if (terminal) return;
+		terminal = true;
+		prepareTerminal();
+		auto receiver_ = receiver;
+		receiver = Receiver.init;
+		receiver_.setErrno("Receive failed", error);
+	}
+	private void finishPolicy() @trusted nothrow {
+		finishException("epoll supports only nonblocking sockets and pipes");
+	}
+	private void finishConflict() @trusted nothrow {
+		finishException("epoll already has a read waiter for this descriptor");
+	}
+	private void finishControl(int error) @trusted nothrow { finishErrno(error); }
+	private void finishException(string message) @trusted nothrow {
+		if (terminal) return;
+		terminal = true;
+		prepareTerminal();
+		auto receiver_ = receiver;
+		receiver = Receiver.init;
+		receiver_.setError(new Exception(message));
 	}
 }
+
 private struct EpollCloseSender { alias Value = void; shared(EpollContextState) context; int fd; auto connect(Receiver)(return Receiver receiver) @safe return scope { return EpollCloseOp!Receiver(context, fd, receiver); } }
-private struct EpollCloseOp(Receiver) { shared(EpollContextState) context; int fd; Receiver receiver; @disable this(this); void start() @trusted nothrow scope { auto action = new EpollCloseAction!Receiver(cast() context, fd, receiver); receiver = Receiver.init; context.push(new CommandEnvelope(action)); } }
+private struct EpollCloseOp(Receiver) {
+	shared(EpollContextState) context; int fd; Receiver receiver; CommandHeader command;
+	@disable this(this);
+	void start() @trusted nothrow scope { command.initialize(cast(void*) &this, &execute, &cancel); context.push(&command); }
+	private static bool execute(void* owner) @trusted nothrow { finish(cast(EpollCloseOp!Receiver*) owner, false); return true; }
+	private static void cancel(void* owner) @trusted nothrow { finish(cast(EpollCloseOp!Receiver*) owner, true); }
+	private static void finish(EpollCloseOp!Receiver* op, bool cancelled) @trusted nothrow {
+		auto context = cast(EpollContextState) op.context;
+		context.closeDescriptor(op.fd); int error; auto result = context.closeOnce(op.fd, error);
+		if (cancelled) op.receiver.setDone(); else if (result == 0) op.receiver.setValueOrError(); else op.receiver.setErrno("Close failed", error);
+		op.receiver = Receiver.init;
+	}
+}
 
 private struct EpollRunSender(Sender) {
 	alias Value = Sender.Value;
