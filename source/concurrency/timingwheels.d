@@ -137,7 +137,8 @@ struct ListElement(T) {
 
 enum TimerCommand : ushort {
 	Register = 1,
-	Cancel = 2,
+	Armed = 2,
+	Cancel = 3,
 }
 
 struct TimingWheels(T) {

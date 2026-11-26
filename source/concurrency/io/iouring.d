@@ -26,14 +26,14 @@ private auto smallestNthPowerOfTwo(T)(T t) {
 /// To create an IOUringContext use the static `construct` method, passing in the
 /// size of the sqe and cqe buffers.
 struct IOUringContext {
-    import concurrency.scheduler : Timer, TimingWheels, TimerCommand;
+    import concurrency.scheduler : Timer, TimerData, TimingWheels, TimerCommand;
     import core.time : msecs, Duration;
     import core.thread : ThreadID;
     import std.process : thisThreadID;
     import std.typecons : Nullable;
 
     private MPSCQueue!(Item) requests;
-    private MPSCQueue!(Timer) timers;
+    private MPSCQueue!(TimerData) timers;
     private Queue!(Item) pending;
     private ptrdiff_t totalSubmitted;
     private ptrdiff_t newlySubmitted;
@@ -62,7 +62,7 @@ struct IOUringContext {
             );
         event = eventfd(0, EFD_CLOEXEC);
         requests = new MPSCQueue!(Item);
-        timers = new MPSCQueue!(Timer);
+        timers = new MPSCQueue!(TimerData);
         wheels.initialize();
         threadId = thisThreadID;
         needsWakeup = true;
@@ -112,7 +112,7 @@ struct IOUringContext {
     }
 
     private void addTimer(ref Timer timer) @trusted shared {
-        timers.push(&timer);
+        timers.push(&timer.userdata);
         wakeup();
     }
 
@@ -122,8 +122,15 @@ struct IOUringContext {
     }
 
     private void cancelTimer(ref Timer timer) @trusted shared {
-        timer.command = TimerCommand.Cancel;
-        timers.push(&timer);
+        import core.atomic : cas, MemoryOrder;
+
+        if (!cas!(MemoryOrder.acq_rel, MemoryOrder.acq)(
+                &timer.command, TimerCommand.Register, TimerCommand.Cancel)) {
+            if (!cas!(MemoryOrder.acq_rel, MemoryOrder.acq)(
+                    &timer.command, TimerCommand.Armed, TimerCommand.Cancel))
+                return;
+            timers.push(&timer.userdata);
+        }
         wakeup();
     }
 
@@ -203,21 +210,23 @@ struct IOUringContext {
         return 0;
     }
 
-    private void scheduleTimers() @safe nothrow {
+    private void scheduleTimers() @trusted nothrow {
         import std.datetime.systime : Clock;
         import core.time : hnsecs;
         import concurrency.scheduler : TimerTrigger;
 
-        Queue!(Timer) items;
+        Queue!(TimerData) items;
         items.append(timers.popAll());
 
         if (!items.empty)
             dirtyTimers = true;
 
         while (!items.empty) {
-            auto timer = items.pop();
+            auto timer = timerFor(items.pop());
 
-            if (timer.command == TimerCommand.Register) {
+            import core.atomic : cas, MemoryOrder;
+            if (cas!(MemoryOrder.acq_rel, MemoryOrder.acq)(
+                    &timer.command, TimerCommand.Register, TimerCommand.Armed)) {
                 auto real_now = Clock.currStdTime;
                 auto tw_now = wheels.currStdTime(tickSize);
                 auto delay = (real_now - tw_now).hnsecs;
@@ -225,7 +234,7 @@ struct IOUringContext {
                 wheels.schedule(timer, at);
             } else {
                 wheels.cancel(timer);
-                timer.userdata(TimerTrigger.cancel);
+                timer.userdata.callback(TimerTrigger.cancel);
             }
         }
     }
@@ -241,7 +250,7 @@ struct IOUringContext {
             dirtyTimers = true;
             while (t !is null) {
                 auto next = t.next;
-                t.userdata(TimerTrigger.trigger);
+                t.userdata.callback(TimerTrigger.trigger);
                 t = next;
             }
         }
@@ -336,6 +345,11 @@ struct IOUringContext {
             io.popFront();
         }
     }
+
+    private static Timer* timerFor(TimerData* data) @trusted nothrow {
+        static assert(Timer.userdata.offsetof == 0);
+        return cast(Timer*) data;
+    }
 }
 
 /// very simple single linked list used for pending items in IOUringContext.
@@ -349,7 +363,7 @@ private struct Queue(Node) {
 
     Node* pop() {
         auto res = tail;
-        tail = tail.next;
+        tail = cast(Node*) tail.next;
         return res;
     }
 
@@ -358,7 +372,7 @@ private struct Queue(Node) {
             head = chain.head;
             tail = chain.tail;
         } else {
-            head.next = chain.tail;
+            head.next = cast(typeof(head.next)) chain.tail;
             head = chain.head;
         }
     }

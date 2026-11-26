@@ -135,7 +135,7 @@ package struct LocalThreadWorker {
 
 	private bool removeTimer(RemoveTimer cmd) {
 		auto removed = executor.wheels.cancel(cmd.timer);
-		cmd.timer.userdata(TimerTrigger.cancel);
+		cmd.timer.userdata.callback(TimerTrigger.cancel);
 		return removed;
 	}
 
@@ -185,7 +185,7 @@ package struct LocalThreadWorker {
 					executor.wheels.advance(advance, t);
 					while (t !is null) {
 						auto next = t.next;
-						t.userdata(TimerTrigger.trigger);
+						t.userdata.callback(TimerTrigger.trigger);
 						t = next;
 					}
 				}
@@ -226,8 +226,10 @@ package struct LocalThreadWorker {
 
 		auto cmd = RemoveTimer(&timer);
 		if (isInContext) {
-			if (removeTimer(cmd))
+			if (executor.wheels.cancel(cmd.timer)) {
+				cmd.timer.userdata.callback(TimerTrigger.cancel);
 				return;
+			}
 			// if the timer is still in the queue, rewrite the queue node to a Noop
 			auto nodes = executor.queue[].find!((node) {
 				return node.payload.match!((AddTimer t) {
@@ -238,6 +240,7 @@ package struct LocalThreadWorker {
 			if (!nodes.empty) {
 				nodes.front.payload = WorkItem(Noop());
 			}
+			cmd.timer.userdata.callback(TimerTrigger.cancel);
 		} else
 			executor.queue.push(new WorkNode(WorkItem(cmd)));
 	}

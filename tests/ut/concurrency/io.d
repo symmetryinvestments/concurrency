@@ -6,7 +6,7 @@ import concurrency.scheduler;
 import concurrency;
 import concurrency.operations;
 import std.typecons : tuple;
-import core.time : msecs;
+import core.time : msecs, seconds;
 
 version (linux):
 
@@ -48,6 +48,19 @@ unittest {
             ScheduleAfter(1.msecs).then(() => 2)
         )
     ).syncWait().value.should == tuple(1,2);
+}
+
+@safe
+@("ScheduleAfter.cancel-before-drain")
+unittest {
+    import concurrency.sender : delay, justFrom;
+    shared source = StopSource();
+    auto io = IOContext.construct(12);
+
+    io.run(whenAll(
+        delay(1.seconds),
+        justFrom(() shared => source.stop),
+    )).syncWait(source).isCancelled.shouldBeTrue();
 }
 
 @safe

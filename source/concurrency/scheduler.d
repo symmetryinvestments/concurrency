@@ -54,8 +54,12 @@ alias TimerDelegate = void delegate(TimerTrigger) @safe shared nothrow;
 
 import concurrency.timingwheels : ListElement;
 static import concurrency.timingwheels;
-alias Timer = ListElement!(TimerDelegate);
-alias TimingWheels = concurrency.timingwheels.TimingWheels!(TimerDelegate);
+struct TimerData {
+	TimerDelegate callback;
+	shared TimerData* next;
+}
+alias Timer = ListElement!TimerData;
+alias TimingWheels = concurrency.timingwheels.TimingWheels!TimerData;
 public import concurrency.timingwheels : TimerCommand;
 
 auto localThreadScheduler() {
@@ -124,10 +128,11 @@ struct ScheduleAfterOp(Worker, Receiver) {
 	import concurrency.receiver : setValueOrError;
 
 	enum Flags {
-		locked = 0x0,
-		stop = 0x1,
-		triggered = 0x2,
-		setup = 0x4,
+		locked = 0,
+		stop = 1,
+		triggered = 2,
+		canceled = 4,
+		setup = 8,
 	}
 
 	Worker worker;
@@ -160,39 +165,49 @@ struct ScheduleAfterOp(Worker, Receiver) {
 		stopCb.register(token, cast(void delegate() nothrow @safe shared) &stop);
 
 		try {
-			timer.userdata = cast(void delegate(TimerTrigger) @safe shared nothrow) &trigger;
+			timer.userdata.callback = cast(TimerDelegate) &trigger;
 			worker.addTimer(timer);
 		} catch (Throwable e) {
+			stopCb.dispose();
 			receiver.setError(e);
 			return;
 		}
 
 		with (flags.add(Flags.setup)) {
-			if (has(Flags.stop)) {
+			if (has(Flags.canceled)) {
+				stopCb.dispose();
+				receiver.setDone();
+			} else if (has(Flags.stop)) {
 				try {
 					worker.cancelTimer(timer);
 				} catch (Throwable e) {} // TODO: what to do here?
-			}
-
-			if (has(Flags.triggered)) {
+			} else if (has(Flags.triggered)) {
+				stopCb.dispose();
 				receiver.setValueOrError();
 			}
 		}
 	}
 
 	private void trigger(TimerTrigger cause) @trusted nothrow {
-		with (flags.add(Flags.triggered)) {
-			if (!has(Flags.setup))
-				return;
-			stopCb.dispose();
-			final switch (cause) {
-				case TimerTrigger.cancel:
+		final switch (cause) {
+			case TimerTrigger.cancel:
+				with (flags.add(Flags.canceled)) {
+					if (!has(Flags.setup))
+						return;
+					stopCb.dispose();
 					receiver.setDone();
-					break;
-				case TimerTrigger.trigger:
+				}
+				break;
+			case TimerTrigger.trigger:
+				with (flags.add(Flags.triggered)) {
+					if (!has(Flags.setup))
+						return;
+					if (has(Flags.stop))
+						return;
+					stopCb.dispose();
 					receiver.setValueOrError();
-					break;
-			}
+				}
+				break;
 		}
 	}
 
@@ -202,11 +217,12 @@ struct ScheduleAfterOp(Worker, Receiver) {
 				return;
 			}
 
-			if (!has(Flags.triggered)) {
-				try {
-					worker.cancelTimer(timer);
-				} catch (Throwable e) {} // TODO: what to do here?
-			}
+			if (has(Flags.triggered))
+				return;
+
+			try {
+				worker.cancelTimer(timer);
+			} catch (Throwable e) {} // TODO: what to do here?
 		}
 	}
 }
@@ -290,7 +306,7 @@ class ManualTimeWorker {
 			wheels.cancel(&timer);
 		}
 
-		timer.userdata(TimerTrigger.cancel);
+		timer.userdata.callback(TimerTrigger.cancel);
 	}
 
 	Nullable!Duration timeUntilNextEvent() @trusted shared {
@@ -310,7 +326,7 @@ class ManualTimeWorker {
 				wheels.advance(incr, t);
 				while (t !is null) {
 					auto next = t.next;
-					t.userdata(TimerTrigger.trigger);
+					t.userdata.callback(TimerTrigger.trigger);
 					t = next;
 				}
 			}
